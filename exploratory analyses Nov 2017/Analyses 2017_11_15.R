@@ -1,7 +1,5 @@
 
 
-
-
 ## Load required libraries
 library(tidyverse)
 library(ggplot2)
@@ -26,6 +24,8 @@ library(factoextra)
 
 setwd("E:/Dropbox/Projects/2017 - Common garden/analyses/exploratory analyses Nov 2017")
 
+setwd("~/Dropbox/Projects/2017 - Common garden/analyses/exploratory analyses Nov 2017")
+
 ## Load in california outline
 cali_outline <- readShapePoly("../data/california_outline/california_outline.shp",
                               proj4string = CRS("+proj=longlat +datum=WGS84"))
@@ -34,7 +34,7 @@ lobata_range <- readShapePoly("../data/valley oak range/querloba.shp",
 
 
 ### Load in garden data 
-  dat_all <- read_csv("../data/cleaned data/Growth data  2016_2017 census 2017_11_13.csv")
+  dat_all <- read_csv("../data/cleaned data/Growth data  2016_2017 census 2017_11_15.csv")
   dat_all$lat <- NULL; dat_all$lon <- NULL; dat_all$elev <- NULL ## Clean up before merge
   
   ## Read in climate data of individuals and merge with 
@@ -56,6 +56,12 @@ garden_climate <- garden_climate %>%
 
 ### Converting row and column numbers to XY locations
 
+  ## Check for duplicate locations within each section - should all be 0
+   sum(table(dat_all$row[dat_all$section == "block1"], dat_all$column[dat_all$section == "block1"]) > 1)
+   sum(table(dat_all$row[dat_all$section == "north"], dat_all$column[dat_all$section == "north"]) > 1 )
+   sum(table(dat_all$row[dat_all$section == "north_annex"], dat_all$column[dat_all$section == "north_annex"]) > 1)
+   sum(table(dat_all$row[dat_all$section == "placerville"], dat_all$column[dat_all$section == "placerville"]) > 1)
+  
 dat_all$row_orig <- dat_all$row
 dat_all$row <- as.numeric(factor(dat_all$row, 
                                  levels = rev(c( "A","B","C","D","E","F","G","H","I","J","K","L","M",
@@ -85,23 +91,53 @@ table(test$row)
 
 dat_all$row[dat_all$section == "north"] <- dat_all$row[dat_all$section == "north"] + 50
 dat_all$row[dat_all$section == "north_annex"] <- dat_all$row[dat_all$section == "north_annex"] + 100
-dat_all$row[dat_all$section == "placerville"] <- dat_all$row[dat_all$section == "placerville"] + 150
+dat_all$row[dat_all$section == "placerville"] <- dat_all$row[dat_all$section == "placerville"] + 250
 
 plot(dat_all$column, dat_all$row, pch = 22)
 
 
+### Replace max heights to normal heights if higher
+for(i in 1:nrow(dat_all)){
+  if(!is.na(dat_all$height_max_2017[i])){
+    if(dat_all$height_max_2017[i] > dat_all$height_2017[i]){
+      dat_all$height_2017[i] <- dat_all$height_max_2017[i]
+    }
+  }
+  if(!is.na(dat_all$height_max_2016[i])){
+    if(dat_all$height_max_2016[i] > dat_all$height_2016[i]){
+      dat_all$height_2016[i] <- dat_all$height_max_2016[i]
+    }
+  }
+}
+
+
+#### Round height values to the nearest 5
+  dat_all$height_2016 <- round(dat_all$height_2016 / 5) * 5
+  dat_all$height_2017 <- round(dat_all$height_2017 / 5) * 5
+
+
+## Calculate relative growth rates
+  
+  dat_all$rgr <- (log(dat_all$height_2017) - log(dat_all$height_2016))/1
+  
+  summary(dat_all$rgr)
+  
+  # View(dat_all[dat_all$rgr < -1 & !is.na(dat_all$rgr), ])
+  # 
+  # View(dat_all[dat_all$rgr > 1 & !is.na(dat_all$rgr), ])
+  
 
 
 ## Exclude trees that died of things like gophers or are shaded by trees
-# dat_all <- dat_all[-which(dat_all$exclude == "y"), ]
+dat_all <- dat_all[-which(dat_all$exclude == "y"), ]
 
-## Change to NA outlier values in height
-# 
-# dat_all$height[dat_all$height <= quantile(dat_all$height, 0.05, na.rm = TRUE) | 
-#                    dat_all$height >= quantile(dat_all$height, 0.95, na.rm = TRUE)] <- NA
-# 
-# 
-# 
+## Change to NA outlier values in relative growth rate
+
+dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.05, na.rm = TRUE) |
+                   dat_all$rgr >= quantile(dat_all$rgr, 0.95, na.rm = TRUE)] <- NA
+
+
+
 
 ## Calculate season variables
 
@@ -331,7 +367,7 @@ elev_mean <- mean(dat_all_pca$elev)
 dat_all_pca$elev <- (dat_all_pca$elev - elev_mean) / elev_sd
 
 ### PC model
-fit = lmer(height_2017  ~ PC1 + I(PC1^2) +
+fit = lmer(rgr  ~ PC1 + I(PC1^2) +
              + PC2 + I(PC2^2)  
            + PC3 + I(PC3^2) 
            + PC4 + I(PC4^2)
@@ -347,6 +383,89 @@ fit = lmer(height_2017  ~ PC1 + I(PC1^2) +
            + (1 | prov) + (1 | mom), 
            data = dat_all_pca)
 
+
+######## Testing models
+
+dat_sub <- dat_all_pca[dat_all_pca$section == "placerville" & !is.na(dat_all_pca$rgr),]
+
+library(nlme)
+
+fit = lme(rgr ~1,
+          random = list( ~ 1 | block, ~ 1 |  prov, ~ 1 | mom) ,
+                            data = dat_sub)
+
+fit = lme(rgr ~1,
+          random = list( pdIdent(~ prov)) ,
+          data = dat_sub)
+one = rep(1, length(dat_sub$rgr))
+fit = lme(rgr ~1,
+          random = pdBlocked(list(pdIdent(~block-1), pdIdent(~prov-1),
+                                  pdIdent(~mom-1))) ,
+          data = dat_sub)
+
+summary(fit)
+
+fit_exp <- update(fit,  corr = corExp(form = ~row + column, nugget = TRUE))
+summary(fit_exp)
+
+fit_gaus <- update(fit,  corr = corGaus(form=~row + column, nugget = TRUE))
+summary(fit_gaus)
+
+# fit_lin <- update(fit, corr = corLin(form = ~row + column, nugget = TRUE))
+# summary(fit_lin)
+
+anova(fit, fit_exp, fit_gaus)
+
+### SPAMM TESTING
+
+library(spaMM)
+
+dat_test <- as.data.frame(dat_sub[, c("rgr", "prov", "block", "mom", "row", "column")])
+
+fit <- HLfit(rgr ~ 1 + (1|block) + (1|prov) + (1|mom)  + Matern(1|row+column), data = dat_test)
+
+summary(fit)
+
+plot(fit)
+
+
+plot(Variogram(fit, resType = "normalized"))
+
+
+residuals(fit)
+
+resids <- data.frame(y = dat_sub$row[!is.na(dat_sub$rgr)], 
+                     x = dat_sub$column[!is.na(dat_sub$rgr)], 
+                     resids = residuals(fit))
+coordinates(resids) <- c("x", "y")
+
+bubble(resids, zcol = "resids")
+
+
+## Variogram
+library(gstat)
+
+vario <- variogram(resids ~ 1, data = resids)
+plot(vario)
+
+library(ncf)
+
+plot(spline.correlog(x = resids$x, y = resids$y, z = resids$resids, resamp = 0))
+
+
+## Moran's I
+dists <- as.matrix(dist(cbind(resids$x, resids$y)))
+
+dists.inv <- 1/dists
+diag(dists.inv) <- 0
+
+library(ape)
+
+Moran.I(resids$resids, dists.inv)
+
+
+## Model summary
+
 summary(fit)
 print(r.squaredGLMM(fit))
 sjp.lmer(fit, type = "fe", p.kr = FALSE)
@@ -361,7 +480,7 @@ for( var in climate_vars_dif){
 }
 
 
-fit = lmer(height_2017  ~ CMD_dif + I(CMD_dif^2) +
+fit = lmer(rgr  ~ CMD_dif + I(CMD_dif^2) +
              + MWMT_dif + I(MWMT_dif^2)  
            + MCMT_dif + I(MCMT_dif^2) 
            + DD5_dif  + I(DD5_dif^2)
