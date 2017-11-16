@@ -384,84 +384,37 @@ fit = lmer(rgr  ~ PC1 + I(PC1^2) +
            data = dat_all_pca)
 
 
-######## Testing models
 
-dat_sub <- dat_all_pca[dat_all_pca$section == "placerville" & !is.na(dat_all_pca$rgr),]
-
-library(nlme)
-
-fit = lme(rgr ~1,
-          random = list( ~ 1 | block, ~ 1 |  prov, ~ 1 | mom) ,
-                            data = dat_sub)
-
-fit = lme(rgr ~1,
-          random = list( pdIdent(~ prov)) ,
-          data = dat_sub)
-one = rep(1, length(dat_sub$rgr))
-fit = lme(rgr ~1,
-          random = pdBlocked(list(pdIdent(~block-1), pdIdent(~prov-1),
-                                  pdIdent(~mom-1))) ,
-          data = dat_sub)
-
-summary(fit)
-
-fit_exp <- update(fit,  corr = corExp(form = ~row + column, nugget = TRUE))
-summary(fit_exp)
-
-fit_gaus <- update(fit,  corr = corGaus(form=~row + column, nugget = TRUE))
-summary(fit_gaus)
-
-# fit_lin <- update(fit, corr = corLin(form = ~row + column, nugget = TRUE))
-# summary(fit_lin)
-
-anova(fit, fit_exp, fit_gaus)
-
-### SPAMM TESTING
-
-library(spaMM)
-
-dat_test <- as.data.frame(dat_sub[, c("rgr", "prov", "block", "mom", "row", "column")])
-
-fit <- HLfit(rgr ~ 1 + (1|block) + (1|prov) + (1|mom)  + Matern(1|row+column), data = dat_test)
-
-summary(fit)
-
-plot(fit)
-
-
-plot(Variogram(fit, resType = "normalized"))
-
-
-residuals(fit)
-
-resids <- data.frame(y = dat_sub$row[!is.na(dat_sub$rgr)], 
-                     x = dat_sub$column[!is.na(dat_sub$rgr)], 
-                     resids = residuals(fit))
-coordinates(resids) <- c("x", "y")
-
-bubble(resids, zcol = "resids")
-
-
-## Variogram
-library(gstat)
-
-vario <- variogram(resids ~ 1, data = resids)
-plot(vario)
-
-library(ncf)
-
-plot(spline.correlog(x = resids$x, y = resids$y, z = resids$resids, resamp = 0))
-
-
-## Moran's I
-dists <- as.matrix(dist(cbind(resids$x, resids$y)))
-
-dists.inv <- 1/dists
-diag(dists.inv) <- 0
-
-library(ape)
-
-Moran.I(resids$resids, dists.inv)
+## Spatial autocorrelation in residuals
+# 
+#     resids <- data.frame(y = dat_all_pca$row[!is.na(dat_all_pca$rgr)], 
+#                          x = dat_all_pca$column[!is.na(dat_all_pca$rgr)], 
+#                          resids = residuals(fit))
+#     coordinates(resids) <- c("x", "y")
+#     
+#     bubble(resids, zcol = "resids")
+#     
+#     
+#     ## Variogram
+#     library(gstat)
+#     
+#     vario <- variogram(resids ~ 1, data = resids)
+#     plot(vario)
+#     
+#     library(ncf)
+#     
+#     plot(spline.correlog(x = resids$x, y = resids$y, z = resids$resids, resamp = 0))
+#     
+#     
+#     ## Moran's I
+#     dists <- as.matrix(dist(cbind(resids$x, resids$y)))
+#     
+#     dists.inv <- 1/dists
+#     diag(dists.inv) <- 0
+#     
+#     library(ape)
+#     
+#     Moran.I(resids$resids, dists.inv)
 
 
 ## Model summary
