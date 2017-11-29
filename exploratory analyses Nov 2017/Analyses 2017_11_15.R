@@ -7,6 +7,7 @@ library(ggplot2)
 #install_github("ujjwalkarn/xda")
 library(xda)
 library(maptools)
+library(scatterpie)
 
 library(lme4)
 library(MuMIn)
@@ -21,6 +22,11 @@ library(raster)
 library(rasterVis)
 library(ggfortify)
 library(factoextra)
+
+#devtools::install_github('royfrancis/pophelper')
+library(pophelper) ## For admixture results
+
+
 
 setwd("E:/Dropbox/Projects/2017 - Common garden/analyses/exploratory analyses Nov 2017")
 
@@ -138,6 +144,114 @@ dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.05, na.rm = TRUE) |
 
 
 
+
+#########
+### Reading in GBS clustering data
+
+
+## Admixture results
+## Read in Admixture ancestry estimates
+
+  admix_results <- read.table("../data/GBS data/gbs451.GDP4.AN50.biallelic.QD10.filtered.final.recode.pruned_ld.3.Q")
+
+  
+  ## Read in family names output from PLINK/Admixture
+  admix_moms <- read_delim("../data/GBS data/gbs451.GDP4.AN50.biallelic.QD10.filtered.final.recode.pruned_ld.fam", delim = " ", col_names = FALSE)
+  
+ 
+  admix_results <- cbind(admix_moms$X1, admix_results)
+  colnames(admix_results) <- c("mom", "cluster1", "cluster2", "cluster3")
+  admix_results$mom <- as.character(admix_results$mom)
+  head(admix_results)
+  
+  ## Read in datasheet that has provenance names of each individual with GBS data
+  ## This datasheet was made my ham
+  admix_moms_provs <- read_delim("../data/GBS data/gbs451 samples provenance list.txt", delim = "\t")
+  
+  ## Join with admix_results
+  
+  admix_results <- left_join(admix_results, admix_moms_provs)
+  sum(is.na(admix_results$prov)) ## Should equal to 0 - might have changed since NOV prov format gets messed up by excel and changed to date
+  # View(admix_results[is.na(admix_results$prov), ])
+  
+  
+  ### Average cluster assignment at the provenance level
+  ## So that we are able to use information from samples across the provenance instead of just samples that have maternal trees in the common garden
+  
+  admix_results_avg = admix_results %>% 
+    group_by(prov) %>%
+    dplyr::select(prov, cluster1, cluster2, cluster3) %>%
+    summarise_all(mean, na.rm = TRUE) %>%
+    rename(cluster1_avg = cluster1, cluster2_avg = cluster2, cluster3_avg = cluster3)
+  
+  # barplot(t(as.matrix(admix_results[, c(2,3,4)])), col=rainbow(3),
+  #         xlab="Individual #", ylab="Ancestry", names.arg = admix_results$prov)
+  # 
+  
+  
+# ### Read in GBS codes with lat long to match up with ADMIXTURE results
+#   
+#   gbs_moms_info <- read_csv("../data/GBS data/GBS Trees info 2017_Master.csv")
+#   gbs_moms_info$mom <- paste(gbs_moms_info$`Site Abbreviation`, gbs_moms_info$`Mother Plant Field ID`,
+#                              sep = "")
+#   
+#   
+#   ## Join with lat long info 
+#   admix_results <- left_join(admix_results, gbs_moms_info)
+#   
+#   ## Count number of samples for each prov
+#   
+#   admix_results <- admix_results %>%
+#     dplyr::filter(!is.na(cluster1)) %>%
+#     group_by(`Site Abbreviation`) %>%
+#     count() %>%
+#     rename(gbs_sample_count = n) %>%
+#     left_join(admix_results, .)
+#   
+
+  #View(admix_results)
+  
+  ## Look at individuals with GBS data that didn't match up
+  
+  #View(admix_results[is.na(admix_results$Latitude), ])
+  
+  ## Joine back with main dataset
+  
+  dat_all <- left_join(dat_all, admix_results_avg, by = "prov")
+  
+
+  ## Assign cluster based on majority assignment
+  
+  dat_all$cluster_assigned <- NA
+  dat_all$cluster_assigned[dat_all$cluster1_avg > 0.50 & !is.na(dat_all$cluster1_avg)] <- "1"
+  dat_all$cluster_assigned[dat_all$cluster2_avg > 0.50 & !is.na(dat_all$cluster2_avg)] <- "2"
+  dat_all$cluster_assigned[dat_all$cluster3_avg > 0.50 & !is.na(dat_all$cluster3_avg)] <- "3"
+
+  table(dat_all$cluster_assigned)
+  
+  dat_all$cluster_assigned <- factor(dat_all$cluster_assigned)
+  
+  boxplot(rgr ~ cluster_assigned, dat_all)
+  
+  ## How many seedlings not assigned?
+  sum(is.na(dat_all$cluster_assigned)) # 1360
+  
+  
+  ### Plot circle graph onto map of population assignment
+  
+  cali_fort <- fortify(cali_outline) ## Fortify to print california outline
+  
+  dat_all_prov_avg <- dat_all %>% ## Average across provenances
+    group_by(prov) %>%
+    summarise_all(mean, na.rm = T)
+  
+  ## Make plot
+  ggplot() + geom_scatterpie(aes(x = lon, y = lat, group = prov), data = dat_all_prov_avg,
+                             cols = c("cluster1_avg", "cluster2_avg")) +
+                             coord_equal() + 
+    geom_path(data = cali_fort, aes(x = long, y = lat, group = group )) +
+    theme_bw()
+  
 
 ## Calculate season variables
 
@@ -367,7 +481,7 @@ elev_mean <- mean(dat_all_pca$elev)
 dat_all_pca$elev <- (dat_all_pca$elev - elev_mean) / elev_sd
 
 ### PC model
-fit = lmer(rgr  ~ PC1 + I(PC1^2) +
+fit_nocluster = lmer(rgr  ~ PC1 + I(PC1^2) +
              + PC2 + I(PC2^2)  
            + PC3 + I(PC3^2) 
            + PC4 + I(PC4^2)
@@ -381,41 +495,36 @@ fit = lmer(rgr  ~ PC1 + I(PC1^2) +
            #   + site
              + (1 | block) # + (1 | site) 
            + (1 | prov) + (1 | mom), 
-           data = dat_all_pca)
+           data = dat_all_pca[!is.na(dat_all_pca$cluster_assigned),])
 
 
 
-## Spatial autocorrelation in residuals
-# 
-#     resids <- data.frame(y = dat_all_pca$row[!is.na(dat_all_pca$rgr)], 
-#                          x = dat_all_pca$column[!is.na(dat_all_pca$rgr)], 
-#                          resids = residuals(fit))
-#     coordinates(resids) <- c("x", "y")
-#     
-#     bubble(resids, zcol = "resids")
-#     
-#     
-#     ## Variogram
-#     library(gstat)
-#     
-#     vario <- variogram(resids ~ 1, data = resids)
-#     plot(vario)
-#     
-#     library(ncf)
-#     
-#     plot(spline.correlog(x = resids$x, y = resids$y, z = resids$resids, resamp = 0))
-#     
-#     
-#     ## Moran's I
-#     dists <- as.matrix(dist(cbind(resids$x, resids$y)))
-#     
-#     dists.inv <- 1/dists
-#     diag(dists.inv) <- 0
-#     
-#     library(ape)
-#     
-#     Moran.I(resids$resids, dists.inv)
 
+### PC model
+fit = lmer(rgr  ~ PC1*cluster_assigned + I(PC1^2)*cluster_assigned 
+             + PC2*cluster_assigned + I(PC2^2)*cluster_assigned  
+           + PC3*cluster_assigned + I(PC3^2) *cluster_assigned
+           + PC4*cluster_assigned  + I(PC4^2)*cluster_assigned
+           + cluster_assigned
+           + (1 | block)
+           + (1 | prov) + (1 | mom), 
+           data = dat_all_pca[!is.na(dat_all_pca$cluster_assigned),])
+
+
+
+fit = lmer(rgr  ~ PC1 + I(PC1^2) 
+           + PC2 + I(PC2^2)  
+           + PC3 + I(PC3^2) 
+           + PC4  + I(PC4^2)
+           + (1 | block)
+           + (1 | prov) + (1 | mom)
+           + (PC1 | cluster_assigned) + (PC2 | cluster_assigned) + + (PC3| cluster_assigned)
+           + (PC4 | cluster_assigned), 
+           data = dat_all_pca[!is.na(dat_all_pca$cluster_assigned),])
+
+anova(fit, fit_nocluster)
+
+ranef(fit)
 
 ## Model summary
 
@@ -424,8 +533,12 @@ print(r.squaredGLMM(fit))
 sjp.lmer(fit, type = "fe", p.kr = FALSE)
 sjp.lmer(fit, type = "eff")
 
+sjp.int(fit)
 
-### INDIVIDUAL CLIMATE MODEL
+
+
+
+
 ### Scaling climate variables
 
 for( var in climate_vars_dif){
@@ -433,10 +546,11 @@ for( var in climate_vars_dif){
 }
 
 
-fit = lmer(rgr  ~ CMD_dif + I(CMD_dif^2) +
-             + MWMT_dif + I(MWMT_dif^2)  
-           + MCMT_dif + I(MCMT_dif^2) 
-           + DD5_dif  + I(DD5_dif^2)
+fit = lmer(rgr  ~ CMD_dif*cluster_assigned  + I(CMD_dif^2) +
+             + MWMT_dif*cluster_assigned  + I(MWMT_dif^2)  
+           + MCMT_dif*cluster_assigned  + I(MCMT_dif^2) 
+           + DD5_dif*cluster_assigned   + I(DD5_dif^2)
+           + cluster_assigned +
            # + elev + I(elev^2)
            # + elev*CMD_dif + elev*I(CMD_dif^2)
            # + elev*MCMT_dif + elev*I(MCMT_dif^2)
@@ -453,6 +567,8 @@ summary(fit)
 print(r.squaredGLMM(fit))
 sjp.lmer(fit, type = "fe", p.kr = FALSE)
 sjp.lmer(fit, type = "eff")
+
+sjp.int(fit)
 
 #sjp.glmer(fit, type = "ma")
 
@@ -846,13 +962,6 @@ summary(temp)
 
 
 
-```
-
-
-
-
-```{r, random_forest}
-
 library(randomForest)
 
 
@@ -873,5 +982,41 @@ varImpPlot(branches_rf)
 
 
 
-```
+#############################################
+###### GRAVEYARD
+
+
+
+## Spatial autocorrelation in residuals
+# 
+#     resids <- data.frame(y = dat_all_pca$row[!is.na(dat_all_pca$rgr)], 
+#                          x = dat_all_pca$column[!is.na(dat_all_pca$rgr)], 
+#                          resids = residuals(fit))
+#     coordinates(resids) <- c("x", "y")
+#     
+#     bubble(resids, zcol = "resids")
+#     
+#     
+#     ## Variogram
+#     library(gstat)
+#     
+#     vario <- variogram(resids ~ 1, data = resids)
+#     plot(vario)
+#     
+#     library(ncf)
+#     
+#     plot(spline.correlog(x = resids$x, y = resids$y, z = resids$resids, resamp = 0))
+#     
+#     
+#     ## Moran's I
+#     dists <- as.matrix(dist(cbind(resids$x, resids$y)))
+#     
+#     dists.inv <- 1/dists
+#     diag(dists.inv) <- 0
+#     
+#     library(ape)
+#     
+#     Moran.I(resids$resids, dists.inv)
+
+
 
