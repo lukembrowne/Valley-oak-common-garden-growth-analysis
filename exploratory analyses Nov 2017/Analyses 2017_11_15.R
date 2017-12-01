@@ -1,5 +1,4 @@
 
-
 ## Load required libraries
 library(tidyverse)
 library(ggplot2)
@@ -126,7 +125,17 @@ for(i in 1:nrow(dat_all)){
   
   dat_all$rgr <- (log(dat_all$height_2017) - log(dat_all$height_2016))/1
   
+  dat_all$rgr <- (dat_all$height_2017 - dat_all$height_2016) / dat_all$height_2016
+  
+  
   summary(dat_all$rgr)
+  
+  plot(jitter(dat_all$height_2016), jitter(dat_all$height_2017), pch = 19, cex = 0.5, las = 1)
+  abline(a = 0, b = 1, lwd = 2, col = "steelblue")
+  
+  
+  plot(dat_all$height_2016, dat_all$rgr, pch = 19, cex = 0.5)
+  cor.test(dat_all$height_2016, dat_all$rgr)
   
   # View(dat_all[dat_all$rgr < -1 & !is.na(dat_all$rgr), ])
   # 
@@ -135,18 +144,17 @@ for(i in 1:nrow(dat_all)){
 
 
 ## Exclude trees that died of things like gophers or are shaded by trees
-dat_all <- dat_all[-which(dat_all$exclude == "y"), ]
+ dat_all <- dat_all[-which(dat_all$exclude == "y"), ]
 
-## Change to NA outlier values in relative growth rate
+ ## Change to NA outlier values in relative growth rate
+ dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.01, na.rm = TRUE) |
+               dat_all$rgr >= quantile(dat_all$rgr, 0.99, na.rm = TRUE)] <- NA
 
-dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.05, na.rm = TRUE) |
-                   dat_all$rgr >= quantile(dat_all$rgr, 0.95, na.rm = TRUE)] <- NA
-
-
+ 
 
 
 #########
-### Reading in GBS clustering data
+### Reading in GBS clustering and PCA results data
 
 
 ## Admixture results
@@ -154,13 +162,12 @@ dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.05, na.rm = TRUE) |
 
   admix_results <- read.table("../data/GBS data/gbs451.GDP4.AN50.biallelic.QD10.filtered.final.recode.pruned_ld.3.Q")
 
-  
   ## Read in family names output from PLINK/Admixture
   admix_moms <- read_delim("../data/GBS data/gbs451.GDP4.AN50.biallelic.QD10.filtered.final.recode.pruned_ld.fam", delim = " ", col_names = FALSE)
   
- 
   admix_results <- cbind(admix_moms$X1, admix_results)
-  colnames(admix_results) <- c("mom", "cluster1", "cluster2", "cluster3")
+  colnames(admix_results) <- c("mom", paste("cluster",
+                                            1:(ncol(admix_results)-1), sep = ""))
   admix_results$mom <- as.character(admix_results$mom)
   head(admix_results)
   
@@ -180,9 +187,11 @@ dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.05, na.rm = TRUE) |
   
   admix_results_avg = admix_results %>% 
     group_by(prov) %>%
-    dplyr::select(prov, cluster1, cluster2, cluster3) %>%
-    summarise_all(mean, na.rm = TRUE) %>%
-    rename(cluster1_avg = cluster1, cluster2_avg = cluster2, cluster3_avg = cluster3)
+    dplyr::select(prov, contains("cluster")) %>%
+    summarise_all(mean, na.rm = TRUE)
+  
+    ## Rename columns
+  colnames(admix_results_avg)[grep("cluster", colnames(admix_results_avg))] <- paste(colnames(admix_results_avg)[grep("cluster", colnames(admix_results_avg))], "_avg", sep = "" ) ## Rename columns
   
   # barplot(t(as.matrix(admix_results[, c(2,3,4)])), col=rainbow(3),
   #         xlab="Individual #", ylab="Ancestry", names.arg = admix_results$prov)
@@ -226,6 +235,9 @@ dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.05, na.rm = TRUE) |
   dat_all$cluster_assigned[dat_all$cluster1_avg > 0.50 & !is.na(dat_all$cluster1_avg)] <- "1"
   dat_all$cluster_assigned[dat_all$cluster2_avg > 0.50 & !is.na(dat_all$cluster2_avg)] <- "2"
   dat_all$cluster_assigned[dat_all$cluster3_avg > 0.50 & !is.na(dat_all$cluster3_avg)] <- "3"
+  dat_all$cluster_assigned[dat_all$cluster4_avg > 0.50 & !is.na(dat_all$cluster4_avg)] <- "4"
+  dat_all$cluster_assigned[dat_all$cluster5_avg > 0.50 & !is.na(dat_all$cluster5_avg)] <- "5"
+  
 
   table(dat_all$cluster_assigned)
   
@@ -242,17 +254,63 @@ dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.05, na.rm = TRUE) |
   cali_fort <- fortify(cali_outline) ## Fortify to print california outline
   
   dat_all_prov_avg <- dat_all %>% ## Average across provenances
+    mutate(cluster_assigned = as.numeric(cluster_assigned)) %>%
     group_by(prov) %>%
-    summarise_all(mean, na.rm = T)
+    summarise_all(mean, na.rm = T) %>%
+    mutate(cluster_assigned = factor(cluster_assigned))
   
   ## Make plot
-  ggplot() + geom_scatterpie(aes(x = lon, y = lat, group = prov), data = dat_all_prov_avg,
-                             cols = c("cluster1_avg", "cluster2_avg")) +
+  ggplot() + geom_scatterpie(aes(x = lon, y = lat, group = prov, r = .2),
+                             
+                             data = dat_all_prov_avg,
+                             cols = colnames(dplyr::select(dplyr::select(dat_all_prov_avg, 
+                                                                contains("cluster")),
+                                                  contains("_avg"))))+
                              coord_equal() + 
     geom_path(data = cali_fort, aes(x = long, y = lat, group = group )) +
     theme_bw()
   
+  ggplot(dat_all_prov_avg[dat_all_prov_avg$cluster_assigned != "NaN",]) + 
+    geom_point(aes(x = lon, y = lat, col = cluster_assigned), size = 3) +
+    coord_equal() + 
+    geom_path(data = cali_fort, aes(x = long, y = lat, group = group )) +
+    theme_bw()
+  
+  
 
+  
+#########  
+#### Read in PCA of SNPs
+  
+  gen_pca <- read_table("../data/GBS data/plink.eigenval", col_names = FALSE)
+  
+  gen_pca / sum(gen_pca)
+  
+  
+  gen_pca_vals <- read_tsv("../data/GBS data/plink.eigenvec")
+  
+  plot(gen_pca_vals$PC1, gen_pca_vals$PC2, pch = 19)
+  text(gen_pca_vals$PC1, gen_pca_vals$PC2, gen_pca_vals$FID)
+  
+  ## Join with provenance names and average across provenances - same as what's done with admixture
+  
+  pca_results <- left_join(gen_pca_vals, admix_moms_provs, by = c("FID" =  "mom"))
+  sum(is.na(pca_results$prov)) ## Should equal to 0 - might have changed since NOV prov format gets messed up by excel and changed to date
+
+  ### Average PCA Values for each provenance
+  ## So that we are able to use information from samples across the provenance instead of just samples that have maternal trees in the common garden
+  
+  pca_results_avg = pca_results %>% 
+    group_by(prov) %>%
+    dplyr::select(prov, PC1:PC20) %>%
+    summarise_all(mean, na.rm = TRUE) 
+  colnames(pca_results_avg)[grep("PC", colnames(pca_results_avg))] <- paste(colnames(pca_results_avg)[grep("PC", colnames(pca_results_avg))], "_avg", sep = "" ) ## Rename columns
+  
+  ## Join back with main dataset
+ dat_all <- left_join(dat_all, pca_results_avg)
+
+ 
+ 
 ## Calculate season variables
 
 ## Seedlings
@@ -313,7 +371,7 @@ climate_vars = colnames(
 
 ### Climate vars from previous sork papers
 
-climate_vars = c("CMD", "MWMT", "MCMT", "DD5")
+#climate_vars = c("CMD", "MWMT", "MCMT", "DD5")
 
 climate_vars_dif <- paste(climate_vars, "_dif", sep = "")
 
@@ -480,49 +538,38 @@ elev_mean <- mean(dat_all_pca$elev)
 
 dat_all_pca$elev <- (dat_all_pca$elev - elev_mean) / elev_sd
 
+dat_all_pca$height_2016_scaled <- (dat_all_pca$height_2016 - mean(dat_all_pca$height_2016, na.rm = T)) / sd(dat_all_pca$height_2016, na.rm = T)
+
 ### PC model
 fit_nocluster = lmer(rgr  ~ PC1 + I(PC1^2) +
              + PC2 + I(PC2^2)  
            + PC3 + I(PC3^2) 
-           + PC4 + I(PC4^2)
-           #   + elev + I(elev^2)
-           #      + PC5 + I(PC5^2)
-           # + elev*PC1 #+ elev*I(PC1^2)
-           # + elev*PC2 #+ elev*I(PC2^2)
-           # + elev*PC3 #+ elev*I(PC3^2)
-           #  + elev*PC4 #+ elev*I(PC4^2)
-           #    + block 
-           #   + site
-             + (1 | block) # + (1 | site) 
+           + height_2016_scaled
+           + (1 | block) # + (1 | site) 
            + (1 | prov) + (1 | mom), 
            data = dat_all_pca[!is.na(dat_all_pca$cluster_assigned),])
-
-
-
 
 ### PC model
 fit = lmer(rgr  ~ PC1*cluster_assigned + I(PC1^2)*cluster_assigned 
              + PC2*cluster_assigned + I(PC2^2)*cluster_assigned  
            + PC3*cluster_assigned + I(PC3^2) *cluster_assigned
-           + PC4*cluster_assigned  + I(PC4^2)*cluster_assigned
            + cluster_assigned
+           + height_2016_scaled
            + (1 | block)
            + (1 | prov) + (1 | mom), 
            data = dat_all_pca[!is.na(dat_all_pca$cluster_assigned),])
 
 
-
-fit = lmer(rgr  ~ PC1 + I(PC1^2) 
-           + PC2 + I(PC2^2)  
-           + PC3 + I(PC3^2) 
-           + PC4  + I(PC4^2)
+fit_pca = lmer(rgr  ~ PC1*PC2_avg + I(PC1^2)*PC2_avg 
+           + PC2*PC2_avg + I(PC2^2)*PC2_avg  
+           + PC3*PC2_avg + I(PC3^2) *PC2_avg
+           + height_2016_scaled
            + (1 | block)
-           + (1 | prov) + (1 | mom)
-           + (PC1 | cluster_assigned) + (PC2 | cluster_assigned) + + (PC3| cluster_assigned)
-           + (PC4 | cluster_assigned), 
+           + (1 | prov) + (1 | mom), 
            data = dat_all_pca[!is.na(dat_all_pca$cluster_assigned),])
 
-anova(fit, fit_nocluster)
+
+anova(fit, fit_nocluster, fit_pca)
 
 ranef(fit)
 
@@ -537,8 +584,6 @@ sjp.int(fit)
 
 
 
-
-
 ### Scaling climate variables
 
 for( var in climate_vars_dif){
@@ -548,19 +593,13 @@ for( var in climate_vars_dif){
 
 fit = lmer(rgr  ~ CMD_dif*cluster_assigned  + I(CMD_dif^2) +
              + MWMT_dif*cluster_assigned  + I(MWMT_dif^2)  
-           + MCMT_dif*cluster_assigned  + I(MCMT_dif^2) 
-           + DD5_dif*cluster_assigned   + I(DD5_dif^2)
-           + cluster_assigned +
-           # + elev + I(elev^2)
-           # + elev*CMD_dif + elev*I(CMD_dif^2)
-           # + elev*MCMT_dif + elev*I(MCMT_dif^2)
-           # + elev*MWMT_dif + elev*I(MWMT_dif^2)
-           # + elev*DD5_dif + elev*I(DD5_dif^2)
-           #   + block 
-           #  + site
-              + (1 | block) # + (1 | site) 
-           + (1 | prov) + (1 | mom), 
-           data = dat_all_pca)
+             + MCMT_dif*cluster_assigned  + I(MCMT_dif^2) 
+             + DD5_dif*cluster_assigned   + I(DD5_dif^2)
+             + cluster_assigned 
+             + height_2016_scaled   
+             + (1 | block) # + (1 | site) 
+             + (1 | prov) + (1 | mom), 
+             data = dat_all_pca)
 
 
 summary(fit)
@@ -962,25 +1001,457 @@ summary(temp)
 
 
 
+
+
+
+
+###############################
+##### Random forest testing
+
 library(randomForest)
+library(forestFloor)
+
+ran_for_data <- dat_all_pca %>%
+                dplyr::filter(site == "chico") %>%
+                dplyr::filter(!is.na(rgr), !is.na(cluster_assigned)) %>%
+                dplyr::select(rgr, cluster_assigned, block, height_2016_scaled,
+                              PC1_avg:PC5_avg, PC1:PC5,
+                            #  climate_vars_dif
+                              )
 
 
-branches_rf = randomForest(height ~ ., data = dat_all[!is.na(dat_all$branches_relative),
-                                                      c("height", "block",
-                                                        climate_vars_dif)],
+height_rf = randomForest(rgr ~ ., data = ran_for_data,
+                         keep.inbag= T,
                            importance = TRUE)
 
+height_rf
 
-branches_rf = randomForest(branches ~ ., data = dat_all_pca[!is.na(dat_all_pca$branches),
-                                                            c("branches", "PC1", "PC2", "PC3", "PC4", "PC5")],
-                           importance = TRUE)
-
-
-branches_rf
-
-varImpPlot(branches_rf)
+varImpPlot(height_rf)
 
 
+ff = forestFloor(
+  rf.fit = height_rf, # mandatory
+  X = ran_for_data, # mandatory
+  calc_np = FALSE, # TRUE or FALSE both works, makes no difference
+  binary_reg = FALSE # takes no effect here when rfo$type="regression"
+)
+
+#plot partial functions of most important variables first
+plot(ff, # forestFloor object
+    # plot_seq = 1:7, # optional sequence of features to plot
+     orderByImportance=TRUE # if TRUE index sequence by importance, else by X column
+)
+
+
+
+# library(ranger)
+# 
+# height_ranger <- ranger(rgr ~ ., data = ran_for_data, importance = "permutation")
+# 
+# sort(height_ranger$variable.importance, decreasing = T)
+# 
+# importance_pvalues(height_ranger)
+# 
+# height_ranger$r.squared
+# 
+
+library(gbm)
+library(dismo)
+
+
+gbm_data <- dat_all_pca %>%
+            dplyr::filter(!is.na(rgr)) %>%
+          #  dplyr::filter(!is.na(cluster_assigned)) %>%
+            dplyr::select(rgr, 
+                          #cluster1_avg:cluster3_avg,
+                          height_2016,
+                          PC1_avg:PC20_avg, 
+                          #PC1:PC5, 
+                          block, site,
+                        #   prov, mom,
+                            climate_vars_dif,
+            )
+names(gbm_data)[-1]
+
+
+# height_gbm = gbm(rgr ~ ., data = gbm_data, n.trees = 1000, shrinkage = 0.01,
+#                  interaction.depth = 5, bag.fraction = 0.5, train.fraction = 1.0,
+#                  cv.folds = 5, keep.data = TRUE, distribution = "gaussian")
+
+## Step function
+
+response <-  which(colnames(gbm_data) == "rgr")
+predictors <- which(colnames(gbm_data) %in% setdiff(names(gbm_data), c("rgr", "name")))
+
+## Step function
+height_gbm <- gbm.step(data = as.data.frame(gbm_data),
+                        gbm.y = response, gbm.x = predictors,
+                       tree.complexity = 5,
+                       learning.rate = 0.001, bag.fraction = 0.5,
+                       family = "gaussian")
+
+summary(height_gbm)
+
+## Simplify by dropping variables
+
+height_gbm_simp <- gbm.simplify(height_gbm, n.drops = 5)
+
+
+gbm.plot(height_gbm, n.plots = 12)
+
+gbm.plot.fits(height_gbm, v = 1:6)
+
+find.int <- gbm.interactions(height_gbm)
+
+find.int$interactions
+
+find.int$rank.list
+
+plot(gbm_data$rgr ~ gbm_data$mom)
+
+
+
+print(height_gbm)
+
+summary(height_gbm)
+
+gbm.perf(height_gbm, method = "OOB")
+gbm.perf(height_gbm, method = "test")
+
+best.iter <- gbm.perf(height_gbm, method="cv")
+print(best.iter)
+
+summary(height_gbm, best.iter)
+
+plot(height_gbm, 15, best.iter, las = 1, continuous.resolution = 1000)
+
+interact.gbm(height_gbm, gbm_data, i.var = c(5, 17), n.trees = best.iter)
+
+test = partial(height_gbm, "height_2016_scaled", n.trees = best.iter, grid.resolution = 100,
+        smooth = TRUE)
+
+plotPartial(test, smooth = TRUE)
+
+
+test = partial(height_gbm, c("PC5_avg", "height_2016_scaled"), n.trees = best.iter, grid.resolution = 100)
+plotPartial(test)
+
+
+
+
+
+###################
+library(xgboost)
+#install_github("AppliedDataSciencePartners/xgboostExplainer")
+library(xgboostExplainer)
+library(pdp)
+
+previous_na_action <- options('na.action')
+options(na.action='na.pass')
+# Do your stuff...
+
+boost_dat = sparse.model.matrix(rgr ~.-1, data = gbm_data, na.action = "na.pass")
+
+dim(boost_dat)
+
+options(na.action=previous_na_action$na.action)
+
+xg <- xgb.cv(data = boost_dat, label = gbm_data$rgr, objective = "reg:linear", 
+             nfold = 3, nrounds = 2)
+
+xg <- xgboost(data = boost_dat, label = gbm_data$rgr, objective = "reg:linear",
+              nrounds = 50, max_depth = 4, fill = TRUE)
+
+xg
+
+xg_import <- xgb.importance(feature_names = colnames(boost_dat), model = xg, )
+
+xg_import
+
+xgb.plot.importance(importance_matrix = xg_import)
+
+xgb.plot.tree(model = xg)
+
+explain <- buildExplainer(xg, trainingData = boost_dat, type = "regression")
+
+partial(xg)
+
+### 
+# Tune an XGBoost model using 10-fold cross-validation
+library(caret) # functions related to classification and regression training
+
+boston.xgb <- train(x = data.matrix(boost_dat),
+                    y = gbm_data$rgr, method = "xgbTree", metric = "Rsquared",
+                    trControl = trainControl(method = "cv", number = 10),
+                    tuneLength = 10)
+
+
+
+##### USing h2o
+
+library(h2o)
+
+
+## Tutorial: https://github.com/h2oai/h2o-3/blob/master/h2o-docs/src/product/tutorials/gbm/gbmTuning.Rmd
+
+## Initialize h2o cluster
+h2o.shutdown()
+h2o.init(nthreads = -1, enable_assertions = FALSE) 
+
+## Write data to csv file first
+gbm_data <- dat_all_pca %>%
+  dplyr::filter(!is.na(rgr)) %>%
+  dplyr::select(rgr, cluster1_avg:cluster_assigned, height_2016_scaled,
+                PC1_avg:PC5_avg, 
+              #  lat:RH, Tmax_seas:Tmin,
+                PC1:PC5, 
+                prov, mom, block, 
+                climate_vars_dif)
+
+## Change to h2o format
+gbm_data_h2o <- as.h2o(x = gbm_data, key = gbm_data_h2o)
+
+summary(gbm_data_h2o) ## Make sure factors are read correctly
+
+
+#######################
+### SPLIT FIT PREDICT 
+#######################
+
+  response <-  "rgr"
+  predictors <- setdiff(names(gbm_data_h2o), c(response, "name"))
+  
+  ## Split data for training, testing, and validation
+  ## May not be correct since data is not independent
+  
+    splits <- h2o.splitFrame(
+      data = gbm_data_h2o, 
+      ratios = c(0.7,0.15),   ## only need to specify 2 fractions, the 3rd is implied
+      destination_frames = c("train.hex", "valid.hex", "test.hex"), seed = 1234
+    )
+    train <- splits[[1]]
+    valid <- splits[[2]]
+    test  <- splits[[3]]
+    
+    
+    print(paste("Training data has", ncol(train), "columns and", nrow(train), "rows, valid has",
+                nrow(valid), "rows, test has", nrow(test)))
+    
+  ### Run gbm model
+    gbm <- h2o.gbm(x = predictors,
+                   y = response,
+                   training_frame = h2o.rbind(train, valid),
+                  # training_frame =  train,
+                  # validation_frame = valid,
+                   nfolds = 5,
+                  
+                   model_id = "gbm",
+                   
+                   ## more trees is better if the learning rate is small enough 
+                   ## here, use "more than enough" trees - we have early stopping
+                   ntrees = 10000,   
+                   
+                   max_depth = 10,
+                   
+                   ## smaller learning rate is better (this is a good value for most datasets, but see below for annealing)
+                   learn_rate=0.01,                                                         
+                   
+                   ## early stopping once the validation MSE doesn't improve by 
+                   # at least 0.01% for 5 consecutive scoring events
+                   stopping_rounds = 5, stopping_tolerance = 1e-4, stopping_metric = "MSE", 
+                  
+                   ## sample 80% of rows per tree
+                   sample_rate = 0.8,                                                       
+                   
+                   ## sample 80% of columns per split
+                   col_sample_rate = 0.8,                                                   
+                   
+                   ## fix a random number generator seed for reproducibility
+                   seed = 1234,                                                             
+                   
+                   ## score every 10 trees to make early stopping reproducible (it depends on the scoring interval)
+                   score_tree_interval = 10 
+       
+                   )
+    
+    ###### TESTING
+    
+    ## Depth 10 is usually plenty of depth for most datasets, but you never know
+    hyper_params = list( 
+      ## restrict the search to the range of max_depth established above
+      max_depth = seq(1,30,2),                                      
+      
+      ## search a large space of row sampling rates per tree
+      sample_rate = seq(0.2,1,0.01),                                             
+      
+      ## search a large space of column sampling rates per split
+      col_sample_rate = seq(0.2,1,0.01),                                         
+      
+      ## search a large space of column sampling rates per tree
+      col_sample_rate_per_tree = seq(0.2,1,0.01),                                
+      
+      ## search a large space of how column sampling per split should change as a function of the depth of the split
+      col_sample_rate_change_per_level = seq(0.9,1.1,0.01),                      
+      
+      ## search a large space of the number of min rows in a terminal node
+      min_rows = 2^seq(0,log2(nrow(train))-1,1),                                 
+      
+      ## search a large space of the number of bins for split-finding for continuous and integer columns
+      nbins = 2^seq(4,10,1),                                                     
+      
+      ## search a large space of the number of bins for split-finding for categorical columns
+      nbins_cats = 2^seq(4,12,1),                                                
+      
+      ## search a few minimum required relative error improvement thresholds for a split to happen
+      min_split_improvement = c(0,1e-8,1e-6,1e-4),                               
+      
+      ## try all histogram types (QuantilesGlobal and RoundRobin are good for numeric columns with outliers)
+      histogram_type = c("UniformAdaptive","QuantilesGlobal","RoundRobin")       
+    )
+    
+    search_criteria = list(
+      ## Random grid search
+      strategy = "RandomDiscrete",      
+      
+      ## limit the runtime to 60 minutes
+      max_runtime_secs = 3600,         
+      
+      ## build no more than 100 models
+      max_models = 100,                  
+      
+      ## random number generator seed to make sampling of parameter combinations reproducible
+      seed = 1234,                        
+      
+      ## early stopping once the leaderboard of the top 5 models is converged to 0.1% relative difference
+      stopping_rounds = 5,                
+      stopping_metric = "MSE",
+      stopping_tolerance = 1e-3
+    )
+    
+    grid <- h2o.grid(
+      ## hyper parameters
+      hyper_params = hyper_params,
+      
+      ## full Cartesian hyper-parameter search
+      search_criteria = search_criteria,
+      
+      ## which algorithm to run
+      algorithm="gbm",
+      
+      ## identifier for the grid, to later retrieve it
+      grid_id="final_grid",
+      
+      ## standard model parameters
+      x = predictors, 
+      y = response, 
+      training_frame = train, 
+      validation_frame = valid,
+      
+      ## more trees is better if the learning rate is small enough 
+      ## here, use "more than enough" trees - we have early stopping
+      ntrees = 10000,                                                            
+      
+      ## smaller learning rate is better
+      ## since we have learning_rate_annealing, we can afford to start with a bigger learning rate
+      learn_rate = 0.05,                                                         
+      
+      ## learning rate annealing: learning_rate shrinks by 1% after every tree 
+      ## (use 1.00 to disable, but then lower the learning_rate)
+      learn_rate_annealing = 0.99,                                               
+
+      ## fix a random number generator seed for reproducibility
+      seed = 1234,                                                             
+      
+      ## early stopping once the validation AUC doesn't improve by at least 0.01% for 5 consecutive scoring events
+      stopping_rounds = 5,
+      stopping_tolerance = 1e-4,
+      stopping_metric = "MSE", 
+      
+      ## score every 10 trees to make early stopping reproducible (it depends on the scoring interval)
+      score_tree_interval = 10                                                
+    )
+    
+    ## by default, display the grid search results sorted by increasing logloss (since this is a classification task)
+    grid                                                                       
+    
+    ## sort the grid models by decreasing AUC
+    sortedGrid <- h2o.getGrid("final_grid", sort_by="MSE", decreasing = FALSE)    
+    sortedGrid
+    
+    gbm <- h2o.getModel(sortedGrid@model_ids[[1]])
+    
+    
+    # Run DRF
+    drf <- h2o.randomForest(x = predictors,
+                            y = response,
+                            training_frame = h2o.rbind(train, valid),
+                            # training_frame =  train,
+                            # validation_frame = valid,
+                            nfolds = 5,
+                            model_id = "rf",
+                            ntrees            = 250,
+                            max_depth         = 30)
+    
+    
+    # 4- Score on holdout set & report
+    train_rmse_gbm  <- h2o.rmse(gbm, train = TRUE)
+    xval_rmse_gbm   <- h2o.rmse(gbm, xval = TRUE)
+    test_perf_gbm <- h2o.performance(model = gbm, newdata = test)
+    test_rmse_gbm   <- h2o.rmse(object = test_perf_gbm)
+    print(paste0("GBM rmse TRAIN = ", train_rmse_gbm, ", rmse XVAL = ", xval_rmse_gbm, ", rmse TEST = ",
+                 test_rmse_gbm))
+    
+    train_rmse_drf  <- h2o.rmse(drf, train = TRUE)
+    xval_rmse_drf   <- h2o.rmse(drf, xval = TRUE)
+    test_perf_drf <- h2o.performance(model = drf, newdata = test)
+    test_rmse_drf   <- h2o.rmse(object = test_perf_drf)
+    print(paste0("DRF rmse TRAIN = ", train_rmse_drf, ", rmse XVAL = ", xval_rmse_drf, ", rmse TEST = ",
+                 test_rmse_drf))
+   
+  
+  ## Show detailed model summary
+  gbm
+  
+  drf
+  
+  
+  ## Get the Mean Squared Error on the validation set
+  h2o.mse(h2o.performance(gbm, newdata = valid)) ## Best is 0.009
+
+  h2o.varimp(gbm)
+  h2o.varimp_plot(gbm, ncol(train))
+  
+  h2o.varimp(drf)
+  h2o.varimp_plot(drf, ncol(train))
+
+  h2o.partialPlot(gbm, h2o.rbind(train, valid))
+  
+  h2o.saveModel(gbm, "h2o_model")
+  
+  
+  
+  
+  ### Make predictions
+  
+  pred_gbm <- h2o.predict(object = gbm,
+                          newdata = test)
+  
+  plot(as.data.frame(test)$rgr, as.data.frame(pred_gbm)$predict, pch = 19, las = 1,
+       xlab = "Observed", ylab = "Predicted")
+  abline(a = 0, b = 1, lwd = 3, col = "steelblue")
+  
+  
+  ## Partial plots
+  
+  h2o.partialPlot(gbm, h2o.rbind(train, valid), c("height_2016_scaled", "DD_0_dif"))
+  h2o.partialPlot(gbm, h2o.rbind(train, valid), "prov", nbins = 100)
+  
+  
+  
+  
+  
+  
+  
 
 #############################################
 ###### GRAVEYARD
