@@ -7,13 +7,9 @@ library(raster)
 library(sp)
 library(maptools)
 
-setwd("~/Dropbox/Projects/2017 - Common garden/analyses/data")
-
-setwd("E:/Dropbox/Projects/2017 - Common garden/analyses/data")
-
 
 ## Load in california outline
-  cali_outline <- readShapePoly("./california_outline/california_outline.shp",
+  cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
                                       proj4string = CRS("+proj=longlat +datum=WGS84"))
 
 ## project to lamber conformal conic to use for cropping below - transforming this and then cropping speeds up operations a lot rather than transforming raster and cropping that
@@ -24,7 +20,7 @@ setwd("E:/Dropbox/Projects/2017 - Common garden/analyses/data")
 
 ## Read in climate variables - https://adaptwest.databasin.org/pages/adaptwest-climatena
 
-  dir_name <- "./dem/"
+  dir_name <- ".data/gis/dem/"
   
   raster_files <- list.files(dir_name, full.names = TRUE)
   raster_files <- raster_files[grep("*.nc", raster_files)] # Only those with nc extension
