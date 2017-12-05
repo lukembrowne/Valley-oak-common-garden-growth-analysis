@@ -105,6 +105,14 @@ rm(list = ls()) ## Clean workspace
   dat_all$height_2017 <- round(dat_all$height_2017 / 5) * 5
   
   
+  ## Calculate height difference
+  dat_all$height_dif <- dat_all$height_2017 - dat_all$height_2016
+  
+  summary(dat_all$height_dif); hist(dat_all$height_dif)
+  
+  plot(dat_all$height_2016, dat_all$height_dif, pch = 19, cex = 0.5)
+  
+  
   ## Calculate relative growth rates
   dat_all$rgr <- (log(dat_all$height_2017) - log(dat_all$height_2016))/1
   
@@ -249,7 +257,7 @@ rm(list = ls()) ## Clean workspace
     group_by(prov) %>%
     dplyr::select(prov, PC1:PC20) %>%
     summarise_all(mean, na.rm = TRUE) 
-  colnames(pca_results_avg)[grep("PC", colnames(pca_results_avg))] <- paste(colnames(pca_results_avg)[grep("PC", colnames(pca_results_avg))], "_avg", sep = "" ) ## Rename columns
+  colnames(pca_results_avg)[grep("PC", colnames(pca_results_avg))] <- paste(colnames(pca_results_avg)[grep("PC", colnames(pca_results_avg))], "_gen_avg", sep = "" ) ## Rename columns
   
   ## Join back with main dataset
   dat_all <- left_join(dat_all, pca_results_avg)
@@ -383,23 +391,23 @@ rm(list = ls()) ## Clean workspace
   
   x = 1
 
-  climate_var_means <- NA
-  climate_var_sds <- NA
+  scaled_var_means <- NA
+  scaled_var_sds <- NA
   
-  to_scale = c(climate_vars_dif, climate_vars, "height_2016")
+  to_scale = colnames(dplyr::select(dat_all, climate_vars_dif, height_2016, PC1_gen_avg:PC20_gen_avg))
 
   for(var in to_scale){
 
-    climate_var_means[x] <- mean(dat_all_scaled[[var]], na.rm = TRUE)
-    climate_var_sds[x] <- sd(dat_all_scaled[[var]], na.rm = TRUE)
+    scaled_var_means[x] <- mean(dat_all_scaled[[var]], na.rm = TRUE)
+    scaled_var_sds[x] <- sd(dat_all_scaled[[var]], na.rm = TRUE)
 
-    dat_all_scaled[var] <- (dat_all_scaled[var] - climate_var_means[x]) / climate_var_sds[x]
+    dat_all_scaled[var] <- (dat_all_scaled[var] - scaled_var_means[x]) / scaled_var_sds[x]
 
     x = x + 1
   }
 
-  names(climate_var_means) <- to_scale
-  names(climate_var_sds) <- to_scale
+  names(scaled_var_means) <- to_scale
+  names(scaled_var_sds) <- to_scale
 
 
   summary(dat_all_scaled[, to_scale]) ## Means should all be 0

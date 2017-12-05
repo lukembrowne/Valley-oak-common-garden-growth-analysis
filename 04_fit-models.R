@@ -13,45 +13,44 @@ library(sjPlot)
 
 # GAMM models -------------------------------------------------------------
 
-
-##### GAMM MODEL
-
+# Null model with only random effects
 fit_null<- gamm4(rgr  ~1 ,
                  random = ~(1|block) + (1|prov) + (1|mom),
                  data = dat_all_scaled)
 
-fit_height_only <- gamm4(rgr  ~ s(height_2016_scaled),
+# Height in 2016 only
+fit_height_only <- gamm4(rgr  ~ s(height_2016),
                          random = ~(1|block) + (1|prov) + (1|mom),
                          data = dat_all_scaled)
 
-fit_climPC <- gamm4(rgr  ~ s(height_2016_scaled)
-                    + s(PC1) 
-                    + s(PC2) 
-                    + s(PC3),
+fit_climPC <- gamm4(rgr  ~ s(height_2016)
+                    + s(PC1_clim_dif) 
+                    + s(PC2_clim_dif) 
+                    + s(PC3_clim_dif),
                     random = ~(1|block) + (1|prov) + (1|mom),
                     data = dat_all_scaled)
 
-fit_genPC <- gamm4(rgr ~ s(height_2016_scaled)
-                   + s(PC1_avg)
-                   + s(PC2_avg) 
-                   + s(PC3_avg),
+fit_genPC <- gamm4(rgr ~ s(height_2016)
+                   + s(PC1_gen_avg)
+                   + s(PC2_gen_avg) 
+                   + s(PC3_gen_avg),
                    random = ~(1|block) + (1|prov) + (1|mom),
                    data = dat_all_scaled)
 
-fit_gen_climPC <- gamm4(rgr ~ s(height_2016_scaled)
-                        + s(PC1, by = cluster_assigned)
-                        #  + s(PC2, by = cluster_assigned) 
-                        # + s(PC3, by = cluster_assigned)
+fit_gen_climPC <- gamm4(rgr ~ s(height_2016)
+                        + s(PC1_clim_dif, by = cluster_assigned)
+                        #  + s(PC2_clim_dif, by = cluster_assigned) 
+                        # + s(PC3_clim_dif, by = cluster_assigned)
                         + cluster_assigned,
-                        #    + s(PC1_avg)
-                        #  + s(PC2_avg) 
-                        #  + s(PC3_avg),
+                        #    + s(PC1_gen_avg)
+                        #  + s(PC2_gen_avg) 
+                        #  + s(PC3_gen_avg),
                         random = ~(1|block) + (1|prov) + (1|mom),
                         data = dat_all_scaled)
 
 
 
-fit_gen_climPC <- gamm4(rgr ~ s(height_2016_scaled)
+fit_gen_climPC <- gamm4(rgr ~ s(height_2016)
                         + s(CMD_dif, by = cluster_assigned) ### Add in normal smooth functions as well!!!!
                         + s(MWMT_dif, by = cluster_assigned) 
                         + s(MCMT_dif, by = cluster_assigned)
@@ -63,7 +62,7 @@ fit_gen_climPC <- gamm4(rgr ~ s(height_2016_scaled)
                         random = ~(1|block) + (1|prov) + (1|mom),
                         data = dat_all_scaled)
 
-fit_gen_climPC <- gamm4(rgr ~ s(height_2016_scaled)
+fit_gen_climPC <- gamm4(rgr ~ s(height_2016)
                         + s(CMD_dif )
                         + s(MWMT_dif) 
                         + s(MCMT_dif)
@@ -99,19 +98,6 @@ gam.check(fit_gen_climPC$gam)
 
 vis.gam(fit_gen_climPC$gam, c("CMD_dif", "height_2016_scaled"))
 
-
-
-
-
-fit = lmer(rgr  ~ CMD_dif*cluster_assigned  + I(CMD_dif^2) +
-             + MWMT_dif*cluster_assigned  + I(MWMT_dif^2)  
-           + MCMT_dif*cluster_assigned  + I(MCMT_dif^2) 
-           + DD5_dif*cluster_assigned   + I(DD5_dif^2)
-           + cluster_assigned 
-           + height_2016_scaled   
-           + (1 | block) # + (1 | site) 
-           + (1 | prov) + (1 | mom), 
-           data = dat_all_pca)
 
 
 summary(fit)
