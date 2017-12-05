@@ -85,19 +85,26 @@ AIC(fit_null$mer,
 anova.gam(fit_null$gam, fit_gen_climPC$gam, test = "Chisq")
 
 
-plot(fit_gen_climPC$gam, residuals = FALSE, shade = TRUE, scale = -1)
-
-summary(fit_gen_climPC$gam)
-
-summary(fit_gen_climPC$mer)
-
-anova(fit_gen_climPC$gam)
-
-gam.check(fit_gen_climPC$gam)
+# Checking model ----------------------------------------------------------
 
 
-vis.gam(fit_gen_climPC$gam, c("CMD_dif", "height_2016_scaled"))
-
+  ## Set model to check
+  fit <- fit_height_only
+  
+  
+  plot(fit$gam, residuals = FALSE, shade = TRUE, scale = -1)
+  
+  summary(fit$gam)
+  
+  summary(fit$mer)
+  
+  anova(fit$gam)
+  
+  gam.check(fit$gam)
+  
+  
+  vis.gam(fit$gam, c("CMD_dif", "height_2016_scaled"))
+  
 
 
 summary(fit)
@@ -118,8 +125,11 @@ sjp.int(fit)
 
 
 
-#############################################
-###### GRAVEYARD
+# Graveyard ---------------------------------------------------------------
+
+
+
+# Spatial autocorrelation -------------------------------------------------
 
 
 
@@ -411,9 +421,9 @@ sjp.int(fit)
   # summary(gbm_data_h2o) ## Make sure factors are read correctly
   # 
   # 
-  # #######################
+  # 
   # ### SPLIT FIT PREDICT 
-  # #######################
+  #
   # 
   # response <-  "rgr"
   # predictors <- setdiff(names(gbm_data_h2o), c(response, "name"))
