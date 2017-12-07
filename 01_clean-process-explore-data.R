@@ -3,6 +3,7 @@
 library(tidyverse)
 library(maptools)
 library(scatterpie)
+library(qtlcharts)
 
 
 rm(list = ls()) ## Clean workspace
@@ -76,8 +77,18 @@ rm(list = ls()) ## Clean workspace
   dat_all$row[dat_all$section == "north_annex"] <- dat_all$row[dat_all$section == "north_annex"] + 100
   dat_all$row[dat_all$section == "placerville"] <- dat_all$row[dat_all$section == "placerville"] + 250
   
+  ## Make column unique as well to use as a random effect later
+  dat_all$column_uniq <- dat_all$column
+  dat_all$column_uniq[dat_all$section == "north"] <- dat_all$column_uniq[dat_all$section == "north"] + 50
+  dat_all$column_uniq[dat_all$section == "north_annex"] <- dat_all$column_uniq[dat_all$section == "north_annex"] + 150
+  dat_all$column_uniq[dat_all$section == "placerville"] <- dat_all$column_uniq[dat_all$section == "placerville"] + 250
+  
   plot(dat_all$column, dat_all$row, pch = 22)
-
+  
+  plot(dat_all$column_uniq, dat_all$row, pch = 22)
+  
+  dat_all$column_uniq_factor <- factor(dat_all$column_uniq)
+  dat_all$row_factor <- factor(dat_all$row)
 
   
   
@@ -101,8 +112,10 @@ rm(list = ls()) ## Clean workspace
   
   
   #### Round height values to the nearest 5
-  dat_all$height_2016 <- round(dat_all$height_2016 / 5) * 5
-  dat_all$height_2017 <- round(dat_all$height_2017 / 5) * 5
+  # dat_all$height_2016 <- round(dat_all$height_2016 / 5) * 5
+  # dat_all$height_2017 <- round(dat_all$height_2017 / 5) * 5
+  # 
+  dat_all$height_2016_log <- log(dat_all$height_2016)
   
   
   ## Calculate height difference
@@ -120,12 +133,18 @@ rm(list = ls()) ## Clean workspace
   
   ## Plots of 2016 vs 2017
   plot(jitter(dat_all$height_2016), jitter(dat_all$height_2017),
-       pch = 19, cex = 0.5, las = 1)
+       pch = 19, cex = 0.5, las = 1,
+       xlab = "Height 2016 (cm)", ylab = "Height 2017 (cm)")
   abline(a = 0, b = 1, lwd = 2, col = "steelblue")
   
   ## Plot of RGR
   plot(dat_all$height_2016, dat_all$rgr, pch = 19, cex = 0.5)
   cor.test(dat_all$height_2016, dat_all$rgr)
+  
+  ## Histogram of RGR
+  ggplot(dat_all, aes(rgr)) + geom_histogram(fill = "steelblue", 
+                                             col = "black") + theme_bw() +
+    xlab("Relative growth rate (rgr)")
   
   ## View 'outliers
     # View(dat_all[dat_all$rgr < -1 & !is.na(dat_all$rgr), ])
@@ -150,7 +169,7 @@ rm(list = ls()) ## Clean workspace
   
   ## Read in datasheet that has provenance names of each individual with GBS data
   ## This datasheet was made by hand
-  admix_moms_provs <- read_delim("./data/GBS_data/gbs451 samples provenance list.txt", delim = "\t")
+  admix_moms_provs <- read_csv("./data/GBS_data/gbs451 samples provenance list.csv")
   
   
   ## Join with admix_results
@@ -158,7 +177,30 @@ rm(list = ls()) ## Clean workspace
   sum(is.na(admix_results$prov)) ## Should equal to 0 - might have changed since NOV prov format gets messed up by excel and changed to date
   # View(admix_results[is.na(admix_results$prov), ])
   
+  ## How many GBS provs in common garden?
+  sum(unique(admix_results$prov) %in% unique(dat_all$prov))
   
+  ## How many Common garden prov in GBS dataset?
+  sum(unique(dat_all$prov) %in% unique(admix_results$prov))
+  
+  
+  ## How many individual maternal trees in common garden have GBS data?
+    gbs_garden_key <- read_csv("./data/GBS_data/GBS Trees info 2017_Master.csv")
+    head(gbs_garden_key)
+    
+    ## Set to match up with other GBS files
+    gbs_garden_key$mom <- paste(gbs_garden_key$`Site Abbreviation`,
+                                gbs_garden_key$`Mother Plant Field ID`, sep = "")
+    
+    sum(gbs_garden_key$mom %in% admix_results$mom)
+    
+    ## Moms that have GBS data
+    # View(gbs_garden_key[gbs_garden_key$mom %in% admix_results$mom, ])
+    
+    ## Moms that do not have GBS data
+    # View(gbs_garden_key[!(gbs_garden_key$mom %in% admix_results$mom), ])
+    
+    
   ### Average cluster assignment at the provenance level
   ## So that we are able to use information from samples across the provenance 
   ## instead of just samples that have maternal trees in the common garden
@@ -183,12 +225,11 @@ rm(list = ls()) ## Clean workspace
   
   ## Assign cluster based on majority assignment
   dat_all$cluster_assigned <- NA
-  dat_all$cluster_assigned[dat_all$cluster1_avg > 0.50 & !is.na(dat_all$cluster1_avg)] <- "1"
-  dat_all$cluster_assigned[dat_all$cluster2_avg > 0.50 & !is.na(dat_all$cluster2_avg)] <- "2"
-  dat_all$cluster_assigned[dat_all$cluster3_avg > 0.50 & !is.na(dat_all$cluster3_avg)] <- "3"
-  dat_all$cluster_assigned[dat_all$cluster4_avg > 0.50 & !is.na(dat_all$cluster4_avg)] <- "4"
-  dat_all$cluster_assigned[dat_all$cluster5_avg > 0.50 & !is.na(dat_all$cluster5_avg)] <- "5"
-  
+  dat_all$cluster_assigned[dat_all$cluster1_avg >= 0.50 & !is.na(dat_all$cluster1_avg)] <- "1"
+  dat_all$cluster_assigned[dat_all$cluster2_avg >= 0.50 & !is.na(dat_all$cluster2_avg)] <- "2"
+  dat_all$cluster_assigned[dat_all$cluster3_avg >= 0.50 & !is.na(dat_all$cluster3_avg)] <- "3"
+  dat_all$cluster_assigned[dat_all$cluster4_avg >= 0.50 & !is.na(dat_all$cluster4_avg)] <- "4"
+  dat_all$cluster_assigned[dat_all$cluster5_avg >= 0.50 & !is.na(dat_all$cluster5_avg)] <- "5"
   
   table(dat_all$cluster_assigned)
   
@@ -318,11 +359,13 @@ rm(list = ls()) ## Clean workspace
   ### Climate vars from previous sork papers
   climate_vars = c("CMD", "MWMT", "MCMT", "DD5") 
   
+  climate_vars = c("CMD", "Tmax", "Tmin", "DD5")
+  
   climate_vars_dif <- paste(climate_vars, "_dif", sep = "")
   
   x = 1
   
-  ## Calculate difference in climate as Garden - Provenance
+  ## Calculate difference in climate as ## GARDEN - PROVENANCE
   for(var in climate_vars){
     
     dat_all[dat_all$site == "chico", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "chico", var]) - dat_all[dat_all$site == "chico", var]
@@ -359,17 +402,21 @@ rm(list = ls()) ## Clean workspace
   
   ## Correlations between variables
   
-  # library(qtlcharts)
+  # # 
   # grpd <- dat_all %>%
   #   group_by(mom) %>% summarise_all(mean)
   # 
   # iplotCorr(dat_all[, climate_vars], reorder=FALSE)
   # 
+  cor(dat_all[, climate_vars])
+
   # 
   
   
   # Filtering data ----------------------------------------------------------
   
+  ## Filter out individuals without an estimated RGR
+  dat_all <- dplyr::filter(dat_all, !is.na(rgr))
   
   ## Exclude trees that died of things like gophers or are shaded by trees
   dat_all <- dat_all[-which(dat_all$exclude == "y"), ]
@@ -377,13 +424,11 @@ rm(list = ls()) ## Clean workspace
   ## Change to NA outlier values in relative growth rate
   dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.01, na.rm = TRUE) |
                 dat_all$rgr >= quantile(dat_all$rgr, 0.99, na.rm = TRUE)] <- NA
-  
-  ## Filter out individuals without an estimated RGR
   dat_all <- dplyr::filter(dat_all, !is.na(rgr))
   
   ## Filter out individuals without genetic data at the provenance level
-  dat_all <- dplyr::filter(dat_all, !is.na(cluster_assigned))
-  
+  # dat_all <- dplyr::filter(dat_all, !is.na(cluster1_avg))
+  # dat_all <- dplyr::filter(dat_all, !is.na(cluster_assigned))
 
 # Scaling predictor variables -------------------------------------------------------
 
@@ -394,7 +439,8 @@ rm(list = ls()) ## Clean workspace
   scaled_var_means <- NA
   scaled_var_sds <- NA
   
-  to_scale = colnames(dplyr::select(dat_all, climate_vars_dif, height_2016, PC1_gen_avg:PC20_gen_avg))
+  to_scale = colnames(dplyr::select(dat_all, climate_vars_dif, height_2016_log, height_2016,
+                                    PC1_gen_avg:PC20_gen_avg, climate_vars))
 
   for(var in to_scale){
 

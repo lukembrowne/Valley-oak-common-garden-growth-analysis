@@ -14,117 +14,125 @@ library(sjPlot)
 # GAMM models -------------------------------------------------------------
 
 # Null model with only random effects
-fit_null<- gamm4(rgr  ~1 ,
-                 random = ~(1|block) + (1|prov) + (1|mom),
+fit_null<- gamm4(rgr  ~ 1,
+                 random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
                  data = dat_all_scaled)
 
 # Height in 2016 only
 fit_height_only <- gamm4(rgr  ~ s(height_2016),
-                         random = ~(1|block) + (1|prov) + (1|mom),
+                         random = ~ (1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
                          data = dat_all_scaled)
 
-fit_climPC <- gamm4(rgr  ~ s(height_2016)
-                    + s(PC1_clim_dif) 
-                    + s(PC2_clim_dif) 
-                    + s(PC3_clim_dif),
-                    random = ~(1|block) + (1|prov) + (1|mom),
-                    data = dat_all_scaled)
-
-fit_genPC <- gamm4(rgr ~ s(height_2016)
-                   + s(PC1_gen_avg)
-                   + s(PC2_gen_avg) 
-                   + s(PC3_gen_avg),
-                   random = ~(1|block) + (1|prov) + (1|mom),
-                   data = dat_all_scaled)
-
-fit_gen_climPC <- gamm4(rgr ~ s(height_2016)
-                        + s(PC1_clim_dif, by = cluster_assigned)
-                        #  + s(PC2_clim_dif, by = cluster_assigned) 
-                        # + s(PC3_clim_dif, by = cluster_assigned)
-                        + cluster_assigned,
-                        #    + s(PC1_gen_avg)
-                        #  + s(PC2_gen_avg) 
-                        #  + s(PC3_gen_avg),
-                        random = ~(1|block) + (1|prov) + (1|mom),
+## Individual climate variables
+fit_CMD <- gamm4(rgr ~ s(height_2016)
+                         + s(CMD_dif),
+                        random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
                         data = dat_all_scaled)
 
+fit_Tmax <- gamm4(rgr ~ s(height_2016)
+                 + s(Tmax_dif),
+                 random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
+                 data = dat_all_scaled)
 
+fit_Tmin <- gamm4(rgr ~ s(height_2016)
+                  + s(Tmin_dif),
+                  random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
+                  data = dat_all_scaled)
 
-fit_gen_climPC <- gamm4(rgr ~ s(height_2016)
-                        + s(CMD_dif, by = cluster_assigned) ### Add in normal smooth functions as well!!!!
-                        + s(MWMT_dif, by = cluster_assigned) 
-                        + s(MCMT_dif, by = cluster_assigned)
-                        + s(DD5_dif, by = cluster_assigned)
-                        + cluster_assigned,
-                        #    + s(PC1_avg)
-                        #  + s(PC2_avg) 
-                        #  + s(PC3_avg),
-                        random = ~(1|block) + (1|prov) + (1|mom),
-                        data = dat_all_scaled)
-
-fit_gen_climPC <- gamm4(rgr ~ s(height_2016)
-                        + s(CMD_dif )
-                        + s(MWMT_dif) 
-                        + s(MCMT_dif)
-                        + s(DD5_dif ),
-                        #    + s(PC1_avg)
-                        #  + s(PC2_avg) 
-                        #  + s(PC3_avg),
-                        random = ~(1|block) + (1|prov) + (1|mom),
-                        data = dat_all_scaled)
-
-
-
-### Compare via AIC
-AIC(fit_null$mer, 
-    fit_height_only$mer,
-    fit_climPC$mer,
-    fit_genPC$mer,
-    fit_gen_climPC$mer)
-
-anova.gam(fit_null$gam, fit_gen_climPC$gam, test = "Chisq")
+fit_DD5 <- gamm4(rgr ~ s(height_2016)
+                  + s(DD5_dif),
+                  random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
+                  data = dat_all_scaled)
 
 
 # Checking model ----------------------------------------------------------
 
+check_model <- function(gamm4_out){
+  
+  plot(gamm4_out$gam, residuals = FALSE, shade = TRUE, 
+       scale = 0, seWithMean=FALSE, pages = 0)
+  
+  print(summary(gamm4_out$gam))
+  
+  print(summary(gamm4_out$mer))
+  
+  print(anova(gamm4_out$gam))
+  
+  gam.check(gamm4_out$gam)
 
-  ## Set model to check
-  fit <- fit_height_only
+}
+
+
+plot_gam <- function(mod, var, var_index, xlab, plot_raw_pts = TRUE){
+  
+  plt <- plot(mod, pages = 1) ## Extract info from mgcv plot.gam function
+  
+  ## Format into DF
+  plt_df <- data.frame(x_scaled = plt[[var_index]]$x,
+                       fit = plt[[var_index]]$fit, ### Doesn't account for intercept!!
+                       se = plt[[var_index]]$se)
+  
+  ## Scale x axis back to original units
+  plt_df$x_orig <- (plt_df$x_scaled * scaled_var_sds[[var]]) + scaled_var_means[[var]]
+  
+  ## Add back in intercept to fitted values
+  plt_df$fit <- plt_df$fit + mod$coefficients[["(Intercept)"]]
+  
+  ## GGplot
+ p =  ggplot(plt_df, aes(x = x_orig, y = fit)) + geom_line(lwd = 1.5) +
+    geom_ribbon(aes(ymin = fit - 2*se, ymax = fit + 2*se), alpha = 0.3) +
+    geom_hline(yintercept = 0, lty = 2) + geom_vline(xintercept = 0, lty = 2) + 
+    ylab("Relative growth rate") + xlab(xlab) + 
+    theme_bw() + theme(axis.text=element_text(size=12),
+                       axis.title=element_text(size=14),
+                       plot.margin = unit(c(1,1,1,1), "cm"))
+ 
+ if(plot_raw_pts == TRUE){
+  p = p + geom_point(data = dat_all, aes(x = dat_all[[var]], y = rgr), 
+                     alpha = 0.2, cex = 0.75)  
+ }
+ 
+ print(p)
+  
+}
+
+  ## Height only
+  check_model(fit_height_only)
+  plot_gam(fit_height_only$gam, var = "height_2016", var_index = 1, 
+           xlab = "Height 2016", plot_raw_pts = T)
+  ggsave(filename = "./figs_tables/Height only.pdf", scale = .75)
   
   
-  plot(fit$gam, residuals = FALSE, shade = TRUE, scale = -1)
-  
-  summary(fit$gam)
-  
-  summary(fit$mer)
-  
-  anova(fit$gam)
-  
-  gam.check(fit$gam)
-  
-  
-  vis.gam(fit$gam, c("CMD_dif", "height_2016_scaled"))
+  summary(fit_height_only$gam)
   
 
-
-summary(fit)
-print(r.squaredGLMM(fit))
-sjp.lmer(fit, type = "fe", p.kr = FALSE)
-sjp.lmer(fit, type = "eff")
-
-sjp.int(fit)
-
-#sjp.glmer(fit, type = "ma")
-
-#sjp.lmer(fit, type = "fe.slope")
-
-#sjp.int(fit, type = "eff", swap.pred = TRUE, show.ci = FALSE)
-
-
-
-
-
-
+  ## CMD
+  check_model(fit_CMD)
+  plot_gam(fit_CMD$gam, var = "CMD_dif", var_index = 2, 
+           xlab = "CMD_dif", plot_raw_pts = F)
+  ggsave(filename = "./figs_tables/CMD_dif no pts.pdf", scale = .75)
+  
+  ## Tmax
+  check_model(fit_Tmax)
+  plot_gam(fit_Tmax$gam, var = "Tmax_dif", var_index = 2, 
+           xlab = "Tmax_dif", plot_raw_pts = T)
+  ggsave(filename = "./figs_tables/Tmax_dif no pts.pdf", scale = .75)
+  
+  ## Tmin
+  check_model(fit_Tmin)
+  plot_gam(fit_Tmin$gam, var = "Tmin_dif", var_index = 2,
+           xlab = "Tmin_dif", plot_raw_pts = T)
+  ggsave(filename = "./figs_tables/Tmin_dif pts.pdf", scale = .75)
+  
+  
+  ## DD5
+  check_model(fit_DD5)
+  plot_gam(fit_DD5$gam, var = "DD5_dif", var_index = 2,
+           xlab = "DD5_dif", plot_raw_pts = F)
+  ggsave(filename = "./figs_tables/DD5_dif no pts.pdf", scale = .75)
+  
+  
+  
 # Graveyard ---------------------------------------------------------------
 
 

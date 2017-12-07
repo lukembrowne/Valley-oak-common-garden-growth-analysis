@@ -7,7 +7,7 @@ library(factoextra)
 
 # PCA on climate variables ------------------------------------------------
 
-  clim_pca <- prcomp(dplyr::select(dat_all_scaled, contains("_dif")), scale = FALSE) 
+  clim_pca <- prcomp(dplyr::select(dat_all_scaled, climate_vars_dif), scale = FALSE) 
   
   summary(clim_pca)
 
@@ -31,8 +31,8 @@ library(factoextra)
   
   
   ## Biplot of PCA
-  ggplot2::autoplot(clim_pca, data = dat_all_scaled, colour = "prov", loadings = TRUE, 
-           loadings.label = TRUE) + theme_bw() + theme(legend.position="none") 
+  # autoplot(clim_pca, data = dat_all_scaled, colour = "prov", loadings = TRUE, 
+  #          loadings.label = TRUE) + theme_bw() + theme(legend.position="none") 
   
   
   ## Contributions of each axis
