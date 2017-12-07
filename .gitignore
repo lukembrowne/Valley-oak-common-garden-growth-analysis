@@ -5,4 +5,6 @@
 /lagniappe
 /old_archive
 /data
-packrat/lib*/
+/figs_tables
+*.Rproj
+
