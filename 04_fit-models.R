@@ -133,6 +133,17 @@ plot_gam <- function(mod, var, var_index, xlab, plot_raw_pts = TRUE){
   
   
   
+
+# Climate models with genetic interactions --------------------------------
+
+  
+  
+  
+  
+  
+  
+  
+  
 # Graveyard ---------------------------------------------------------------
 
 

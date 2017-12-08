@@ -44,81 +44,77 @@ future_files <- c(list.files(path="./data/gis/climate_data/NA_ENSEMBLE_rcp85_208
 
 # Calculate Tmax and Tmin -------------------------------------------------
 
-
-
-
-
-
-
-### Calculate max and min temperatature of the warmest month
-dat_all <- dat_all %>%
-  mutate(Tmax = apply( dplyr::select(., Tmax01:Tmax12), 1, max))
-
-
-### Tmax
-  Tmax_current_rast <- stack()
-  Tmax_future_rast <- stack()
   
-  for(var in general_files[grep("Tmax", general_files)]){
-  
-    current_path <- current_files[grep(var, current_files)]
-    cat("Reading in as current file:", current_path, "... \n")
-    
-    ## Load in current raster
-    current_rast <- raster(current_path) 
-    
-    future_path <- future_files[grep(var, future_files)]
-    cat("Reading in as future file:", future_path, "... \n")
-    
-    ## Load in future raster 
-    future_rast <-  raster(future_path) 
-    
-    ### Save to respective stack
-    Tmax_current_rast <- raster::stack(Tmax_current_rast, current_rast)
-    Tmax_future_rast <- raster::stack(Tmax_future_rast, future_rast)
-    
-  }
-  
-  ## Calculate difference between future and current values
-
-  Tmax_dif_rast <- max(Tmax_future_rast) - max(Tmax_current_rast)
-  names(Tmax_dif_rast) <- "Tmax_dif"
-  plot(Tmax_dif_rast)
+  ### Calculate max and min temperatature of the warmest month
+  dat_all <- dat_all %>%
+    mutate(Tmax = apply( dplyr::select(., Tmax01:Tmax12), 1, max))
   
   
-### Tmin
-  Tmin_current_rast <- stack()
-  Tmin_future_rast <- stack()
+  ### Tmax
+    Tmax_current_rast <- stack()
+    Tmax_future_rast <- stack()
+    
+    for(var in general_files[grep("Tmax", general_files)]){
+    
+      current_path <- current_files[grep(var, current_files)]
+      cat("Reading in as current file:", current_path, "... \n")
+      
+      ## Load in current raster
+      current_rast <- raster(current_path) 
+      
+      future_path <- future_files[grep(var, future_files)]
+      cat("Reading in as future file:", future_path, "... \n")
+      
+      ## Load in future raster 
+      future_rast <-  raster(future_path) 
+      
+      ### Save to respective stack
+      Tmax_current_rast <- raster::stack(Tmax_current_rast, current_rast)
+      Tmax_future_rast <- raster::stack(Tmax_future_rast, future_rast)
+      
+    }
+    
+    ## Calculate difference between future and current values
   
-  for(var in general_files[grep("Tmin", general_files)]){
+    Tmax_dif_rast <- max(Tmax_future_rast) - max(Tmax_current_rast)
+    names(Tmax_dif_rast) <- "Tmax_dif"
+    plot(Tmax_dif_rast)
     
-    current_path <- current_files[grep(var, current_files)]
-    cat("Reading in as current file:", current_path, "... \n")
     
-    ## Load in current raster
-    current_rast <- raster(current_path) 
+  ### Tmin
+    Tmin_current_rast <- stack()
+    Tmin_future_rast <- stack()
     
-    future_path <- future_files[grep(var, future_files)]
-    cat("Reading in as future file:", future_path, "... \n")
+    for(var in general_files[grep("Tmin", general_files)]){
+      
+      current_path <- current_files[grep(var, current_files)]
+      cat("Reading in as current file:", current_path, "... \n")
+      
+      ## Load in current raster
+      current_rast <- raster(current_path) 
+      
+      future_path <- future_files[grep(var, future_files)]
+      cat("Reading in as future file:", future_path, "... \n")
+      
+      ## Load in future raster 
+      future_rast <-  raster(future_path) 
+      
+      ### Save to respective stack
+      Tmin_current_rast <- raster::stack(Tmin_current_rast, current_rast)
+      Tmin_future_rast <- raster::stack(Tmin_future_rast, future_rast)
+      
+    }
     
-    ## Load in future raster 
-    future_rast <-  raster(future_path) 
+    ## Calculate difference between future and current values
     
-    ### Save to respective stack
-    Tmin_current_rast <- raster::stack(Tmin_current_rast, current_rast)
-    Tmin_future_rast <- raster::stack(Tmin_future_rast, future_rast)
+    Tmin_dif_rast <- min(Tmin_future_rast) - min(Tmin_current_rast)
+    names(Tmin_dif_rast) <- "Tmin_dif"
     
-  }
-  
-  ## Calculate difference between future and current values
-  
-  Tmin_dif_rast <- min(Tmin_future_rast) - min(Tmin_current_rast)
-  names(Tmin_dif_rast) <- "Tmin_dif"
-  
-  plot(Tmin_dif_rast) 
+    plot(Tmin_dif_rast) 
 
 
-## Loop through climate variables and calculate difference between future and current climate
+## Loop through climate variables and calculate difference between future 
+    ## and current climate - Tmax and Tmin addded in later
   
   
 
@@ -128,7 +124,6 @@ dat_all <- dat_all %>%
   x = 1 # For looping through var names in plot title
   
   ## Only loop through climate variables that are used in the models to speed up process
-  ## Tmax and Tmin added in later
   for(var in general_files[apply(sapply(paste(climate_vars, "_", sep =""), 
                                         function(x) grepl(x, general_files)), 1, any)]){
     
@@ -272,7 +267,8 @@ dat_all <- dat_all %>%
 plot_future_growth <- function(gam_mod){
   
   ## Make prediction dataframe
-  predictions <- extracted_vals_scaled[, climate_vars_dif] # Doesn't matter for univariate models if there are multiple climatic variables in this DF
+  # Doesn't matter for univariate models if there are >1 climatic variables in this DF
+  predictions <- extracted_vals_scaled[, climate_vars_dif] 
   summary(predictions)
   
   predictions$height_2016 <-  0 ## Use average seedling height
@@ -289,45 +285,61 @@ plot_future_growth <- function(gam_mod){
   
   
   ## Generate predictions
-  height_predictions =  predict(gam_mod, predictions, 
+  rgr_predictions =  predict(gam_mod, predictions, 
                                 re.form = NA, type = "response",
-                                se.fit = FALSE)
+                                se.fit = TRUE)
   
-  summary(height_predictions)
+  summary(rgr_predictions$fit)
+  hist(rgr_predictions$fit)
   
-  height_predictions_null <-  predict(gam_mod, predictions_null, 
+  rgr_predictions_null <-  predict(gam_mod, predictions_null, 
                                       re.form = NA, type = "response",
-                                      se.fit = FALSE)
-  summary(height_predictions_null)
+                                      se.fit = TRUE)
+  summary(rgr_predictions_null$fit)
   
+  ## Calculating points where SEs don't overlap
+  rgr_predictions$upper <- (rgr_predictions$fit + 2 * rgr_predictions$se.fit)
+  rgr_predictions_null$lower <- (rgr_predictions_null$fit - 2 *
+                                   rgr_predictions_null$se.fit)
+  rgr_predictions$noSE_overlap <- rgr_predictions$upper <= rgr_predictions_null$lower
+  
+  cat("Whether SE overlap or not - if TRUE  == SE doesn't overlap \n")
+  print(table(rgr_predictions$noSE_overlap)) ## IF TRUE THIS MEANS SE DON'T OVERLAP
+  
+
   ## Save values into raster
-  height_rast <- dif_rast[[1]] ## Initialize raster
-  height_rast_null <- dif_rast[[1]]
+  rgr_rast <- dif_rast[[1]] ## Initialize raster
+  rgr_rast_null <- dif_rast[[1]]
+  rgr_rast_SEoverlap <- dif_rast[[1]]
   
-  values(height_rast) <- NA # Just in case the next line doesn't work
-  values(height_rast) <- c(height_predictions) # Save in real predictions
+  values(rgr_rast) <- NA # Just in case the next line doesn't work
+  values(rgr_rast) <- c(rgr_predictions$fit) # Save in real predictions
   
-  values(height_rast_null) <- NA # Just in case the next line doesn't work
-  values(height_rast_null) <- c(height_predictions_null) # Save in real predictions
+  values(rgr_rast_null) <- NA # Just in case the next line doesn't work
+  values(rgr_rast_null) <- c(rgr_predictions_null$fit) # Save in real predictions
+  
+  values(rgr_rast_SEoverlap) <- NA
+  values(rgr_rast_SEoverlap) <- c(rgr_predictions$noSE_overlap)
   
   ## Percent change in growth rates in comparison to no change 
-  height_rast_change <- ((height_rast - height_rast_null) / height_rast ) * 100
+  ## Formula == (new value - old value) / old value
+  rgr_rast_change <- ((rgr_rast - rgr_rast_null) / rgr_rast_null ) * 100
   
-  hist(height_rast_change)
+  hist(rgr_rast_change)
   
   
   ## Plot of predicted growth rates
   hsTheme <- modifyList(GrTheme(), list(regions=list(alpha=.15)))
-  heightTheme <- modifyList(RdBuTheme(), list(regions=list(alpha=1)))
+  rgrTheme <- modifyList(RdBuTheme(), list(regions=list(alpha=1)))
   
   pixel_num = 1e5 ## Can make resolution better by making this 1e6 
   
   ## Plot
   cat("Plotting % change in growth rates...")
   
-  p = levelplot(height_rast_change, 
-    #  levelplot(raster::mask(height_rast, rgeos::gBuffer(lobata_range, width = 0, byid = TRUE)),
-            contour = FALSE, margin = FALSE, par.settings = heightTheme, 
+  p = levelplot(rgr_rast_change, 
+    #  levelplot(raster::mask(rgr_rast, rgeos::gBuffer(lobata_range, width = 0, byid = TRUE)),
+            contour = FALSE, margin = FALSE, par.settings = rgrTheme, 
             maxpixels = pixel_num, colorkey = TRUE, main = "% Change in Relative Growth Rate") +
     levelplot(hill,  margin = FALSE, par.settings=hsTheme, maxpixels = pixel_num) +
     latticeExtra::layer(sp.polygons(cali_outline, lwd=2)) +
@@ -335,34 +347,56 @@ plot_future_growth <- function(gam_mod){
   
   print(p)
   
+  # ### Plot of areas where SEs don't overlap
+  # p = levelplot(rgr_rast_SEoverlap, 
+  #               contour = FALSE, margin = FALSE,
+  #               maxpixels = pixel_num, colorkey = TRUE, at = seq(0, 2, 1),
+  #               main = "% Change in Relative Growth Rate") +
+  #   levelplot(hill,  margin = FALSE, par.settings=hsTheme, maxpixels = pixel_num) +
+  #   latticeExtra::layer(sp.polygons(cali_outline, lwd=2)) +
+  #   latticeExtra::layer(sp.polygons(lobata_range,fill = "black", alpha = 0.15))
+  # 
+  # print(p)
   
-  ## Histogram of changes in relative height
+  
+  
+  ## Histogram of changes in relative rgr
   
   ## Across all of california
+  rgr_change_range = unlist(raster::extract(rgr_rast_change, lobata_range))
+  rgr_change_cali = unlist(raster::extract(rgr_rast_change, 1:ncell(rgr_rast)))
   
-  height_change_range = unlist(raster::extract(height_rast_change, lobata_range))
-  height_change_cali = unlist(raster::extract(height_rast_change, 1:ncell(height_rast)))
+  cat("Summary of rgr change within Valley oak range \n")
+  print(summary(rgr_change_range))
   
-  summary(height_change_range)
-  summary(height_change_cali)
+  cat("Summary of rgr change across California \n")
+  print(summary(rgr_change_cali))
   
   ## Growth within range
-  p = ggplot(data.frame(height_change_range),
-         aes(height_change_range)) + 
-    geom_histogram(color = "black", fill = "steelblue2") + theme_bw() +
+  p = ggplot(data.frame(rgr_change_range),
+         aes(rgr_change_range)) + 
+    geom_histogram(color = "black", fill = "steelblue2") +
     geom_vline(xintercept = 0, lty = 2) + 
-    xlab("% Change in relative growth rate within range") + 
-    theme(plot.margin = margin(1, 1, 1, 1, "cm"))
+    xlab("% change in relative growth rate") + 
+    ggtitle("Within Valley oak range") +
+    theme_bw() +
+    theme(axis.text=element_text(size=12),
+                axis.title=element_text(size=14),
+                plot.margin = unit(c(1,1,1,1), "cm"))
   
   print(p)
   
   ## Growth within Cali
-  p = ggplot(data.frame(height_change_cali),
-         aes(height_change_cali)) + 
-    geom_histogram(color = "black", fill = "steelblue2") + theme_bw() +
+  p = ggplot(data.frame(rgr_change_cali),
+         aes(rgr_change_cali)) + 
+    geom_histogram(color = "black", fill = "steelblue2") + 
     geom_vline(xintercept = 0, lty = 2) +
-    xlab("% Change in relative growth rate within California") + 
-    theme(plot.margin = margin(1, 1, 1, 1, "cm"))
+    xlab("% change in relative growth rate") + 
+    ggtitle("Across California") +
+    theme_bw() +
+    theme(axis.text=element_text(size=12),
+                axis.title=element_text(size=14),
+                plot.margin = unit(c(1,1,1,1), "cm"))
   
   print(p)
   
