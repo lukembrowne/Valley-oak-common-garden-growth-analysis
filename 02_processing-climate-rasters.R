@@ -20,7 +20,7 @@ library(maptools)
 
 ## Read in climate variables - https://adaptwest.databasin.org/pages/adaptwest-climatena
 
-  dir_name <- ".data/gis/dem/"
+  dir_name <- "./data/gis/climate_data/NA_NORM_8110_Monthly_netCDF/"
   
   raster_files <- list.files(dir_name, full.names = TRUE)
   raster_files <- raster_files[grep("*.nc", raster_files)] # Only those with nc extension
