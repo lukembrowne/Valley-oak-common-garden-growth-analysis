@@ -27,6 +27,8 @@ rm(list = ls()) ## Clean workspace
   garden_climate <- garden_climate %>%
     group_by(site) %>%
     summarise_all(mean)
+  
+  garden_climate$elev <- garden_climate$Elevation
 
   ## Load in california outline
   cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
@@ -93,7 +95,7 @@ rm(list = ls()) ## Clean workspace
   
   
 
-# Formatting height -------------------------------------------------------
+# Formatting height and elev -------------------------------------------------------
     
   ### Setting max height to main height if secondary stem is larger
   for(i in 1:nrow(dat_all)){
@@ -150,6 +152,11 @@ rm(list = ls()) ## Clean workspace
     # View(dat_all[dat_all$rgr < -1 & !is.na(dat_all$rgr), ])
      
     # View(dat_all[dat_all$rgr > 1 & !is.na(dat_all$rgr), ])
+  
+  
+  ## Log transform elevation to test it out
+  dat_all$elev <- log(dat_all$elev + 10)
+  
 
 
 # Reading in GBS data -----------------------------------------------------
@@ -200,6 +207,19 @@ rm(list = ls()) ## Clean workspace
     ## Moms that do not have GBS data
     # View(gbs_garden_key[!(gbs_garden_key$mom %in% admix_results$mom), ])
     
+  ## Join to main dataset
+    
+    admix_results <- left_join(admix_results, 
+                               dplyr::select(gbs_garden_key, mom, 
+                                             `Common Garden Accession Number`),
+                               by = c("mom" = "mom"))
+    
+    dat_all <- left_join(dat_all, 
+                         dplyr::select(admix_results, -mom, -prov),
+                         by = c("mom" = "Common Garden Accession Number"))
+    
+    summary(dat_all$cluster1)
+    
     
   ### Average cluster assignment at the provenance level
   ## So that we are able to use information from samples across the provenance 
@@ -224,26 +244,36 @@ rm(list = ls()) ## Clean workspace
   
   
   ## Assign cluster based on majority assignment
+  
+  ## Individual level
   dat_all$cluster_assigned <- NA
-  dat_all$cluster_assigned[dat_all$cluster1_avg >= 0.50 & !is.na(dat_all$cluster1_avg)] <- "1"
-  dat_all$cluster_assigned[dat_all$cluster2_avg >= 0.50 & !is.na(dat_all$cluster2_avg)] <- "2"
-  dat_all$cluster_assigned[dat_all$cluster3_avg >= 0.50 & !is.na(dat_all$cluster3_avg)] <- "3"
-  dat_all$cluster_assigned[dat_all$cluster4_avg >= 0.50 & !is.na(dat_all$cluster4_avg)] <- "4"
-  dat_all$cluster_assigned[dat_all$cluster5_avg >= 0.50 & !is.na(dat_all$cluster5_avg)] <- "5"
+  dat_all$cluster_assigned[dat_all$cluster1 >= 0.50 & !is.na(dat_all$cluster1)] <- "1"
+  dat_all$cluster_assigned[dat_all$cluster2 >= 0.50 & !is.na(dat_all$cluster2)] <- "2"
+  dat_all$cluster_assigned[dat_all$cluster3 >= 0.50 & !is.na(dat_all$cluster3)] <- "3"
+  dat_all$cluster_assigned[dat_all$cluster4 >= 0.50 & !is.na(dat_all$cluster4)] <- "4"
+  dat_all$cluster_assigned[dat_all$cluster5 >= 0.50 & !is.na(dat_all$cluster5)] <- "5"
+
+  ## Provenance level
+  dat_all$cluster_assigned_prov <- NA
+  dat_all$cluster_assigned_prov[dat_all$cluster1_avg >= 0.50 & !is.na(dat_all$cluster1_avg)] <- "1"
+  dat_all$cluster_assigned_prov[dat_all$cluster2_avg >= 0.50 & !is.na(dat_all$cluster2_avg)] <- "2"
+  dat_all$cluster_assigned_prov[dat_all$cluster3_avg >= 0.50 & !is.na(dat_all$cluster3_avg)] <- "3"
+  dat_all$cluster_assigned_prov[dat_all$cluster4_avg >= 0.50 & !is.na(dat_all$cluster4_avg)] <- "4"
+  dat_all$cluster_assigned_prov[dat_all$cluster5_avg >= 0.50 & !is.na(dat_all$cluster5_avg)] <- "5"
   
   table(dat_all$cluster_assigned)
+  table(dat_all$cluster_assigned_prov) ## SHould be more in this category
   
   dat_all$cluster_assigned <- factor(dat_all$cluster_assigned) # Refactor
-  
+  dat_all$cluster_assigned_prov <- factor(dat_all$cluster_assigned_prov) # Refactor
   
   ## Plot of RGR by cluster
   boxplot(rgr ~ cluster_assigned, dat_all)
   
-  
   ## How many seedlings not assigned?
   sum(is.na(dat_all$cluster_assigned)) 
   
-  
+
   
   ### Plot circle graph onto map of population assignment
   cali_fort <- fortify(cali_outline) ## Fortify to print california outline
@@ -255,6 +285,9 @@ rm(list = ls()) ## Clean workspace
     mutate(cluster_assigned = factor(cluster_assigned))
   
   ## Make plot
+  
+  
+  ## Provenance level - pie chart
   ggplot() + geom_scatterpie(aes(x = lon, y = lat, group = prov, r = .2),
                              data = dat_all_prov_avg,
                              cols = colnames(dplyr::select(dplyr::select(dat_all_prov_avg, 
@@ -262,13 +295,31 @@ rm(list = ls()) ## Clean workspace
                                                            contains("_avg"))))+
     coord_equal() + 
     geom_path(data = cali_fort, aes(x = long, y = lat, group = group )) +
-    theme_bw()
-  
+    theme_bw() + theme(axis.text=element_text(size=12),
+                       axis.title=element_text(size=14),
+                       plot.margin = unit(c(1,1,1,1), "cm"))
+
+  ### Point plot of assigned cluster provenance level
   ggplot(dat_all_prov_avg[dat_all_prov_avg$cluster_assigned != "NaN",]) + 
     geom_point(aes(x = lon, y = lat, col = cluster_assigned), size = 3) +
     coord_equal() + 
     geom_path(data = cali_fort, aes(x = long, y = lat, group = group )) +
     theme_bw()
+  
+  
+  ### Point plot of assigned cluster individual level
+  ggplot(dat_all[dat_all$cluster_assigned != "NaN",]) + 
+    geom_point(aes(x = lon, y = lat, 
+                    fill = cluster_assigned), col = "black", pch = 21, size = 4, alpha = 0.5) +
+    coord_equal() + 
+    geom_path(data = cali_fort, aes(x = long, y = lat, group = group )) +
+    theme_bw()
+  
+  
+  ## Table of cluster by provenance
+  table(dat_all$prov, dat_all$cluster_assigned)
+  
+  table(dat_all$prov, dat_all$cluster_assigned_prov)
   
   
   
@@ -348,20 +399,21 @@ rm(list = ls()) ## Clean workspace
 # Choose climate variables ------------------------------------------------
 
   ## All climate variables - both averaged across year and by season, excluding radiaton  
-  # climate_vars = colnames(
-  #   #  dplyr::select(dat_all, Tmax_wt:RH,  ## Seasonal and annual variables
-  #   dplyr::select(dat_all, MAT:RH, ## Just annual variables
-  #                 #  dplyr::select(dat_all, Tmax_wt:RH_at, ## Seasonal variables
-  #                 -contains("Rad"), - contains("MAR"), ## Getting rid of solar radiation
-  #                 -contains("DD_0_sm"), -contains("PAS_sm"))) ## Do not vary at all..
+  climate_vars = c(colnames(
+    #  dplyr::select(dat_all, Tmax_wt:RH,  ## Seasonal and annual variables
+    dplyr::select(dat_all, MAT:RH, ## Just annual variables
+                  #  dplyr::select(dat_all, Tmax_wt:RH_at, ## Seasonal variables
+                  -contains("Rad"), - contains("MAR"), ## Getting rid of solar radiation
+                  -contains("DD_0_sm"), -contains("PAS_sm"))), ## Do not vary at all..
+                  "Tmax", "Tmin")
   
   
   ### Climate vars from previous sork papers
-  climate_vars = c("CMD", "MWMT", "MCMT", "DD5") 
-  
-  climate_vars = c("CMD", "Tmax", "Tmin", "DD5")
+ # climate_vars = c("CMD", "Tmax", "Tmin", "DD5", "elev")
   
   climate_vars_dif <- paste(climate_vars, "_dif", sep = "")
+  
+ # climate_vars_dif <- climate_vars_dif[-which(climate_vars_dif == "elev_dif")]
   
   x = 1
   
@@ -426,9 +478,14 @@ rm(list = ls()) ## Clean workspace
                 dat_all$rgr >= quantile(dat_all$rgr, 0.99, na.rm = TRUE)] <- NA
   dat_all <- dplyr::filter(dat_all, !is.na(rgr))
   
-  ## Filter out individuals without genetic data at the provenance level
-  # dat_all <- dplyr::filter(dat_all, !is.na(cluster1_avg))
+  ## Filter out individuals without genetic data at the INDIVIDUAL level
+  # dat_all <- dplyr::filter(dat_all, !is.na(cluster1))
   # dat_all <- dplyr::filter(dat_all, !is.na(cluster_assigned))
+
+
+  ## Filter out individuals without genetic data at the PROVENANCE level
+  # dat_all <- dplyr::filter(dat_all, !is.na(cluster1_avg))
+  # dat_all <- dplyr::filter(dat_all, !is.na(cluster_assigned_prov))
 
 # Scaling predictor variables -------------------------------------------------------
 

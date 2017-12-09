@@ -44,7 +44,6 @@ fit_DD5 <- gamm4(rgr ~ s(height_2016)
                   random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
                   data = dat_all_scaled)
 
-
 # Checking model ----------------------------------------------------------
 
 check_model <- function(gamm4_out){
@@ -58,12 +57,12 @@ check_model <- function(gamm4_out){
   
   print(anova(gamm4_out$gam))
   
-  gam.check(gamm4_out$gam)
+  #gam.check(gamm4_out$gam)
 
 }
 
 
-plot_gam <- function(mod, var, var_index, xlab, plot_raw_pts = TRUE){
+plot_gam <- function(mod, var, var_index, xlab, plot_raw_pts = TRUE, PCA = FALSE){
   
   plt <- plot(mod, pages = 1) ## Extract info from mgcv plot.gam function
   
@@ -73,7 +72,11 @@ plot_gam <- function(mod, var, var_index, xlab, plot_raw_pts = TRUE){
                        se = plt[[var_index]]$se)
   
   ## Scale x axis back to original units
-  plt_df$x_orig <- (plt_df$x_scaled * scaled_var_sds[[var]]) + scaled_var_means[[var]]
+  if(PCA == FALSE) {
+   plt_df$x_orig <- (plt_df$x_scaled * scaled_var_sds[[var]]) + scaled_var_means[[var]]
+  } else {
+    plt_df$x_orig <- plt_df$x_scaled
+  }
   
   ## Add back in intercept to fitted values
   plt_df$fit <- plt_df$fit + mod$coefficients[["(Intercept)"]]
@@ -96,16 +99,14 @@ plot_gam <- function(mod, var, var_index, xlab, plot_raw_pts = TRUE){
   
 }
 
+
+
   ## Height only
   check_model(fit_height_only)
   plot_gam(fit_height_only$gam, var = "height_2016", var_index = 1, 
            xlab = "Height 2016", plot_raw_pts = T)
   ggsave(filename = "./figs_tables/Height only.pdf", scale = .75)
   
-  
-  summary(fit_height_only$gam)
-  
-
   ## CMD
   check_model(fit_CMD)
   plot_gam(fit_CMD$gam, var = "CMD_dif", var_index = 2, 
@@ -115,13 +116,13 @@ plot_gam <- function(mod, var, var_index, xlab, plot_raw_pts = TRUE){
   ## Tmax
   check_model(fit_Tmax)
   plot_gam(fit_Tmax$gam, var = "Tmax_dif", var_index = 2, 
-           xlab = "Tmax_dif", plot_raw_pts = T)
+           xlab = "Tmax_dif", plot_raw_pts = F)
   ggsave(filename = "./figs_tables/Tmax_dif no pts.pdf", scale = .75)
   
   ## Tmin
   check_model(fit_Tmin)
   plot_gam(fit_Tmin$gam, var = "Tmin_dif", var_index = 2,
-           xlab = "Tmin_dif", plot_raw_pts = T)
+           xlab = "Tmin_dif", plot_raw_pts = F)
   ggsave(filename = "./figs_tables/Tmin_dif pts.pdf", scale = .75)
   
   
@@ -136,14 +137,153 @@ plot_gam <- function(mod, var, var_index, xlab, plot_raw_pts = TRUE){
 
 # Climate models with genetic interactions --------------------------------
 
+  ### Need to rerun 01_clean process script with filtering for GBS data
   
+  ## Individual climate variables
+  fit_CMD_clust <- gamm4(rgr ~ s(height_2016)
+                   + s(CMD_dif, by = cluster_assigned),
+                   random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
+                   data = dat_all_scaled)
   
+  fit_Tmin_clust <- gamm4(rgr ~ s(height_2016)
+                    + s(Tmin_dif, by = cluster_assigned),
+                    random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
+                    data = dat_all_scaled)
   
+  fit_Tmax_clust <- gamm4(rgr ~ s(height_2016)
+                          + s(Tmax_dif, by = cluster_assigned)
+                          random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
+                          data = dat_all_scaled)
   
+  fit_DD5_clust <- gamm4(rgr ~ s(height_2016)
+                   + s(DD5_dif, by = cluster_assigned),
+                   random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
+                   data = dat_all_scaled)
   
+
+  ## Compare models with and without genetic cluster interactions
+    anova(fit_CMD_clust$mer, fit_CMD$mer)
+    anova(fit_Tmin_clust$mer, fit_Tmin$mer)
+    anova(fit_Tmax_clust$mer, fit_Tmax$mer)
+    anova(fit_DD5_clust$mer, fit_DD5$mer)
+    
+    
+    fit_Tmax_clust <- gamm4(rgr ~ s(height_2016)
+                            + s(Tmax_dif, by = Tmax),
+                            random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
+                            data = dat_all_scaled)
+    
+    
+    
+
+# Adding elevation to models ----------------------------------------------
+
+    ## Individual climate variables
+    fit_CMD_elev <- gamm4(rgr ~ s(height_2016)
+                           +s(CMD_dif)
+                           +s(elev)
+                           + t2(CMD_dif, elev),
+                           random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
+                           data = dat_all_scaled)
+    
+    fit_Tmin_elev <- gamm4(rgr ~ s(height_2016)
+                            + t2(Tmin_dif, elev),
+                            random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
+                            data = dat_all_scaled)
+    
+    fit_Tmax_elev <- gamm4(rgr ~ s(height_2016)
+                            +s(Tmax_dif)
+                            +s(elev),
+                          #  + t2(Tmax_dif, elev),
+                            random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
+                            data = dat_all_scaled)
+    
+    ## DD5
+    fit_DD5_elev <- gamm4(rgr ~ s(height_2016)
+                           +s(DD5_dif)
+                           +s(elev)
+                           + t2(DD5_dif, elev),
+                           random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
+                           data = dat_all_scaled)
+    
+    fit_DD5_elev_noint <- gamm4(rgr ~ s(height_2016)
+                          +s(DD5_dif)
+                          +s(elev),
+                          random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
+                          data = dat_all_scaled)
+    
+    
+    ## Compare models with and without genetic elever interactions
+    anova(fit_CMD_elev$mer, fit_CMD$mer) ## No interaction
+    anova(fit_Tmin_elev$mer, fit_Tmin$mer) ## 
+    anova(fit_Tmax_elev$mer, fit_Tmax$mer) ## Elev but no interaction
+    anova(fit_DD5_elev$mer, fit_DD5_elev_noint$mer, fit_DD5$mer) ##  Elev but no interaction
+    
+    
+    anova(fit_Tmax$mer, fit_Tmax_old$mer)
+    
+    vis.gam(fit_Tmax_elev_int$gam, view = c("elev", "Tmax_dif"), theta = 45, phi = 25)
+    
+    vis.gam(fit_Tmax_elev_int$gam, view = c("elev", "Tmax_dif"), plot.type = "contour")
+    
+    ## Tmax
+    check_model(fit_Tmax_elev)
+    plot_gam(fit_Tmax_elev$gam, var = "elev", var_index = 3, 
+             xlab = "elev", plot_raw_pts = F)
+    
   
-  
-  
+
+# Models with PC of climate variables -------------------------------------
+
+    # Null model with only random effects
+    fit_null<- gamm4(rgr  ~ 1,
+                     random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
+                     data = dat_all_scaled)
+    
+    # Height in 2016 only
+    fit_height_only <- gamm4(rgr  ~ s(height_2016),
+                             random = ~ (1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
+                             data = dat_all_scaled)
+    
+    ## PC Climate variables
+    fit_clim_pca <- gamm4(rgr ~ s(height_2016)
+                     + PC1_clim_dif
+                     + s(PC2_clim_dif)
+                     + s(PC3_clim_dif),
+                     random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
+                     data = dat_all_scaled)
+    
+    fit_clim_pca_clust <- gamm4(rgr ~ s(height_2016)
+                          + s(PC1_clim_dif, by = cluster_assigned)
+                          + s(PC2_clim_dif, by = cluster_assigned)
+                          + s(PC3_clim_dif, by = cluster_assigned)
+                          + s(PC4_clim_dif, by = cluster_assigned),
+                          random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
+                          data = dat_all_scaled)
+    
+    
+    
+    ## Check PC climate variables
+    check_model(fit_clim_pca)
+    
+    ## These don't work right if not a smoothing factor!!
+    
+    plot_gam(fit_clim_pca$gam, var = "PC1_clim_dif", var_index = 2, 
+             xlab = "PC1_clim_dif", plot_raw_pts = F, PCA = TRUE)
+    
+    plot_gam(fit_clim_pca$gam, var = "PC2_clim_dif", var_index = 3, 
+             xlab = "PC2_clim_dif", plot_raw_pts = F, PCA = TRUE)
+    
+    plot_gam(fit_clim_pca$gam, var = "PC3_clim_dif", var_index = 4, 
+             xlab = "PC3_clim_dif", plot_raw_pts = F, PCA = TRUE)
+    
+    plot_gam(fit_clim_pca$gam, var = "PC4_clim_dif", var_index = 5, 
+             xlab = "PC4_clim_dif", plot_raw_pts = F, PCA = TRUE)
+    
+
+    
+      
+
 # Graveyard ---------------------------------------------------------------
 
 

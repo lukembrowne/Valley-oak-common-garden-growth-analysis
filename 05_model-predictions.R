@@ -75,8 +75,11 @@ future_files <- c(list.files(path="./data/gis/climate_data/NA_ENSEMBLE_rcp85_208
     }
     
     ## Calculate difference between future and current values
+    
+     Tmax_current_rast_max <- max(Tmax_current_rast)
+     names(Tmax_current_rast_max) <- "Tmax"
   
-    Tmax_dif_rast <- max(Tmax_future_rast) - max(Tmax_current_rast)
+    Tmax_dif_rast <- max(Tmax_future_rast) - Tmax_current_rast_max
     names(Tmax_dif_rast) <- "Tmax_dif"
     plot(Tmax_dif_rast)
     
@@ -107,10 +110,15 @@ future_files <- c(list.files(path="./data/gis/climate_data/NA_ENSEMBLE_rcp85_208
     
     ## Calculate difference between future and current values
     
-    Tmin_dif_rast <- min(Tmin_future_rast) - min(Tmin_current_rast)
+    Tmin_current_rast_min <- min(Tmin_current_rast)
+    names(Tmin_current_rast_min) <- "Tmin"
+    
+    Tmin_dif_rast <- min(Tmin_future_rast) - Tmin_current_rast_min
     names(Tmin_dif_rast) <- "Tmin_dif"
     
     plot(Tmin_dif_rast) 
+    
+
 
 
 ## Loop through climate variables and calculate difference between future 
@@ -158,12 +166,16 @@ future_files <- c(list.files(path="./data/gis/climate_data/NA_ENSEMBLE_rcp85_208
     x = x+1
   }  
   
-  names(dif_rast) <- gsub("cropped", "dif", gsub("X.", "", names(dif_rast)))
+  names(dif_rast) <- gsub("cropped", "dif", gsub("^X.", "", names(dif_rast)))
   names(cur_rast) <- gsub("_dif", "", names(dif_rast))
   
   ### Add in Tmax and Tmin difference rasts
   dif_rast <- raster::stack(dif_rast, Tmax_dif_rast)
   dif_rast <- raster::stack(dif_rast, Tmin_dif_rast)
+  
+  ## Add Tmax and Tmin to current rasters
+  cur_rast <- raster::stack(cur_rast, Tmax_current_rast_max)
+  cur_rast <- raster::stack(cur_rast, Tmin_current_rast_min)
   
   
   dif_rast_raw  <- dif_rast # Intermediate object so don't have to reload if change masking
@@ -174,6 +186,19 @@ future_files <- c(list.files(path="./data/gis/climate_data/NA_ENSEMBLE_rcp85_208
 
   dif_rast = dif_rast_raw
   # dif_rast <- raster::mask(dif_rast_raw, rgeos::gBuffer(lobata_range,                                                      width = 0, byid = TRUE))
+  ## If including current conditions
+ # dif_rast <- raster::stack(dif_rast_raw, cur_rast)
+  
+  
+
+# Scaling elevation data --------------------------------------------------
+
+  elev_rast <- dem
+  names(elev_rast) <- "elev"
+  elev_rast <- log(elev_rast + 10) ## Similar to how it was handled in processing script
+
+  elev_df <- data.frame(elev = raster::extract(elev_rast, 1:ncell(elev_rast)))
+  summary(elev_df)
   
 
 # Extract and scale values ------------------------------------------------
@@ -181,13 +206,14 @@ future_files <- c(list.files(path="./data/gis/climate_data/NA_ENSEMBLE_rcp85_208
   ## Extract values from raster into dataframe
   extracted_vals = raster::extract(dif_rast, 1:ncell(dif_rast))
   extracted_vals <- as.data.frame(extracted_vals)
-
+  
+  ## Add in elevation
+  extracted_vals <- cbind(extracted_vals, elev_df)
 
   ### Scale extracted values to match with scaled variables
-
   extracted_vals_scaled <- extracted_vals
   
-    for(var in climate_vars_dif){
+    for(var in c(climate_vars_dif, "elev")){
       extracted_vals_scaled[, var] <- (extracted_vals[, var] - scaled_var_means[var]) / 
         scaled_var_sds[var]
     }
@@ -244,32 +270,27 @@ future_files <- c(list.files(path="./data/gis/climate_data/NA_ENSEMBLE_rcp85_208
 
 
 
-# Make layers for PCA model -----------------------------------------------
-
-  ### PCA model  
-  ### Make new rasters of each PC by calculating their loadings
-  # predictions <- predict(clim_pca, newdata = extracted_vals_scaled)
-  # predictions <- as.data.frame(predictions)
-  # 
-  # summary(predictions)
-  # 
-  # pc1_rast <- dif_rast[[1]]
-  # 
-  # values(pc1_rast) <- predictions$PC1
-  # 
-  # levelplot(pc1_rast, contour = TRUE, margin = FALSE)
-  # 
-
-
 # Model predictions -------------------------------------------------------
 
   
-plot_future_growth <- function(gam_mod){
+plot_future_growth <- function(gam_mod, PCA = FALSE){
   
   ## Make prediction dataframe
   # Doesn't matter for univariate models if there are >1 climatic variables in this DF
-  predictions <- extracted_vals_scaled[, climate_vars_dif] 
-  summary(predictions)
+  if(PCA == FALSE){
+    predictions <- extracted_vals_scaled[, c(climate_vars_dif, "elev")] 
+     summary(predictions) 
+  }  else if(PCA == TRUE){
+    ## PCA model
+    ## Make new rasters of each PC by calculating their loadings
+    
+    predictions <- predict(clim_pca, newdata = extracted_vals_scaled)
+    predictions <- as.data.frame(predictions)
+    
+    colnames(predictions) <- paste(colnames(predictions), "_clim_dif", sep = "")
+    
+    summary(predictions)
+  }
   
   predictions$height_2016 <-  0 ## Use average seedling height
   predictions$cluster_assigned <- 1 ## If using genetic model
@@ -283,6 +304,16 @@ plot_future_growth <- function(gam_mod){
   }
   summary(predictions_null)
   
+  ## Convert to PCs
+  if(PCA == TRUE){
+    predictions_null <- predict(clim_pca, newdata = predictions_null)
+    
+    colnames(predictions_null) <- paste(colnames(predictions_null), "_clim_dif", sep = "")
+    
+    predictions_null <- as.data.frame(predictions_null)
+    
+    predictions_null$height_2016 <-  0 ## Use average seedling height
+  }
   
   ## Generate predictions
   rgr_predictions =  predict(gam_mod, predictions, 
@@ -292,10 +323,12 @@ plot_future_growth <- function(gam_mod){
   summary(rgr_predictions$fit)
   hist(rgr_predictions$fit)
   
+  ## Null model
   rgr_predictions_null <-  predict(gam_mod, predictions_null, 
                                       re.form = NA, type = "response",
                                       se.fit = TRUE)
   summary(rgr_predictions_null$fit)
+  hist(rgr_predictions_null$fit)
   
   ## Calculating points where SEs don't overlap
   rgr_predictions$upper <- (rgr_predictions$fit + 2 * rgr_predictions$se.fit)
@@ -325,14 +358,23 @@ plot_future_growth <- function(gam_mod){
   ## Formula == (new value - old value) / old value
   rgr_rast_change <- ((rgr_rast - rgr_rast_null) / rgr_rast_null ) * 100
   
+  ## Getting rid of outliers
+  rgr_rast_change[rgr_rast_change < quantile(rgr_rast_change, 0.025) | 
+                    rgr_rast_change > quantile(rgr_rast_change, 0.975)] <- NA
+  
+  rgr_rast_change[rgr_rast_change < -100 | 
+                    rgr_rast_change > 100] <- NA
+  summary(rgr_rast_change)
   hist(rgr_rast_change)
+  
+  ## Problem cells [1] 1068038 1361177 1486313
   
   
   ## Plot of predicted growth rates
   hsTheme <- modifyList(GrTheme(), list(regions=list(alpha=.15)))
   rgrTheme <- modifyList(RdBuTheme(), list(regions=list(alpha=1)))
   
-  pixel_num = 1e5 ## Can make resolution better by making this 1e6 
+  pixel_num = 1e6 ## Can make resolution better by making this 1e6 
   
   ## Plot
   cat("Plotting % change in growth rates...")
@@ -402,17 +444,24 @@ plot_future_growth <- function(gam_mod){
   
 } # End function
   
+  
+  
+  
   ## CMD
   plot_future_growth(fit_CMD$gam)
   
   ## Tmax
   plot_future_growth(fit_Tmax$gam)
+  plot_future_growth(fit_Tmax_elev$gam)
   
   ## Tmin
   plot_future_growth(fit_Tmin$gam)
   
   ## DD5
   plot_future_growth(fit_DD5$gam)
+  
+  ## PCA model
+  plot_future_growth(fit_clim_pca$gam, PCA = TRUE)
   
   
 
