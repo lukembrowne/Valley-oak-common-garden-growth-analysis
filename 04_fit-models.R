@@ -254,17 +254,17 @@ plot_gam <- function(mod, var, var_index, xlab, plot_raw_pts = TRUE, PCA = FALSE
                      data = dat_all_scaled)
     
     fit_clim_pca_clust <- gamm4(rgr ~ s(height_2016)
-                          + s(PC1_clim_dif, by = cluster_assigned)
-                          + s(PC2_clim_dif, by = cluster_assigned)
-                          + s(PC3_clim_dif, by = cluster_assigned)
-                          + s(PC4_clim_dif, by = cluster_assigned),
+                          + s(PC2_clim_dif, by = PC1_gen_avg),
+                         # + s(PC2_clim_dif, by = PC1_gen_avg)
+                          #+ s(PC3_clim_dif, by = PC1_gen_avg)
+                          #+ s(PC4_clim_dif, by = PC1_gen_avg),
                           random = ~(1|block) + (1|prov) + (1|mom) + (1|row) + (1|column),
                           data = dat_all_scaled)
     
     
     
     ## Check PC climate variables
-    check_model(fit_clim_pca)
+    check_model(fit_clim_pca_clust)
     
     ## These don't work right if not a smoothing factor!!
     

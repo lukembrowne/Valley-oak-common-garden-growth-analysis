@@ -484,8 +484,8 @@ rm(list = ls()) ## Clean workspace
 
 
   ## Filter out individuals without genetic data at the PROVENANCE level
-  # dat_all <- dplyr::filter(dat_all, !is.na(cluster1_avg))
-  # dat_all <- dplyr::filter(dat_all, !is.na(cluster_assigned_prov))
+  dat_all <- dplyr::filter(dat_all, !is.na(cluster1_avg))
+  dat_all <- dplyr::filter(dat_all, !is.na(cluster_assigned_prov))
 
 # Scaling predictor variables -------------------------------------------------------
 
