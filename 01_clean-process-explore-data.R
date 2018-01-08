@@ -6,19 +6,18 @@ library(scatterpie)
 library(qtlcharts)
 
 
-rm(list = ls()) ## Clean workspace
-
 # Load data ---------------------------------------------------------------
 
   ## Load in garden data 
-  dat_all <- read_csv("./data/cleaned_data/Growth data  2016_2017 census 2017_11_15.csv")
+  dat_all_raw <- read_csv("./data/cleaned_data/Growth data  2016_2017 census 2017_11_15.csv")
+  dat_all <- dat_all_raw
   dat_all$lat <- NULL; dat_all$lon <- NULL; dat_all$elev <- NULL ## Clean up before merge
   
-  ## Read in climate data of individuals and merge with 
-  climate_ind <- read_csv("./data/cleaned_data/Climate data for all individuals 2017_09_27.csv")
+  ## Read in climate data of of maternal trees and merge with master data
+  climate_mom <- read_csv("./data/cleaned_data/maternal tree climate data BCM 1950-1981 2017_12_12.csv")
   
   ## Merge data
-  dat_all <- left_join(dat_all, climate_ind, by = c("prov", "mom", "progeny"))
+  dat_all <- left_join(dat_all, climate_mom)
   
   ## Load in climate of common garden locations - 2010 to 2015
   garden_climate <- read_csv("./data/cleaned_data/CommonGardenClimate 2017_09_28.csv")

@@ -11,8 +11,15 @@ library(maptools)
 library(climates)
 
 
-## Average across moms to create base DF
-  ## Add variables to data frame
+
+
+  
+# Read in Historical BCM data --------------------------------------------------------
+  
+  ## California Basin Characterization Model  
+  ## https://ecologicalprocesses.springeropen.com/articles/10.1186/2192-1709-2-25
+  
+
   dat_mom <- dat_all_raw %>%
     dplyr::select(mom, lat, lon) %>%
     group_by(mom) %>%
@@ -21,44 +28,33 @@ library(climates)
   dim(dat_mom) ## Should be 659
   
   head(dat_mom)
+  
+  
+  ## Directory path to where 1951-1980 historical BCM climate data is located
+  dir_name <- "./data/gis/climate_data/BCM/historical/"
+  
+    ## Creates vector with list of file paths to all .tif raster files
+    raster_files <- list.files(dir_name, full.names = TRUE, recursive = TRUE)
+    raster_files <- raster_files[grep("*[[:digit:]].tif$", raster_files)] # Only those with .tif extension
+    
 
-  
-# Read in BCM data --------------------------------------------------------
-  
-  ## California Basin Characterization Model  
-  ## https://ecologicalprocesses.springeropen.com/articles/10.1186/2192-1709-2-25
-  
-  
-  ## Get list of file names for TIF files
-  
-  ## Directory path to where BCM climate data is located
-  dir_name <- "./data/gis/climate_data/BCM/"
-
-  ## Creates vector with list of file paths to all .tif raster files
-  raster_files <- list.files(dir_name, full.names = TRUE, recursive = TRUE)
-  raster_files <- raster_files[grep("*[[:digit:]].tif$", raster_files)] # Only those with .tif extension
-  
-  
   ## Loop through raster files and add climate values to dat_mom dataframe
   for(file in raster_files){
     
     cat("Working on file:", file, "...\n")
     
     ## Load in raster
-    raster_temp <- raster::raster(file) 
+    raster_temp <- raster::stack(file) 
     
     ## Project to lat long
     raster_latlong <- raster::projectRaster(raster_temp, crs="+proj=longlat +datum=WGS84") 
     
     ## Extract climate values to dataframe
-    
-    col_name <-  names(raster_temp)
-    
-    
+    col_name <-  names(raster_temp) ## Use for adding back to dataframe
+
     dat_mom[, col_name] <-  raster::extract(raster_latlong, dat_mom[, c("lon", "lat")])
     
-  }
-  
+  } ## End file loop
  
   head(dat_mom)
   
@@ -113,18 +109,76 @@ library(climates)
   ## Reorder columns
   dat_mom <- dat_mom %>%
     dplyr::select(mom, lat, lon, tmax, tmax_sum, tmin, tmin_winter,
-                  ppt, cwd, aet, bioclim_01:bioclim_19, tmax_01:tmax_12, tmin_01:tmin_12, ppt_01:ppt_12)
+                  ppt, cwd, aet, bioclim_01:bioclim_19, tmax_01:tmax_12, 
+                  tmin_01:tmin_12, ppt_01:ppt_12)
   
   ## Write to file
   
   #write_csv(dat_mom, path = "./data/cleaned_data/maternal tree climate data BCM 1950-1981 2017_12_12.csv")
   
   
-  
-  
-  
-  
-  
+
+# Read in current BCM climate data ----------------------------------------
+
+    dat_garden <- data.frame(site = c("chico", "placerville"),
+                          lat = c(39.710764, 38.740382),
+                          lon = c(-121.786064, -120.735832))
+    
+    ## Directory path to where monthly current BCM climate data is located
+    dir_name <- "./data/gis/climate_data/BCM/current/"
+    
+    
+    ## If files haven't already been projected to lat long
+    
+    # ## Creates vector with list of file paths to all .tif raster files
+    # raster_files <- list.files(dir_name, full.names = TRUE, recursive = TRUE)
+    # raster_files <- raster_files[grep("*.tif$", raster_files)] # Only those with .tif extension
+    # 
+    # ## Loop through raster files, convert to lat long if needed so we can extract values
+    # for(file in raster_files){
+    #   
+    #   cat("Working on file:", file, "...\n")
+    #   
+    #   ## Load in raster
+    #   raster_temp <- raster::stack(file) 
+    #   
+    #   ## Project to lat long and save to file
+    #   raster::projectRaster(raster_temp, crs="+proj=longlat +datum=WGS84",
+    #                        file = gsub(".tif", "_latlong.tif", file)) 
+    # 
+    # } ## End file loop
+    # 
+    
+    
+    ## Creates vector with list of file paths to all .tif raster files projected to lat long
+    raster_files <- list.files(dir_name, full.names = TRUE, recursive = TRUE)
+    raster_files <- raster_files[grep("*_latlong.tif$", raster_files)] # Only those with .tif extension
+
+    ## Loop through raster files
+    for(file in raster_files){
+      
+      raster_temp <- raster::stack(file) 
+      
+      ## Extract climate values to dataframe
+      dat_garden <- cbind(dat_garden, raster::extract(raster_temp, dat_garden[, c("lon", "lat")]))
+    
+    }
+    
+    str(dat_garden)
+    
+    ## Remove latlong from column names
+    colnames(dat_garden) <- gsub(pattern = "latlong.", "", colnames(dat_garden))
+    
+    ## Average across years !!
+    
+    dat_garden %>%
+      dplyr::select(-lat, -lon) %>%
+      tidyr::gather(site, var, aet_wy2014_1:tmx_wy2016_12 )
+    t = tidyr::gather(dat_garden, key = "var", site)
+    
+    head(t)
+    ## Need to figure out seasonal variables as well!!
+    
   
   
   
