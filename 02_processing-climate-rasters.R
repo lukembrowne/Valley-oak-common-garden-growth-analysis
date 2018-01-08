@@ -1,8 +1,16 @@
 
+## TODO
+
+# 1. Need to calculate bioclim variables for garden sites, after averaging across years
+# 2. Need to calculate out seasonal variables as well!!
+# 3. Need paul to send a list of trees that have GBS data and their coordinates
+
+
 
 ## This script loads a series of raster files in a directory, crops them to california outline (more or less), projects them into lat / long, and saves them as a geotiff format
 
 ## Load required packages
+library(tidyverse)
 library(raster)
 library(sp)
 library(maptools)
@@ -20,6 +28,8 @@ library(climates)
   ## https://ecologicalprocesses.springeropen.com/articles/10.1186/2192-1709-2-25
   
 
+## Climate variables for mom in common garden
+ ## Need to run 01_ r script first
   dat_mom <- dat_all_raw %>%
     dplyr::select(mom, lat, lon) %>%
     group_by(mom) %>%
@@ -29,6 +39,17 @@ library(climates)
   
   head(dat_mom)
   
+  
+  
+  
+  
+## Climate variables for GBS moms for Paul
+  
+  # dat_mom <- read_csv("./data/GBS_data/GBS Trees info 2017_Master.csv")
+  # dat_mom$lon <- dat_mom$Longitude; dat_mom$Longitude <- NULL;
+  # dat_mom$lat <- dat_mom$Latitude; dat_mom$Latitude <- NULL;
+  # dat_mom$gbs_lab <- paste(dat_mom$`Site Abbreviation`, dat_mom$`Mother Plant Field ID`, sep = "")
+  # 
   
   ## Directory path to where 1951-1980 historical BCM climate data is located
   dir_name <- "./data/gis/climate_data/BCM/historical/"
@@ -106,6 +127,7 @@ library(climates)
   str(dat_mom)
   
 
+  ## For common garden moms
   ## Reorder columns
   dat_mom <- dat_mom %>%
     dplyr::select(mom, lat, lon, tmax, tmax_sum, tmin, tmin_winter,
@@ -115,6 +137,22 @@ library(climates)
   ## Write to file
   
   #write_csv(dat_mom, path = "./data/cleaned_data/maternal tree climate data BCM 1950-1981 2017_12_12.csv")
+  
+  
+  
+  ## For GBS moms
+  ## Reorder columns
+  # dat_mom <- dat_mom %>%
+  #   dplyr::select(`Site Abbreviation`,
+  #                 `Mother Plant Field ID`,
+  #                 `Common Garden Accession Number`, lat, lon, tmax, tmax_sum, tmin, tmin_winter,
+  #                 ppt, cwd, aet, bioclim_01:bioclim_19, tmax_01:tmax_12, 
+  #                 tmin_01:tmin_12, ppt_01:ppt_12)
+  
+  ## Write to file
+  
+  # write_csv(dat_mom, path = "./data/cleaned_data/GBS maternal tree climate data BCM 1950-1981 2018_01_08.csv")
+  
   
   
 
@@ -177,6 +215,8 @@ library(climates)
     t = tidyr::gather(dat_garden, key = "var", site)
     
     head(t)
+    
+    
     ## Need to figure out seasonal variables as well!!
     
   
