@@ -3,9 +3,6 @@
 
 # 1. Need to calculate bioclim variables for garden sites, after averaging across years
 # 2. Need to calculate out seasonal variables as well!!
-# 3. Need paul to send a list of trees that have GBS data and their coordinates
-
-
 
 ## This script loads a series of raster files in a directory, crops them to california outline (more or less), projects them into lat / long, and saves them as a geotiff format
 
