@@ -141,17 +141,18 @@
       
   
 # Filtering data ----------------------------------------------------------
+      
+    ## Remove inviduals without an accession or progeny number
+      dat_all <- dplyr::filter(dat_all, !is.na(accession))
+      
   
-    ## Filter out individuals without an estimated RGR
-    dat_all <- dplyr::filter(dat_all, !is.na(rgr))
-    
-    ## Exclude trees that died of things like gophers or are shaded by trees
-    dat_all <- dat_all[-which(dat_all$exclude == "y"), ]
-    
-    ## Change to NA outlier values in relative growth rate
-    dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.01, na.rm = TRUE) |
-                  dat_all$rgr >= quantile(dat_all$rgr, 0.99, na.rm = TRUE)] <- NA
-    dat_all <- dplyr::filter(dat_all, !is.na(rgr))
-    
+    # ## Filter out individuals without an estimated RGR
+    # dat_all <- dplyr::filter(dat_all, !is.na(rgr))
+    # 
+    # ## Change to NA outlier values in relative growth rate
+    # dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.01, na.rm = TRUE) |
+    #               dat_all$rgr >= quantile(dat_all$rgr, 0.99, na.rm = TRUE)] <- NA
+    # dat_all <- dplyr::filter(dat_all, !is.na(rgr))
+    # 
   
 
