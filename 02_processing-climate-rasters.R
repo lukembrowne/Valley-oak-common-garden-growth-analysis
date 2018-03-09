@@ -1,9 +1,4 @@
 
-## TODO
-
-# 0. RERUN climate variables for common garden moms and see if thye match up with the data I've been sending out to everyone.
-# - Merge in climate data to dat_all dataset another script like 03 or something
-
 ## This script loads a series of raster files in a directory, crops them to california outline (more or less), projects them into lat / long, and saves them as a geotiff format
 
   ## Load required packages
@@ -136,7 +131,7 @@
 
 # Read in current BCM climate data for common garden sites ----------------------------------------
 
-    dat_garden <- data.frame(site = c("chico", "placerville"),
+    dat_garden <- data.frame(site = c("Chico", "IFG"),
                           lat = c(39.710764, 38.740382),
                           lon = c(-121.786064, -120.735832))
     
