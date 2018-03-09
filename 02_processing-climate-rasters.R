@@ -1,21 +1,23 @@
 
 ## TODO
 
-# 1. Need to calculate bioclim variables for garden sites, after averaging across years
-# 2. Need to calculate out seasonal variables as well!!
+# 0. RERUN climate variables for common garden moms and see if thye match up with the data I've been sending out to everyone.
+# - Merge in climate data to dat_all dataset another script like 03 or something
 
 ## This script loads a series of raster files in a directory, crops them to california outline (more or less), projects them into lat / long, and saves them as a geotiff format
 
-## Load required packages
-library(tidyverse)
-library(raster)
-library(sp)
-library(maptools)
+  ## Load required packages
+  library(tidyverse)
+  library(raster)
+  library(sp)
+  library(maptools)
+  
+  #install.packages("climates",,'http://rforge.net/',type='source', dependencies = TRUE)
+  library(climates)
+  
 
-#install.packages("climates",,'http://rforge.net/',type='source', dependencies = TRUE)
-library(climates)
 
-
+#### Run code below if needed to extract and write climate data to file
 
 
   
@@ -25,29 +27,16 @@ library(climates)
   ## https://ecologicalprocesses.springeropen.com/articles/10.1186/2192-1709-2-25
   
 
-## Climate variables for mom in common garden
- ## Need to run 01_ r script first
-  dat_mom <- dat_all_raw %>%
-    dplyr::select(mom, lat, lon) %>%
-    group_by(mom) %>%
-    summarise_all(mean)
+## Get locations of maternal trees in common garden
+  dat_mom <- gs_read(gs_key("1DUEV-pqV28D6qJl6vJM6S1VLWbxc9E71afufulDRbIc"), ws = 2)
   
+  ## Subset down to those with accession numbers
+  dat_mom <- dat_mom[!is.na(dat_mom$Accession),]
   dim(dat_mom) ## Should be 659
   
-  head(dat_mom)
+ ## unique(dat_17_raw$Accession)[which(!(unique(dat_17_raw$Accession) %in% dat_mom$Accession))]
   
-  
-  
-  
-  
-## Climate variables for GBS moms for Paul
-  
-  # dat_mom <- read_csv("./data/GBS_data/GBS Trees info 2017_Master.csv")
-  # dat_mom$lon <- dat_mom$Longitude; dat_mom$Longitude <- NULL;
-  # dat_mom$lat <- dat_mom$Latitude; dat_mom$Latitude <- NULL;
-  # dat_mom$gbs_lab <- paste(dat_mom$`Site Abbreviation`, dat_mom$`Mother Plant Field ID`, sep = "")
-  # 
-  
+
   ## Directory path to where 1951-1980 historical BCM climate data is located
   dir_name <- "./data/gis/climate_data/BCM/historical/"
   
@@ -70,7 +59,7 @@ library(climates)
     ## Extract climate values to dataframe
     col_name <-  names(raster_temp) ## Use for adding back to dataframe
 
-    dat_mom[, col_name] <-  raster::extract(raster_latlong, dat_mom[, c("lon", "lat")])
+    dat_mom[, col_name] <-  raster::extract(raster_latlong, dat_mom[, c("Longitude", "Latitude")])
     
   } ## End file loop
  
@@ -85,18 +74,18 @@ library(climates)
   colnames(dat_mom) <- gsub("1951_1980", "", colnames(dat_mom))
   
   ## Add month number to monthly variables
-  colnames(dat_mom) <- gsub("jan", "_01", colnames(dat_mom))
-  colnames(dat_mom) <- gsub("feb", "_02", colnames(dat_mom))
-  colnames(dat_mom) <- gsub("mar", "_03", colnames(dat_mom))
-  colnames(dat_mom) <- gsub("apr", "_04", colnames(dat_mom))
-  colnames(dat_mom) <- gsub("may", "_05", colnames(dat_mom))
-  colnames(dat_mom) <- gsub("jun", "_06", colnames(dat_mom))
-  colnames(dat_mom) <- gsub("jul", "_07", colnames(dat_mom))
-  colnames(dat_mom) <- gsub("aug", "_08", colnames(dat_mom))
-  colnames(dat_mom) <- gsub("sep", "_09", colnames(dat_mom))
-  colnames(dat_mom) <- gsub("oct", "_10", colnames(dat_mom))
-  colnames(dat_mom) <- gsub("nov", "_11", colnames(dat_mom))
-  colnames(dat_mom) <- gsub("dec", "_12", colnames(dat_mom))
+  colnames(dat_mom) <- gsub("jan", "_jan", colnames(dat_mom))
+  colnames(dat_mom) <- gsub("feb", "_feb", colnames(dat_mom))
+  colnames(dat_mom) <- gsub("mar", "_mar", colnames(dat_mom))
+  colnames(dat_mom) <- gsub("apr", "_apr", colnames(dat_mom))
+  colnames(dat_mom) <- gsub("may", "_may", colnames(dat_mom))
+  colnames(dat_mom) <- gsub("jun", "_jun", colnames(dat_mom))
+  colnames(dat_mom) <- gsub("jul", "_jul", colnames(dat_mom))
+  colnames(dat_mom) <- gsub("aug", "_aug", colnames(dat_mom))
+  colnames(dat_mom) <- gsub("sep", "_sep", colnames(dat_mom))
+  colnames(dat_mom) <- gsub("oct", "_oct", colnames(dat_mom))
+  colnames(dat_mom) <- gsub("nov", "_nov", colnames(dat_mom))
+  colnames(dat_mom) <- gsub("dec", "_dec", colnames(dat_mom))
   
   ## For seasonal variables
   colnames(dat_mom) <- gsub("djf", "_winter", colnames(dat_mom))
@@ -109,14 +98,22 @@ library(climates)
   names(dat_mom)
   
   ## Reorder columns so monthly variables are sequential
-  dat_mom <- dat_mom[, sort(colnames(dat_mom))]
+  dat_mom <- dat_mom[, c("Locality full name", "Locality", "Sample #",
+                         "Accession", "Latitude", "Longitude", "Elevation (m)", "aet",
+                         "cwd", "ppt", "tmin_winter", "tmax_sum", "tmax", "tmin",
+                         "ppt_jan","ppt_feb","ppt_mar","ppt_apr","ppt_may","ppt_jun",
+                         "ppt_jul","ppt_aug","ppt_sep","ppt_oct","ppt_nov","ppt_dec",
+                         "tmax_jan","tmax_feb","tmax_mar","tmax_apr","tmax_may","tmax_jun",
+                         "tmax_jul","tmax_aug","tmax_sep","tmax_oct","tmax_nov","tmax_dec",
+                         "tmin_jan","tmin_feb","tmin_mar","tmin_apr","tmin_may","tmin_jun",
+                         "tmin_jul","tmin_aug","tmin_sep","tmin_oct","tmin_nov","tmin_dec")]
   
 
 # Calculate Bioclimatic variables for each maternal tree ------------------
 
-  bioclim_vars <-  climates::bioclim2(tmin = as.data.frame(dplyr::select(dat_mom, tmin_01:tmin_12)),
-                     tmax = as.data.frame(dplyr::select(dat_mom, tmax_01:tmax_12)),
-                     prec = as.data.frame(dplyr::select(dat_mom, ppt_01:ppt_12)),
+  bioclim_vars <-  climates::bioclim2(tmin = as.data.frame(dplyr::select(dat_mom, tmin_jan:tmin_dec)),
+                     tmax = as.data.frame(dplyr::select(dat_mom, tmax_jan:tmax_dec)),
+                     prec = as.data.frame(dplyr::select(dat_mom, ppt_jan:ppt_dec)),
                      files.as.inputs = FALSE)
   
   dat_mom <- bind_cols(dat_mom, as.data.frame(bioclim_vars))
@@ -126,34 +123,18 @@ library(climates)
 
   ## For common garden moms
   ## Reorder columns
-  dat_mom <- dat_mom %>%
-    dplyr::select(mom, lat, lon, tmax, tmax_sum, tmin, tmin_winter,
-                  ppt, cwd, aet, bioclim_01:bioclim_19, tmax_01:tmax_12, 
-                  tmin_01:tmin_12, ppt_01:ppt_12)
+  dat_mom_final <- dat_mom %>%
+    dplyr::select(`Locality`,Accession, Latitude, Longitude, `Elevation (m)`, 
+                  tmax, tmax_sum, tmin, tmin_winter,
+                  ppt, cwd, aet, bioclim_01:bioclim_19, tmax_jan:tmax_dec, 
+                  tmin_jan:tmin_dec, ppt_jan:ppt_dec)
   
   ## Write to file
   
-  #write_csv(dat_mom, path = "./data/cleaned_data/maternal tree climate data BCM 1950-1981 2017_12_12.csv")
-  
-  
-  
-  ## For GBS moms
-  ## Reorder columns
-  # dat_mom <- dat_mom %>%
-  #   dplyr::select(`Site Abbreviation`,
-  #                 `Mother Plant Field ID`,
-  #                 `Common Garden Accession Number`, lat, lon, tmax, tmax_sum, tmin, tmin_winter,
-  #                 ppt, cwd, aet, bioclim_01:bioclim_19, tmax_01:tmax_12, 
-  #                 tmin_01:tmin_12, ppt_01:ppt_12)
-  
-  ## Write to file
-  
-  # write_csv(dat_mom, path = "./data/cleaned_data/GBS maternal tree climate data BCM 1950-1981 2018_01_08.csv")
-  
-  
+  #write_csv(dat_mom_final, path = "./data/cleaned_data/maternal tree climate data BCM 1950-1981 2018_03_08.csv")
   
 
-# Read in current BCM climate data ----------------------------------------
+# Read in current BCM climate data for common garden sites ----------------------------------------
 
     dat_garden <- data.frame(site = c("chico", "placerville"),
                           lat = c(39.710764, 38.740382),
@@ -192,6 +173,8 @@ library(climates)
     ## Loop through raster files
     for(file in raster_files){
       
+      cat("Working on file:", file, "...\n")
+      
       raster_temp <- raster::stack(file) 
       
       ## Extract climate values to dataframe
@@ -203,180 +186,224 @@ library(climates)
     
     ## Remove latlong from column names
     colnames(dat_garden) <- gsub(pattern = "latlong.", "", colnames(dat_garden))
+    colnames(dat_garden)
     
-    ## Average across years !!
+    ## Months / bands are based on water years, which begin Oct 1st and end Sep 30
+    ## So band/month 1 = Oct, 2 = Nov, 3 = Dec, etc
+    ## Need to convert column names
+    colnames(dat_garden) <- gsub(pattern = "_1$", "_oct", colnames(dat_garden))
+    colnames(dat_garden) <- gsub(pattern = "_2", "_nov", colnames(dat_garden))
+    colnames(dat_garden) <- gsub(pattern = "_3", "_dec", colnames(dat_garden))
+    colnames(dat_garden) <- gsub(pattern = "_4", "_jan", colnames(dat_garden))
+    colnames(dat_garden) <- gsub(pattern = "_5", "_feb", colnames(dat_garden))
+    colnames(dat_garden) <- gsub(pattern = "_6", "_mar", colnames(dat_garden))
+    colnames(dat_garden) <- gsub(pattern = "_7", "_apr", colnames(dat_garden))
+    colnames(dat_garden) <- gsub(pattern = "_8", "_may", colnames(dat_garden))
+    colnames(dat_garden) <- gsub(pattern = "_9", "_jun", colnames(dat_garden))
+    colnames(dat_garden) <- gsub(pattern = "_10", "_jul", colnames(dat_garden))
+    colnames(dat_garden) <- gsub(pattern = "_11", "_aug", colnames(dat_garden))
+    colnames(dat_garden) <- gsub(pattern = "_12", "_sep", colnames(dat_garden))
     
-    dat_garden %>%
-      dplyr::select(-lat, -lon) %>%
-      tidyr::gather(site, var, aet_wy2014_1:tmx_wy2016_12 )
-    t = tidyr::gather(dat_garden, key = "var", site)
+    ## Replace tmn with tmin and tmx with tmax
+    colnames(dat_garden) <- gsub("tmn", "tmin", colnames(dat_garden))
+    colnames(dat_garden) <- gsub("tmx", "tmax", colnames(dat_garden))
     
-    head(t)
-    
-    
-    ## Need to figure out seasonal variables as well!!
-    
-  
-  
-  
-  # Comparing BCM and climateWNA data -----------------------------------------
-  
-  
-#   
-#   
-#   ## Tmax
-#   bcm_tmax = raster("./data/gis/climate_data/BCM/tmx1951_1980_ave_HST_1513035565/tmx1951_1980_ave_HST_1513035565.tif")
-#   bcm_tmax = projectRaster(bcm_tmax, crs="+proj=longlat +datum=WGS84")
-#   
-#   ## Tmin
-#   bcm_tmin = raster("./data/gis/climate_data/BCM/tmn1951_1980_ave_HST_1513039895/tmn1951_1980_ave_HST_1513039895.tif")
-#   bcm_tmin = projectRaster(bcm_tmin, crs="+proj=longlat +datum=WGS84")
-#   
-#   ## CWD
-#   bcm_cwd = raster("./data/gis/climate_data/BCM/cwd1951_1980_ave_HST_1513035274/cwd1951_1980_ave_HST_1513035274.tif")
-#   bcm_cwd = projectRaster(bcm_cwd, crs="+proj=longlat +datum=WGS84")
-#   
-#   ## MAP
-#   bcm_map = raster("./data/gis/climate_data/BCM/ppt1951_1980_ave_HST_1513043823/ppt1951_1980_ave_HST_1513043823.tif")
-#   bcm_map = projectRaster(bcm_map, crs="+proj=longlat +datum=WGS84")
-#   
-#   ## Add variables to data frame
-#   dat_all_mom_avg <- dat_all %>%
-#     dplyr::select(mom, lat, lon) %>%
-#     group_by(mom) %>%
-#     summarise_all(mean) %>%
-#     mutate(bcm_tmax = raster::extract(bcm_tmax, .[, c("lon", "lat")]),
-#            bcm_tmin = raster::extract(bcm_tmin, .[, c("lon", "lat")]),
-#            bcm_cwd = raster::extract(bcm_cwd, .[, c("lon", "lat")]),
-#            bcm_map = raster::extract(bcm_map, .[, c("lon", "lat")]))
-#   
-#   dim(dat_all_mom_avg)
-#   
-#   
-# 
-# 
-#   clim_wna <- read_csv("./data/cleaned_data/climateWNA data for all provenances 2017_12_11_Normal_1951_1980Y.csv")
-#   
-#   clim_wna <- clim_wna %>%
-#     rename(prov = id1, mom = ID2 ) %>%
-#     dplyr::select(-Latitude, -Longitude, -Elevation) %>%
-#     mutate(Tmax_monthly = rowMeans(dplyr::select(., Tmax01:Tmax12)),
-#            Tmin_monthly = rowMeans(dplyr::select(., Tmin01:Tmin12)))
-# 
-#   
-# #  clim_wna$mom <- as.factor(clim_wna$mom)
-#   
-#   ## Merge with bcm dataset
-#   
-#   dat_all_mom_avg <- left_join(dat_all_mom_avg, clim_wna)
-# 
-#   
-#   
-#   ## Tmax
-#   ggplot(dat_all_mom_avg, aes(x = Tmax_monthly, y = bcm_tmax)) + 
-#     geom_point(cex = 4, pch = 21, fill = "steelblue") + 
-#     xlab("climateWNA Tmax") + ylab("Flint BCM Tmax") + 
-#     geom_abline(slope = 1, intercept = 0, lwd = 1.5, lty = 2) +
-#     theme_bw() + ggtitle("Tmax") + 
-#     theme(plot.margin = unit(c(1,1,1,1), "cm"), 
-#           axis.text=element_text(size=12),
-#           axis.title=element_text(size=14))
-#   
-#   cor.test(dat_all_mom_avg$Tmax_monthly, dat_all_mom_avg$bcm_tmax)
-#   
-#   ## Tmin
-#   ggplot(dat_all_mom_avg, aes(x = Tmin_monthly, y = bcm_tmin)) + 
-#     geom_point(cex = 4, pch = 21, fill = "steelblue") + 
-#     xlab("climateWNA Tmin") + ylab("Flint BCM Tmin") + 
-#     geom_abline(slope = 1, intercept = 0, lwd = 1.5, lty = 2) +
-#     theme_bw() + ggtitle("Tmin") + 
-#     theme(plot.margin = unit(c(1,1,1,1), "cm"), 
-#           axis.text=element_text(size=12),
-#           axis.title=element_text(size=14))
-#   
-#   cor.test(dat_all_mom_avg$Tmin_monthly, dat_all_mom_avg$bcm_tmin)
-#   
-#   
-#   
-#   
-#   ## CMD
-#   ggplot(dat_all_mom_avg, aes(x = CMD, y = bcm_cwd)) + 
-#     geom_point(cex = 4, pch = 21, fill = "steelblue") + 
-#     xlab("climateWNA CMD") + ylab("Flint BCM CMD") + 
-#     geom_abline(slope = 1, intercept = 0, lwd = 1.5, lty = 2) +
-#     theme_bw() +  ggtitle("CMD") + 
-#     theme(plot.margin = unit(c(1,1,1,1), "cm"), 
-#           axis.text=element_text(size=12),
-#           axis.title=element_text(size=14))
-#   
-#   cor.test(dat_all_mom_avg$CMD, dat_all_mom_avg$bcm_cwd)
-#   
-#   ## Precipitation
-#   ggplot(dat_all_mom_avg, aes(x = MAP, y = bcm_map)) + 
-#     geom_point(cex = 4, pch = 21, fill = "steelblue") + 
-#     xlab("climateWNA MAP") + ylab("Flint BCM MAP") + 
-#     geom_abline(slope = 1, intercept = 0, lwd = 1.5, lty = 2) +
-#     theme_bw() +  ggtitle("MAP") + 
-#     theme(plot.margin = unit(c(1,1,1,1), "cm"), 
-#           axis.text=element_text(size=12),
-#           axis.title=element_text(size=14))
-#   
-#   cor.test(dat_all_mom_avg$MAP, dat_all_mom_avg$bcm_map)
-#   
-# 
-# # Crop climateWNA rasters -------------------------------------------------
-# 
-  
-#   ## Load in california outline
-#   cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
-#                                 proj4string = CRS("+proj=longlat +datum=WGS84"))
-#   
-#   
-#  
-# ## project to lamber conformal conic to use for cropping below - transforming this and then cropping speeds up operations a lot rather than transforming raster and cropping that
-# 
-# ## CRS comes from read in .nc file with raster() and copying the auto-read CRS, adjusting for a typo
-#   cali_outline_lcc <- spTransform(cali_outline, CRS("+proj=lcc +lat_1=49.0 +lat_2=77.0 +lat_0=0.0 +lon_0=-95.0 +x_0=0.0 +y_0=0.0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"))
-# 
-# 
-# ## Read in climate variables - https://adaptwest.databasin.org/pages/adaptwest-climatena
-# 
-#   dir_name <- "./data/gis/climate_data/NA_NORM_8110_Monthly_netCDF/"
-#   
-#   raster_files <- list.files(dir_name, full.names = TRUE)
-#   raster_files <- raster_files[grep("*.nc", raster_files)] # Only those with nc extension
-# 
-# 
-# ## Loop over all rasters in the directory
-#   for(file in raster_files){
-#     
-#     cat("Working on file:", file, "... \n")
-#     
-#     ## Load in raster file
-#     raster_temp <- raster(file)
-#     
-#     ## Assign correct CRS since there is a typo in the NetCDF file
-#     crs(raster_temp) <- "+proj=lcc +lat_1=49.0 +lat_2=77.0 +lat_0=0.0 +lon_0=-95.0 +x_0=0.0 +y_0=0.0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
-#     
-#     ## Crop
-#     raster_temp_cropped <- raster::crop(raster_temp, cali_outline_lcc)
-#     
-#     ## Masking to get exact shape
-#     raster_temp_cropped <- mask(raster_temp_cropped, cali_outline_lcc)
-#     
-#     ## Project to latlong
-#     raster_cropped_latlong <- projectRaster(raster_temp_cropped, crs="+proj=longlat +datum=WGS84")
-#     
-#     ## Write to file - geotiff format set by setting file extension
-#     
-#     file_new = gsub(".nc", "_cropped.tif", file)
-#     
-#     writeRaster(raster_cropped_latlong, file_new, overwrite = TRUE)
-#     
-#   }
-#   
-#   
+    colnames(dat_garden)
 
+    
+    
+    ## Average values across years
+
+    ## Function that takes variable abbreviation, average across years within the 
+    ## same month and outputs table
+    avg_data <- function(dat_garden, var, method){
+      
+        month_order <- c("jan", "feb", "mar", "apr", "may", "jun", 
+                         "jul", "aug", "sep", "oct", "nov", "dec")
+    
+       temp =  dat_garden %>%
+          dplyr::select(site, contains(var)) %>% ## Select only one variable
+          tidyr::gather(key = year_mo, value = climate_var, contains(var)) %>% ## Turn into long format
+          dplyr::mutate(year_mo =  gsub(pattern = paste0(var,"_wy"),
+                                        "", .$year_mo)) %>% ## Remove extra text
+          tidyr::separate(year_mo, into = c("year", "month")) %>% ## Separate year mo into cols
+         dplyr::mutate(month = forcats::fct_relevel(month, month_order))
+       
+       
+       ## Separate out values by month, then average across years
+       if(method == "years_by_month"){
+         
+         temp <- temp %>%
+              dplyr::group_by(site, month) %>%
+              dplyr::select(-year) %>% ## Remove year column
+              dplyr::summarise_all("mean") %>% ## Average across years by month
+              tidyr::spread(key = month, value = climate_var)
+       
+          colnames(temp)[-1] <- paste0(var, "_", colnames(temp)[-1])
+          return(temp)
+       }
+       
+       ## Sum up value within each year and then average across years
+       if(method == "sum_across_year"){
+         temp <- temp %>%
+           dplyr::select(-month) %>%
+           dplyr::group_by(site, year) %>%
+           dplyr::summarise_all("sum") %>%
+           dplyr::select(-year) %>%
+           dplyr::group_by(site) %>%
+           dplyr::summarise_all("mean")
+         
+         colnames(temp)[2] <- var
+         return(temp)
+         
+       }
+       
+       ## Average values across months within year, then average across years
+       if(method == "avg_across_year"){
+         
+         temp <- temp %>%
+           dplyr::select(-month) %>%
+           dplyr::group_by(site, year) %>%
+           dplyr::summarise_all("mean") %>%
+           dplyr::select(-year) %>%
+           dplyr::group_by(site) %>%
+           dplyr::summarise_all("mean")
+         
+         colnames(temp)[2] <- var
+         
+         return(temp)
+         
+       }
+       
+       ## Average values across June-August, then average across years
+       if(method == "avg_across_summer"){
+         
+         temp <- temp %>%
+           dplyr::filter(month %in% c("jun", "jul", "aug")) %>%
+           dplyr::select(-month) %>%
+           dplyr::group_by(site, year) %>%
+           dplyr::summarise_all("mean") %>%
+           dplyr::select(-year) %>%
+           dplyr::group_by(site) %>%
+           dplyr::summarise_all("mean")
+         
+         colnames(temp)[2] <- paste0(var, "_sum")
+         
+         return(temp)
+         
+       }
+       
+       ## Average values across December - February then average across years
+       if(method == "avg_across_winter"){
+         
+         temp <- temp %>%
+           dplyr::filter(month %in% c("dec", "jan", "feb")) %>%
+           dplyr::select(-month) %>%
+           dplyr::group_by(site, year) %>%
+           dplyr::summarise_all("mean") %>%
+           dplyr::select(-year) %>%
+           dplyr::group_by(site) %>%
+           dplyr::summarise_all("mean")
+         
+         colnames(temp)[2] <- paste0(var, "_winter")
+         
+         return(temp)
+         
+       }
+       
+       
+     
+    }
+    
+   ## Max temp 
+   tmax_by_month =  avg_data(dat_garden, "tmax", method = "years_by_month") 
+   tmax_by_month
+   
+   ## Min temp
+   tmin_by_month =  avg_data(dat_garden, "tmin", method = "years_by_month")
+   tmin_by_month
+   
+   ## Precipitation
+   ppt_by_month = avg_data(dat_garden, "ppt", method = "years_by_month")
+   ppt_by_month
+   
+   
+   ## Averaged across year
+   
+   ## Tmax
+   tmax_year =  avg_data(dat_garden, "tmax", method = "avg_across_year") 
+   tmax_year
+   
+   ## Tmax
+   tmin_year =  avg_data(dat_garden, "tmin", method = "avg_across_year") 
+   tmin_year
+   
+   
+  ## Average across summer
+   ## Tmax
+   tmax_sum = avg_data(dat_garden, "tmax", method = "avg_across_summer") 
+   tmax_sum
+   
+   ## Average across winter
+   ## Tmax
+   tmin_winter = avg_data(dat_garden, "tmin", method = "avg_across_winter") 
+   tmin_winter
+   
+   
+   ## Summed across year
+   
+     ## PPT
+     ppt_year <- avg_data(dat_garden, "ppt", method = "sum_across_year")
+     ppt_year
+     
+     ## CWD
+     cwd_year <- avg_data(dat_garden, "cwd", method = "sum_across_year")
+     cwd_year
+     
+     ## AET
+     aet_year <- avg_data(dat_garden, "aet", method = "sum_across_year")
+     aet_year
+     
+  
+  
+# Calculate Bioclimatic variables for each garden site ------------------
+    
+    
+    bioclim_vars_garden <-  climates::bioclim2(tmin = as.data.frame(tmin_by_month[, -1]),
+                                               ## Remove site column
+                                        tmax = as.data.frame(tmax_by_month[, -1]),
+                                        prec = as.data.frame(ppt_by_month[, -1]),
+                                        files.as.inputs = FALSE)
+    
+   
+     
+     ### Bring in all variables into one dataframe
+    dat_garden_final <- dplyr::bind_cols(dat_garden[, c("site", "lat", "lon")], 
+                                   as.data.frame(bioclim_vars_garden))   
+    
+    dat_garden_final <- left_join(dat_garden_final, tmax_by_month ) %>%
+                       left_join(., tmin_by_month) %>%
+                       left_join(., ppt_by_month) %>%
+                       left_join(., tmax_year) %>%
+                        left_join(., ppt_year) %>%
+                        left_join(., cwd_year) %>%
+                        left_join(., aet_year) %>%
+                        left_join(., tmin_year) %>%
+                        left_join(., tmax_sum) %>%
+                        left_join(., tmin_winter)
+   
+    glimpse(dat_garden_final)
+
+    ## Reorder columns
+    dat_garden_final <- dat_garden_final %>%
+      dplyr::select(site, lat, lon, tmax, tmax_sum, tmin, tmin_winter,
+                    ppt, cwd, aet, bioclim_01:bioclim_19, tmax_jan:tmax_dec, 
+                    tmin_jan:tmin_dec, ppt_jan:ppt_dec)
+    
+    ## Write to file
+    
+    write_csv(dat_garden_final, 
+    path = "./data/cleaned_data/common garden climate data BCM 2014-2016 2018_03_08.csv")
 
   
   
