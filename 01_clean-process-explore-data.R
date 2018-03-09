@@ -1,11 +1,5 @@
 ## TODO
 
-# 1. Add in Block information for 2017 and 2015
-# 1.5 Add survival data for 2015
-# 2. Calculate climate variables for garden sites in 02 script
-# 3. 
-
-
 
 # Load libraries ----------------------------------------------------------
   library(tidyverse)
@@ -44,9 +38,6 @@
     ## Remove if we don't know the accession / progeny
     dat_15_raw <- dat_15_raw[!is.na(dat_15_raw$Accession_progeny_2015),]
     
-    ## Need to convert height of 2nd stem to number
-    dat_15_raw$`Height (cm) - 2nd stem_2015` <- as.numeric(dat_15_raw$`Height (cm) - 2nd stem_2015`)
-    
     glimpse(dat_15_raw)
     dim(dat_15_raw)
     
@@ -78,7 +69,7 @@
              Line = Line_2017, Locality = Locality_2017, Accession = Accession_2017,
              Progeny = Progeny_2017, Accession_progeny = Accession_progeny_2017,
              Height_2017 = `Height (cm)_2017`, Height_max_2017 = `Height max (cm)_2017`,
-             Height_2015 = `Height (cm)_2015`, Height_max_2015 = `Height (cm) - 2nd stem_2015` ) %>%
+             Height_2015 = `Height (cm)_2015`) %>%
       select_all(., tolower)
     
     
@@ -105,12 +96,6 @@
         if(!is.na(dat_all$height_max_2017[i])){
           if(dat_all$height_max_2017[i] > dat_all$height_2017[i]){
             dat_all$height_2017[i] <- dat_all$height_max_2017[i]
-          }
-        }
-        
-        if(!is.na(dat_all$height_max_2015[i])){
-          if(dat_all$height_max_2015[i] > dat_all$height_2015[i]){
-            dat_all$height_2015[i] <- dat_all$height_max_2015[i]
           }
         }
       }
@@ -154,90 +139,6 @@
       # View(dat_all[dat_all$rgr > 1 & !is.na(dat_all$rgr), ])
       
       
-      
-      
-    
-    
-    
-    
-
-# Reading in and choosing climate variables ------------------------------------------------
-
-  
-  
-      
-      
-      
-      
-      
-      
-      ## Read in climate data of of maternal trees - "Valley oak maternal tree climate data BCM 2018_01_08"
-      ## Maybe need to run 02_processing-climate-rasters to create the sheet
-      climate_mom <- gs_read(gs_key("1lOQcBjdjUt-I4brnrD5LTCODZ2lvgzpqNnpxkYt_oSE"), ws = 2)
-      
-      ## Merge data
-      dat_all <- left_join(dat_all, climate_mom)
-      
-      ## Load in climate of common garden locations - 2010 to 2015
-      garden_climate <- read_csv("./data/cleaned_data/CommonGardenClimate 2017_09_28.csv")
-      
-      ## Average across 2010 - 2015
-      garden_climate <- garden_climate %>%
-        group_by(site) %>%
-        summarise_all(mean)
-      
-      garden_climate$elev <- garden_climate$Elevation
-      
-      
-      
-  
-  
-  
-  
-  ### Climate vars from previous sork papers
- # climate_vars = c("CMD", "Tmax", "Tmin", "DD5", "elev")
-  
-  climate_vars_dif <- paste(climate_vars, "_dif", sep = "")
-  
- # climate_vars_dif <- climate_vars_dif[-which(climate_vars_dif == "elev_dif")]
-  
-  x = 1
-  
-  ## Calculate difference in climate as ## GARDEN - PROVENANCE
-  for(var in climate_vars){
-    
-    dat_all[dat_all$site == "chico", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "chico", var]) - dat_all[dat_all$site == "chico", var]
-    
-    dat_all[dat_all$site == "placerville", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "placerville", var]) - dat_all[dat_all$site == "placerville", var]
-    
-    x = x + 1
-  }
-  
-  
-  # Make sure values look OK
-  
-  options(max.print = 10000)
-  
-  numSummary(dat_all)
-  
-  charSummary(dat_all)
-  
-  
-
-  ## Correlations between variables
-  
-  # # 
-  # grpd <- dat_all %>%
-  #   group_by(mom) %>% summarise_all(mean)
-  # 
-  # iplotCorr(dat_all[, climate_vars], reorder=FALSE)
-  # 
-  cor(dat_all[, climate_vars])
-
-  # 
-  
-  
-  
   
 # Filtering data ----------------------------------------------------------
   
@@ -252,43 +153,5 @@
                   dat_all$rgr >= quantile(dat_all$rgr, 0.99, na.rm = TRUE)] <- NA
     dat_all <- dplyr::filter(dat_all, !is.na(rgr))
     
-    ## Filter out individuals without genetic data at the INDIVIDUAL level
-    # dat_all <- dplyr::filter(dat_all, !is.na(cluster1))
-    # dat_all <- dplyr::filter(dat_all, !is.na(cluster_assigned))
   
-  
-    ## Filter out individuals without genetic data at the PROVENANCE level
-    dat_all <- dplyr::filter(dat_all, !is.na(cluster1_avg))
-    dat_all <- dplyr::filter(dat_all, !is.na(cluster_assigned_prov))
-
-  
-  
-# Scaling predictor variables -------------------------------------------------------
-
-  dat_all_scaled <- dat_all
-  
-  x = 1
-
-  scaled_var_means <- NA
-  scaled_var_sds <- NA
-  
-  to_scale = colnames(dplyr::select(dat_all, climate_vars_dif, height_2015_log, height_2015,
-                                    PC1_gen_avg:PC20_gen_avg, climate_vars))
-
-  for(var in to_scale){
-
-    scaled_var_means[x] <- mean(dat_all_scaled[[var]], na.rm = TRUE)
-    scaled_var_sds[x] <- sd(dat_all_scaled[[var]], na.rm = TRUE)
-
-    dat_all_scaled[var] <- (dat_all_scaled[var] - scaled_var_means[x]) / scaled_var_sds[x]
-
-    x = x + 1
-  }
-
-  names(scaled_var_means) <- to_scale
-  names(scaled_var_sds) <- to_scale
-
-
-  summary(dat_all_scaled[, to_scale]) ## Means should all be 0
-
 
