@@ -1,4 +1,5 @@
 ## TODO
+# - do a more careful check making sure that the join between sample # and accession in GBS data went correctly
 
 
 # Load libraries ----------------------------------------------------------
@@ -72,7 +73,11 @@
              Height_2015 = `Height (cm)_2015`) %>%
       select_all(., tolower)
     
-    
+
+# Formatting block --------------------------------------------------------
+
+  dat_all$section_block <- paste0(dat_all$section, "-", dat_all$block)    
+
 
 # Formatting rows and lines -----------------------------------------------
 
@@ -139,20 +144,107 @@
       # View(dat_all[dat_all$rgr > 1 & !is.na(dat_all$rgr), ])
       
       
+
+# Reading in GBS data -----------------------------------------------------
+
+     
+  ## Reading in 012 genotype matrix created with vcftools, processing and cleaning in R
+  ## Should be 15,627 Loci based on file gbs451.GDP4.AN50.biallelic.QD10.MAF10.MIS10.vcf from Sorel received March 2018    
+      
+  ## Read in position of SNPs - first column is chromosome number, second column is position
+  snp_pos <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs.gardens.012.pos", 
+                             col_names = c("chrom", "pos"))
+  snp_pos
+  
+  ## Read in genotype cols
+  
+  ## provide column names since they are not included in vcftools output
+  ## First column is sequence of numbers 0-450, which we will remove later
+  col_names <- c("NUM", paste0(snp_pos$chrom, "_", snp_pos$pos))
+  
+  ## Set missing values (-1) to NA
+  genotypes <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs.gardens.012",
+                               col_names = col_names, na = "-1")
+  
+  ## Remove first column
+  genotypes <- dplyr::select(genotypes, -NUM)
+  dim(genotypes) # 318 individuals and 9,413 sites depending on filtering options
+  genotypes
+  
+  ## Read in individual
+  indv <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs.gardens.012.indv",
+                          col_names = "ID")
+  dim(indv) ## Should be 318 depending on filtering option
+  indv 
+  
+  ## Read in file that has gbs_name, locality, and sork lab sample number, in the other of GBS samples
+    sample_key <- readr::read_tsv("./data/GBS_data/gbs451.locality_sample_key.txt")
+    sample_key
+    
+    ## Link up with accession number
+    accession_key <- gs_read(gs_key("1DUEV-pqV28D6qJl6vJM6S1VLWbxc9E71afufulDRbIc"), ws = 2)
+    accession_key
+    
+    sample_key <- dplyr::left_join(sample_key, accession_key, 
+                                   by = c("locality" = "Locality", "sample" = "Sample #")) %>%
+                  rename(accession = Accession)
+    
+    sample_key
+    
+    ## How many GBS samples have accession numbers? 
+    length(table(sample_key$accession))
+    
+      ## Gbs samples NOT in common garden to check for typos etc that may be wrongly excluding samples
+      # View(sample_key[is.na(sample_key$accession), ])
+    
+    ## Output list of samples in common garden with GBS data
+      #write_tsv(data.frame(gbs_name = sample_key$gbs_name[!is.na(sample_key$accession)]),
+      #  path = "./data/GBS_data/samples_w_accession_number.txt",
+      #  col_names = FALSE)
+    
+      
+    ## Join individual names and genotype data and subset to those that are in the common garden
+
+    gen_dat <- dplyr::left_join(dplyr::select(sample_key, gbs_name, accession),
+                                dplyr::bind_cols(indv, genotypes),
+                                                 by = c("gbs_name" = "ID")) 
+    
+    dim(gen_dat)
+    gen_dat
+    
+    ## Mean impute genetic data
+    for(col in 3:ncol(gen_dat)){
+      if(col %% 1000 == 0) cat("Working on SNP:", col, "...\n")
+      mean <- mean(dplyr::pull(gen_dat[, col]), na.rm = TRUE)
+      nas <- which(is.na(gen_dat[, col]))
+      gen_dat[nas, col] <- mean
+     # cat("Imputed mean value is:", mean, "..\n")
+    }
+  
+    hist(pull(gen_dat, 5500))
+    
+      
+      
   
 # Filtering data ----------------------------------------------------------
       
     ## Remove inviduals without an accession or progeny number
       dat_all <- dplyr::filter(dat_all, !is.na(accession))
       
-  
+    ## Change to NA outlier values in relative growth rate
+    dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.01, na.rm = TRUE) |
+                  dat_all$rgr >= quantile(dat_all$rgr, 0.99, na.rm = TRUE)] <- NA
+    dat_all <- dplyr::filter(dat_all, !is.na(rgr))  
+      
+      
+    ## Having just one garden
+      
+     # dat_all <- dplyr::filter(dat_all, site == "Chico")
+      
+      
     # ## Filter out individuals without an estimated RGR
-    # dat_all <- dplyr::filter(dat_all, !is.na(rgr))
-    # 
-    # ## Change to NA outlier values in relative growth rate
-    # dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.01, na.rm = TRUE) |
-    #               dat_all$rgr >= quantile(dat_all$rgr, 0.99, na.rm = TRUE)] <- NA
-    # dat_all <- dplyr::filter(dat_all, !is.na(rgr))
-    # 
+    dat_all <- dplyr::filter(dat_all, !is.na(rgr))
+
+    dim(dat_all)
   
 

@@ -2,6 +2,11 @@
 ## Requires 02_processing-climate-rasters.R to be run and files output
 
 
+# Load libraries ----------------------------------------------------------
+
+  library(psych)
+
+
 # Load in climate data ----------------------------------------------------
 
 
@@ -14,8 +19,9 @@
     select(-Locality) %>%
     rename(Elevation = `Elevation (m)`) %>%
     select_all(., tolower)
-    
   
+  climate_mom
+    
   ## Merge data
   dat_all_clim <- left_join(dat_all, climate_mom, by = "accession")
   dim(dat_all_clim)
@@ -32,7 +38,8 @@
 # Calculating difference in climate variables -----------------------------
 
   ## Core variables from Riordan et al. 2016 Am J Botany  
-  climate_vars <- c("tmax_sum", "tmin_winter", "cwd", "aet", "bioclim_04", "bioclim_15",
+  ## Except we are excluding AET because it is very strongly correlated with cwd
+  climate_vars <- c("tmax_sum", "tmin_winter", "cwd", "bioclim_04", "bioclim_15",
                     "bioclim_18", "bioclim_19")
   
   climate_vars_dif <- paste(climate_vars, "_dif", sep = "")
@@ -57,119 +64,100 @@
   ## Find NAs if there are any
   #View(dat_all_clim[is.na(pull(dat_all_clim, climate_vars_dif[1])), ])
   
+
   
   
+## Correlations between climate variables
+    
+  ## Climate variables in seedlings
+  pairs.panels(dat_all_clim[, climate_vars], scale = TRUE)
   
+  ## Climate variables for moms
+  pairs.panels(climate_mom[, climate_vars], scale = TRUE)
   
-  
-  
-  
-  
-  ## Correlations between variables
-
-# # 
-# grpd <- dat_all %>%
-#   group_by(mom) %>% summarise_all(mean)
-# 
-# iplotCorr(dat_all[, climate_vars], reorder=FALSE)
-# 
-cor(dat_all_clim[, climate_vars])
-
-# 
-
-
-
-
-# Make sure values look OK
-
-options(max.print = 10000)
-
-numSummary(dat_all)
-
-charSummary(dat_all)
-
-
+  ## Climate distances for seedlings
+  pairs.panels(dat_all_clim[, climate_vars_dif], scale = TRUE)
 
 
 
 # Scaling predictor variables -------------------------------------------------------
 
-dat_all_scaled <- dat_all
-
-x = 1
-
-scaled_var_means <- NA
-scaled_var_sds <- NA
-
-to_scale = colnames(dplyr::select(dat_all, climate_vars_dif, height_2015_log, height_2015,
-                                  PC1_gen_avg:PC20_gen_avg, climate_vars))
-
-for(var in to_scale){
+  dat_all_scaled <- dat_all_clim
   
-  scaled_var_means[x] <- mean(dat_all_scaled[[var]], na.rm = TRUE)
-  scaled_var_sds[x] <- sd(dat_all_scaled[[var]], na.rm = TRUE)
+  x = 1
   
-  dat_all_scaled[var] <- (dat_all_scaled[var] - scaled_var_means[x]) / scaled_var_sds[x]
+  scaled_var_means <- NA
+  scaled_var_sds <- NA
   
-  x = x + 1
-}
-
-names(scaled_var_means) <- to_scale
-names(scaled_var_sds) <- to_scale
-
-
-summary(dat_all_scaled[, to_scale]) ## Means should all be 0
-
-
-
-
-# Load libraries ----------------------------------------------------------
-
-library(factoextra)
+  to_scale = colnames(dplyr::select(dat_all_clim, climate_vars_dif, height_2015,
+                                    climate_vars))
+  
+  for(var in to_scale){
+    
+    scaled_var_means[x] <- mean(dat_all_scaled[[var]], na.rm = TRUE)
+    scaled_var_sds[x] <- sd(dat_all_scaled[[var]], na.rm = TRUE)
+    
+    dat_all_scaled[var] <- (dat_all_scaled[var] - scaled_var_means[x]) / scaled_var_sds[x]
+    
+    x = x + 1
+  }
+  
+  names(scaled_var_means) <- to_scale
+  names(scaled_var_sds) <- to_scale
+  
+  
+  summary(dat_all_scaled[, to_scale]) ## Means should all be 0
+  
 
 
-# PCA on climate variables ------------------------------------------------
 
-  clim_pca <- prcomp(dplyr::select(dat_all_scaled, climate_vars_dif), scale = FALSE) 
-  
-  summary(clim_pca)
-
-  
-  ## PCA on home variables
-  clim_pca_home <- prcomp(dat_all_scaled[, climate_vars], scale = FALSE) 
-  
-  summary(clim_pca_home)
-  
-  
-  ## Format as dataframe
-  clim_pca_vals <- as.data.frame(clim_pca$x)
-  colnames(clim_pca_vals) <- paste(colnames(clim_pca_vals), "_clim_dif", sep = "")
-  
-  clim_pca_home_vals <- as.data.frame(clim_pca_home$x)
-  colnames(clim_pca_home_vals) <- paste(colnames(clim_pca_home_vals), "_home", sep = "")
-  
-  
-  ## Scree plot of PCA
-  fviz_screeplot(clim_pca)
-  
-  
-  ## Biplot of PCA
-  # autoplot(clim_pca, data = dat_all_scaled, colour = "prov", loadings = TRUE, 
-  #          loadings.label = TRUE) + theme_bw() + theme(legend.position="none") 
-  
-  
-  ## Contributions of each axis
-  # fviz_contrib(clim_pca, choice = "var", axes = c(1))
-  # fviz_contrib(clim_pca, choice = "var", axes = c(2))
-  # fviz_contrib(clim_pca, choice = "var", axes = c(3))
-  # fviz_contrib(clim_pca, choice = "var", axes = c(4))
-  # fviz_contrib(clim_pca, choice = "var", axes = c(5))
-  # 
-  ## Arrows plot
-  fviz_pca_var(clim_pca, axes = c(1,2))
-  
-  
-  ## Join back to main dataframe
-  dat_all_scaled <- bind_cols(dat_all_scaled, clim_pca_vals)
+# 
+# # PCA on climate variables ------------------------------------------------
+# 
+#   
+#   
+#   library(factoextra)
+#   
+#   clim_pca <- prcomp(dplyr::select(dat_all_scaled, climate_vars_dif), scale = FALSE) 
+#   
+#   summary(clim_pca)
+# 
+#   
+#   ## PCA on home variables
+#   clim_pca_home <- prcomp(dat_all_scaled[, climate_vars], scale = FALSE) 
+#   
+#   summary(clim_pca_home)
+#   
+#   
+#   ## Format as dataframe
+#   clim_pca_vals <- as.data.frame(clim_pca$x)
+#   colnames(clim_pca_vals) <- paste(colnames(clim_pca_vals), "_clim_dif", sep = "")
+#   
+#   clim_pca_home_vals <- as.data.frame(clim_pca_home$x)
+#   colnames(clim_pca_home_vals) <- paste(colnames(clim_pca_home_vals), "_home", sep = "")
+#   
+#   
+#   ## Scree plot of PCA
+#   fviz_screeplot(clim_pca)
+#   
+#   
+#   ## Biplot of PCA
+#   # autoplot(clim_pca, data = dat_all_scaled, colour = "prov", loadings = TRUE, 
+#   #          loadings.label = TRUE) + theme_bw() + theme(legend.position="none") 
+#   
+#   
+#   ## Contributions of each axis
+#   # fviz_contrib(clim_pca, choice = "var", axes = c(1))
+#   # fviz_contrib(clim_pca, choice = "var", axes = c(2))
+#   # fviz_contrib(clim_pca, choice = "var", axes = c(3))
+#   # fviz_contrib(clim_pca, choice = "var", axes = c(4))
+#   # fviz_contrib(clim_pca, choice = "var", axes = c(5))
+#   # 
+#   ## Arrows plot
+#   fviz_pca_var(clim_pca, axes = c(1,2))
+#   
+#   
+#   ## Join back to main dataframe
+#   dat_all_scaled <- bind_cols(dat_all_scaled, clim_pca_vals)
 
 

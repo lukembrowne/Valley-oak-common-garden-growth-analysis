@@ -21,6 +21,11 @@
   ## California Basin Characterization Model  
   ## https://ecologicalprocesses.springeropen.com/articles/10.1186/2192-1709-2-25
   
+  
+  ## GBS Moms from Paul
+  # dat_mom <- read_tsv("./data/GBS_data/Qlobata_GBS_Rangewide.txt")
+  # dat_mom
+  
 
 ## Get locations of maternal trees in common garden
   dat_mom <- gs_read(gs_key("1DUEV-pqV28D6qJl6vJM6S1VLWbxc9E71afufulDRbIc"), ws = 2)
@@ -60,6 +65,9 @@
  
   head(dat_mom)
   
+  ## Save as backup just in case
+  dat_mom2 <- dat_mom
+  
   ## Rename columns
   
   ## Remove second half of colname - e.g. "_ave_HST_1513043823"
@@ -93,8 +101,11 @@
   names(dat_mom)
   
   ## Reorder columns so monthly variables are sequential
-  dat_mom <- dat_mom[, c("Locality full name", "Locality", "Sample #",
-                         "Accession", "Latitude", "Longitude", "Elevation (m)", "aet",
+  dat_mom <- dat_mom[, c(
+                        "Locality full name", "Locality", "Sample #","Accession", 
+                         "Latitude", "Longitude", "Elevation (m)", 
+                      #  "ID", "Latitude", "Longitude", "Elevation", 
+                         "aet",
                          "cwd", "ppt", "tmin_winter", "tmax_sum", "tmax", "tmin",
                          "ppt_jan","ppt_feb","ppt_mar","ppt_apr","ppt_may","ppt_jun",
                          "ppt_jul","ppt_aug","ppt_sep","ppt_oct","ppt_nov","ppt_dec",
@@ -120,13 +131,14 @@
   ## Reorder columns
   dat_mom_final <- dat_mom %>%
     dplyr::select(`Locality`,Accession, Latitude, Longitude, `Elevation (m)`, 
+                  #`ID`, Latitude, Longitude, Elevation,
                   tmax, tmax_sum, tmin, tmin_winter,
                   ppt, cwd, aet, bioclim_01:bioclim_19, tmax_jan:tmax_dec, 
                   tmin_jan:tmin_dec, ppt_jan:ppt_dec)
   
   ## Write to file
   
-  #write_csv(dat_mom_final, path = "./data/cleaned_data/maternal tree climate data BCM 1950-1981 2018_03_08.csv")
+  #write_csv(dat_mom_final, path = "./data/cleaned_data/GBS tree climate data BCM 1950-1981 2018_03_08.csv")
   
 
 # Read in current BCM climate data for common garden sites ----------------------------------------
