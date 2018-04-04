@@ -1,6 +1,5 @@
-## TODO
-# - do a more careful check making sure that the join between sample # and accession in GBS data went correctly
-
+# TODO
+# Blocks that = NA
 
 # Load libraries ----------------------------------------------------------
   library(tidyverse)
@@ -43,14 +42,38 @@
     dim(dat_15_raw)
     
     
+  ## Load in 2014 data which has heights before planted into garden
+    dat_14_raw <- gs_read(gs_key("10Yss2ciOo0cazkT9Udu55QUr37T7zXeQbnGuLpTnAMM"), ws = 2)
+    colnames(dat_14_raw) <- paste0(colnames(dat_14_raw), "_2014")
+    dat_14_raw$Progeny_2014 <- as.character(dat_14_raw$Progeny_2014)
+    
+    # Remove duplicates
+    dat_14_raw <- dat_14_raw[ -which(dat_14_raw$Problem_2014 == "tree number duplicated"), ]
+    
+    dim(dat_14_raw)
+    
+    # Remove NAs
+    dat_14_raw <- dat_14_raw[!is.na(dat_14_raw$Accession_2014), ]
+    dat_14_raw <- dat_14_raw[!is.na(dat_14_raw$Progeny_2014), ]
+    
+    dim(dat_14_raw)
+    
   ## Join 2017 and 2015 data
     dat_all <- left_join(dat_17_raw, dat_15_raw, 
                          by = c("Accession_2017" = "Accession_2015", 
                                 "Progeny_2017" = "Progeny_2015"))
     dim(dat_all)
     
+  ## Add in 2014 height
+    dat_all <- left_join(dat_all, 
+                         dplyr::select(dat_14_raw, Accession_2014, Progeny_2014, 
+                                       `Height (cm)_2014`), 
+                         by = c("Accession_2017" = "Accession_2014", 
+                                "Progeny_2017" = "Progeny_2014"))
     
+    dim(dat_all) ## Adding so many rows?
     
+
   ## Make sure 2015 and 2017 data match up - should all sum to 0
     
     sum(dat_all$Site_2015 != dat_all$Site_2017, na.rm = TRUE)
@@ -63,14 +86,14 @@
     
   ## Filter down and rename columns
     dat_all <- dat_all %>%
-      select(contains("Problem"), Site_2017, Section_2017, Block_2017, Row_2017, Line_2017, 
+      dplyr::select(contains("Problem"), Site_2017, Section_2017, Block_2017, Row_2017, Line_2017, 
              Locality_2017, Accession_2017, Progeny_2017, Accession_progeny_2017, Alive_2017,
              contains("Height"), contains("Comments")) %>%
       rename(Site = Site_2017, Section = Section_2017, Block = Block_2017, Row = Row_2017,
              Line = Line_2017, Locality = Locality_2017, Accession = Accession_2017,
              Progeny = Progeny_2017, Accession_progeny = Accession_progeny_2017,
              Height_2017 = `Height (cm)_2017`, Height_max_2017 = `Height max (cm)_2017`,
-             Height_2015 = `Height (cm)_2015`) %>%
+             Height_2015 = `Height (cm)_2015`, Height_2014 = `Height (cm)_2014`) %>%
       select_all(., tolower)
     
 
@@ -152,7 +175,7 @@
   ## Should be 15,627 Loci based on file gbs451.GDP4.AN50.biallelic.QD10.MAF10.MIS10.vcf from Sorel received March 2018    
       
   ## Read in position of SNPs - first column is chromosome number, second column is position
-  snp_pos <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs.gardens.012.pos", 
+  snp_pos <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs.all.012.pos", 
                              col_names = c("chrom", "pos"))
   snp_pos
   
@@ -163,18 +186,18 @@
   col_names <- c("NUM", paste0(snp_pos$chrom, "_", snp_pos$pos))
   
   ## Set missing values (-1) to NA
-  genotypes <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs.gardens.012",
+  genotypes <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs.all.012",
                                col_names = col_names, na = "-1")
   
   ## Remove first column
   genotypes <- dplyr::select(genotypes, -NUM)
-  dim(genotypes) # 318 individuals and 9,413 sites depending on filtering options
+  dim(genotypes) # Changes depends on filtering options
   genotypes
   
   ## Read in individual
-  indv <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs.gardens.012.indv",
+  indv <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs.all.012.indv",
                           col_names = "ID")
-  dim(indv) ## Should be 318 depending on filtering option
+  dim(indv)
   indv 
   
   ## Read in file that has gbs_name, locality, and sork lab sample number, in the other of GBS samples
@@ -212,14 +235,19 @@
     dim(gen_dat)
     gen_dat
     
+  ## Subset gen_dat to just individuals we have GBS data for
+    gen_dat <- gen_dat %>%
+      filter(gbs_name %in% indv$ID)
+    
+    
     ## Mean impute genetic data
-    for(col in 3:ncol(gen_dat)){
-      if(col %% 1000 == 0) cat("Working on SNP:", col, "...\n")
-      mean <- mean(dplyr::pull(gen_dat[, col]), na.rm = TRUE)
-      nas <- which(is.na(gen_dat[, col]))
-      gen_dat[nas, col] <- mean
-     # cat("Imputed mean value is:", mean, "..\n")
-    }
+    # for(col in 3:ncol(gen_dat)){
+    #   if(col %% 1000 == 0) cat("Working on SNP:", col, "...\n")
+    #   mean <- mean(dplyr::pull(gen_dat[, col]), na.rm = TRUE)
+    #   nas <- which(is.na(gen_dat[, col]))
+    #   gen_dat[nas, col] <- mean
+    #  # cat("Imputed mean value is:", mean, "..\n")
+    # }
   
     hist(pull(gen_dat, 5500))
     
@@ -230,20 +258,47 @@
       
     ## Remove inviduals without an accession or progeny number
       dat_all <- dplyr::filter(dat_all, !is.na(accession))
-      
+    
+    
+    ## Remove individuals with mechanical damage
+    mech <- dplyr::filter(dat_all, grepl('mechanical', comments_2015) |
+                            grepl('mechanical', comments_2017))
+    mech$comments_2017
+    dat_all <- dplyr::filter(dat_all, !(accession_progeny %in% mech$accession_progeny))
+
+    ## Filtering based on height
+      # dat_all$height_2017[dat_all$height_2017 <= quantile(dat_all$height_2017, 0.01,
+      #                                                     na.rm = TRUE) |
+      #               dat_all$height_2017 >= quantile(dat_all$height_2017, 0.99,
+      #                                               na.rm = TRUE)] <- NA
+      # dat_all <- dplyr::filter(dat_all, !is.na(height_2017))
+
+    # ## Filter out NA heights
+      dat_all <- dplyr::filter(dat_all, !is.na(height_2017))
+      dat_all <- dplyr::filter(dat_all, !is.na(height_2014))
+    #   
+    #   
+    # ## Filtering out individuals without genetic data
+       dat_all <- dplyr::filter(dat_all, accession %in% gen_dat$accession)
+
+    ## Filtering based on RGR
+
+
+    ## Individuals with negative growth rates
+      # neg_rgr <- dplyr::filter(dat_all, rgr < 0)
+      # View(dplyr::select(neg_rgr, rgr, height_2015, height_2017) )
+
+
     ## Change to NA outlier values in relative growth rate
-    dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.01, na.rm = TRUE) |
-                  dat_all$rgr >= quantile(dat_all$rgr, 0.99, na.rm = TRUE)] <- NA
-    dat_all <- dplyr::filter(dat_all, !is.na(rgr))  
-      
-      
-    ## Having just one garden
-      
-     # dat_all <- dplyr::filter(dat_all, site == "Chico")
-      
-      
+      dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.05, na.rm = TRUE) |
+                    dat_all$rgr >= quantile(dat_all$rgr, 0.95, na.rm = TRUE)] <- NA
+    # 
+    # ## Having just one garden
+    #  # dat_all <- dplyr::filter(dat_all, site == "Chico")
+    # 
+
     # ## Filter out individuals without an estimated RGR
-    dat_all <- dplyr::filter(dat_all, !is.na(rgr))
+      dat_all <- dplyr::filter(dat_all, !is.na(rgr))
 
     dim(dat_all)
   

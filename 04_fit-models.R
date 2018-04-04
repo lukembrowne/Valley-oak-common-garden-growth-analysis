@@ -1,21 +1,56 @@
 
 
 ## TODO 
-# - Figure out if we are going to exclude any data - like the 99% outliers
-# - Analyze gardens separately?
-# - Figure out which random effects terms improved the model - maybe take out locality / block?
+
+# TO FUTURE LUKE - 
+# Seems weird to do tmax-GBEV analysis because we are predicting phenotype (tmax) with GBS data, but then predicting breeding value from TMAX rasters for climate modeling. But also could be cool because we are integrating climate transfer functions with genomic selection - not sure if that's been done before
+
+# If doing the climate estimated GEBV - can use all 451 gbs trees?
+
+
+
+## If following a model similar to Laskey et al 2015 with Sorghum
+
+# - For each climate variable..
+#  - two approaches MAS (for single gene traits) & GEBV (good for polygenic traits)
+#  - MAS 
+#    - start with n SNPs with the lowest p values or strongest effect sizes estimated with BGLR
+#    - generate phenotype prediction by multipling allelic state by the estimated allelic effect (slope) from the environmental association model
+#    - Because SNPcallswere often missing for a given accession, we took the average of the allelic state × allelic effect across SNPs in themodel for each accession to get the total pre- diction for each accession
+ # - GEBV with RRBLUP
+   # - This model is analogous to the environmental association mixed model (described above) omitting any indi- vidual SNP effects.
+   # - 
+
+# Then correlate predictions (e.g. Tmax_sum score) with phenotype in the field and look for significant associations
+
+# Alter number of SNPs in MAS and combine with BLUP to see what predicts the best - can give inference about genetic architecture of the trait
+# R values from 0.1 - 0.3 in lasky 2015 paper
+
+# 
+
+
+## Run Gemmax on growth rates to see if there are any significant SNPs - separately for each garden? Or possible to do GxE?
+## Story right now is that breeding values based on temperature at home site can predict growth rates in the gardne
+  # Positive breeding values == higher tmax == higher growth rates
+  # But what is this telling us that just tmax wouldn't tell us, or is it confirming that there is a genetic / environmental relationship between tmax and genotypes? So that land managers in the future could just use a variable like Tmax to select trees for higher growth rates
+# Becaues of how the trees are planted, tmax and tmax_sum_dif are negatively correlated so that the only trees that are planted in cooler climates are the trees from warm climates, and vice versa. If tmax was related to overall higher growth rates, regardless of climate transfer, we wouldn't be able to disentangle this effect.
+
+## Read in leaf traits from 2016 and see if genomic selection will do anything with that..
 
 
 # Source files ------------------------------------------------------------
 
 source("./01_clean-process-explore-data.R")
-source("./03_adding-climate-data.R") ## Adds PCA climate dif variables
+source("./03_adding-climate-data.R")
 
 
 # Load libraries ----------------------------------------------------------
 
 library(gamm4)
 library(lmerTest)
+library(caret)
+library(usdm) # to check for vif
+library(flashpcaR)
 #library(sjPlot)
 
 
@@ -23,32 +58,28 @@ library(lmerTest)
 
   dim(dat_all_scaled)
 
-
-
 # Checking model functions ----------------------------------------------------------
 
 ## Prints summary of GAM and MER aspects of the model  
-check_model <- function(gamm4_out){
-  
-    plot(gamm4_out$gam, residuals = FALSE, shade = TRUE, 
-         scale = 0, seWithMean=FALSE, pages = 0)
+  check_model <- function(gamm4_out){
     
-    cat("\n\n----- GAM part of model ----- \n\n")
-    print(summary(gamm4_out$gam))
+      plot(gamm4_out$gam, residuals = FALSE, shade = TRUE, 
+           scale = 0, seWithMean=FALSE, pages = 1)
+      
+      cat("\n\n----- GAM part of model ----- \n\n")
+      print(summary(gamm4_out$gam))
+      
+     # cat("\n\n----- ANOVA on GAM part of model ----- \n\n")
+     # print(anova(gamm4_out$gam))
+      
+      
+      cat("\n\n----- MER part of model ----- \n\n")
+      print(summary(gamm4_out$mer))
+      
+      gam.check(gamm4_out$gam)
+      
+    }
     
-   # cat("\n\n----- ANOVA on GAM part of model ----- \n\n")
-   # print(anova(gamm4_out$gam))
-    
-    
-    cat("\n\n----- MER part of model ----- \n\n")
-    print(summary(gamm4_out$mer))
-    
-    
-    
-    #gam.check(gamm4_out$gam)
-    
-  }
-  
   ## Plots model predictions
   plot_gam <- function(mod, var, var_index, xlab, plot_raw_pts = TRUE, PCA = FALSE){
     
@@ -91,19 +122,41 @@ check_model <- function(gamm4_out){
   
   
 
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 # Testing out which random effects are necessary --------------------------
   
-  ## Best model seems to be with only accession as random effect
+  ## Best model seems to be with everything but section
   ## Not including locality because that is somewhat arbitrary
 
   # Height in 2015 only
   fit_height <- gamm4(rgr  ~ s(height_2015)
-                              + site,
-                           random = ~ (1|section_block) + 
-                             (1|section) + 
-                             (1|accession) + 
-                             (1|section_row) + 
-                             (1|section_line),
+                             + site,
+                           random = ~ (1 | section_block) + 
+                                      (1 | section) + 
+                                      (1 | accession) + 
+                                      (1 | section_row) + 
+                                      (1 | section_line),
                            data = dat_all_scaled[!is.na(dat_all_scaled$block),])
   
   
@@ -145,8 +198,6 @@ check_model <- function(gamm4_out){
                              data = dat_all_scaled[!is.na(dat_all_scaled$block),])
   
 
-  
-  
   # Adding additional terms
   fit_height_top <- gamm4(rgr  ~ s(height_2015)
                       + site,
@@ -188,36 +239,40 @@ check_model <- function(gamm4_out){
 
   
   # Null model with only random effects
-  fit_null<- gamm4(rgr  ~ site,
-                   random = ~(1|section_block) + 
-                            + (1|accession) +
-                              (1|section_row) + (1|section_line),
+  fit_null <- gamm4(rgr  ~ site,
+                   random = ~ (1 | section_block) + 
+                              (1 | accession) +
+                              (1 | section_row) +
+                              (1 | section_line),
                    data = dat_all_scaled)
   
   # Height in 2015 only
   fit_height_only <- gamm4(rgr  ~ s(height_2015)
-                           +site,
-                           random = ~(1|section_block) + 
-                             + (1|accession) +
-                             (1|section_row) + (1|section_line),
+                                + site,
+                           random = ~ (1 | section_block) +
+                                      (1 | accession) +
+                                      (1 | section_row) + 
+                                      (1 | section_line),
                            data = dat_all_scaled)
   
   ## Tmax summer
   fit_tmax_sum <- gamm4(rgr ~ s(height_2015)
-                           + s(tmax_sum_dif) 
-                           + site,
-                        random = ~(1|section_block) + 
-                          + (1|accession) +
-                          (1|section_row) + (1|section_line),
+                            + s(tmax_sum_dif)
+                            + site,
+                        random = ~ (1 | section_block) +
+                          (1 | accession) +
+                          (1 | section_row) + 
+                          (1 | section_line),
                           data = dat_all_scaled)
-  
+
   ## CWD
   fit_cwd <- gamm4(rgr ~ s(height_2015)
                         + s(cwd_dif) 
                         + site,
-                     random = ~(1|section_block) + 
-                       + (1|accession) +
-                       (1|section_row) + (1|section_line),
+                   random = ~ (1 | section_block) +
+                     (1 | accession) +
+                     (1 | section_row) + 
+                     (1 | section_line),
                         data = dat_all_scaled)
 
   ## Height only
@@ -229,8 +284,8 @@ check_model <- function(gamm4_out){
   ## Tmax summer
   check_model(fit_tmax_sum)
   plot_gam(fit_tmax_sum$gam, var = "tmax_sum_dif", var_index = 2, 
-           xlab = "tmax_sum_dif", plot_raw_pts = TRUE)
-  #ggsave(filename = "./figs_tables/Tmax_dif no pts.pdf", scale = .75)
+           xlab = "tmax_sum_dif", plot_raw_pts = FALSE)
+  ggsave(filename = "./figs_tables/2018 mar 23 prelim/Tmax_dif pts.pdf", scale = .75)
   
   
   ## CWD
@@ -242,13 +297,6 @@ check_model <- function(gamm4_out){
   
   
   
-  
-
-# Getting family values ---------------------------------------------------
-
-
-  
-
   
 
 # Testing out SNP data ----------------------------------------------------
@@ -314,6 +362,960 @@ check_model <- function(gamm4_out){
   ggplot(aes(x = tmax_sum_dif, y = rgr)) + 
     geom_point()  + geom_smooth() + theme_bw()
   
+  
+  
+
+# Testing out rrBLUP ------------------------------------------------------
+
+library(rrBLUP) 
+  
+  pairs.panels(dat_all_scaled[ , c("rgr", "height_2014", "height_2015", "height_2017", "alive_2017")])
+  
+ 
+  ## Calculate slopes of intercepts for each accession
+  fit_height_blup <- lmer(height_2017~ 
+                          #  tmax_sum_dif + 
+                            height_2014 + 
+                           #   (1 | section_block) +
+                            #  (1 | accession) + 
+                              (0 + tmax_sum_dif | accession) +
+                            (1 | section_row) + 
+                            (1 | section_line),
+                          REML = FALSE,
+                          data = dat_all_scaled)
+  
+  summary(fit_height_blup)
+  coef(fit_height_blup)
+  
+  int_coef <- coef(fit_height_blup)$accession
+  int_coef$accession <- as.numeric(rownames(int_coef))
+  int_coef$tmax_sum_dif_slope <- int_coef$tmax_sum_dif
+  int_coef$tmax_sum_dif <- NULL
+  int_coef$height_2014 <- NULL
+  
+  int_coef$tmax_sum_dif
+  summary(int_coef$tmax_sum_dif)
+  
+  plot(int_coef$tmax_sum_dif_slope, int_coef$`(Intercept)`)
+  
+  
+  dat_all_scaled %>%
+    filter(accession < 10) %>%
+    ggplot(aes(x = tmax_sum_dif, y = rgr, group = accession)) +
+    facet_wrap(~accession) +
+    geom_point() + geom_smooth() + theme_bw()
+  
+  # Predictions
+  newdat <- expand.grid(tmax_sum_dif = c(0, 2),
+                        accession = unique(dat_all_scaled$accession),
+                        section_row = "Block1-A",
+                        section_line = "Block1-1",
+                        height_2014 = 0)
+  newdat$pred <- predict(fit_height_blup,
+                      newdata = newdat, re.form = NULL)
+  newdat %>%
+    filter(accession < 10) %>%
+    ggplot(aes(x = tmax_sum_dif, y = pred, col = factor(accession))) +
+    facet_wrap(~accession) +
+    geom_point() + geom_line() + theme_bw() + theme(legend.position = "none")
+  
+  
+  ### Getting genetic data
+  snp_col_names <- colnames(gen_dat[, -c(1, 2)])
+  
+  dat_all_gen <- inner_join(dat_all_scaled, gen_dat)
+  dim(dat_all_gen)
+  dat_all_gen <- as.data.frame(dat_all_gen)
+  
+  dat_all_gen <- left_join(dat_all_gen, int_coef, by = "accession")
+  
+  
+  
+  ## Calculate additive relationship matrix
+  
+  ## Filter down to unique accessions
+  blup_gen <- dat_all_gen %>%
+    dplyr::distinct(accession, .keep_all = TRUE) %>%
+    dplyr::filter(accession %in% dat_all_gen$accession) %>%
+    dplyr::select(accession, snp_col_names)
+  dim(blup_gen)
+  
+  rownames(blup_gen) <- blup_gen$accession
+  blup_gen <- blup_gen[, -1]
+  
+  blup_gen[blup_gen == 0] <- -1
+  blup_gen[blup_gen == 1] <- 0
+  blup_gen[blup_gen == 2] <- 1
+  
+  summary(blup_gen[, 1:10])
+  
+  A <- A.mat(X = blup_gen)
+  
+  
+  ## data frame with columns for phenotype, genotype identify, and any environmental variables
+  dat <- data.frame(rgr = dat_all_gen$rgr,
+                  #  rgr_resids = dat_all_gen$rgr_resids,
+                    height_2017 = dat_all_gen$height_2017,
+                    accession = dat_all_gen$accession,
+                    site = dat_all_gen$site,
+                    section = dat_all_gen$section,
+                    section_block = dat_all_gen$section_block,
+                    height_2015 = dat_all_gen$height_2015,
+                    height_2014 = dat_all_gen$height_2014,
+                    tmax_sum_dif = dat_all_gen$tmax_sum_dif,
+                    tmax_sum = dat_all_gen$tmax_sum,
+                    tmax_sum_dif_slope = dat_all_gen$tmax_sum_dif_slope,
+                    tmin_winter = dat_all_gen$tmin_winter,
+                    cwd = dat_all_gen$cwd,
+                    latitude = dat_all_gen$latitude,
+                    bioclim_18 = dat_all_gen$bioclim_18,
+                    random = rnorm(nrow(dat_all_gen)),
+                  elevation = dat_all_gen$elevation)
+  
+  ## Subset to just seedlings planted in warmer climates
+    tmax_thresh <- ((0 - scaled_var_means[["tmax_sum_dif"]]) / scaled_var_sds[["tmax_sum_dif"]])
+    tmax_thresh
+  #  dat <- dat[dat$tmax_sum_dif > tmax_thresh , ]
+    dim(dat)
+  
+  ## Subset to just down in Chico
+   # dat <- dat[dat$section == section, ]
+    dim(dat)
+  
+
+  ## Average over accession
+  dat <- dat %>%
+    group_by(accession) %>%
+    summarise_all("mean")
+  dim(dat)
+
+  
+  ## Set phenotype 
+  pheno = "rgr"
+  
+  # Do 10 fold cross validation
+  folds <- createFolds(y = 1:nrow(dat), k = 5)
+  cors <- NA
+  x=1
+    for(fold in folds){
+      dat_train <- dat
+      dat_train[fold, pheno] <- NA
+  
+  
+     test = kin.blup(data = as.data.frame(dat_train),
+                      geno = "accession",
+                      pheno = pheno,
+                  #   fixed = c("section"),
+                      covariate = c("height_2014"),
+                      K = A)  
+  
+    test
+    
+    test$Vg
+    
+    # Broad sense heritability
+    cat("BSH == ", test$Vg / (test$Vg + test$Ve), "\n") ## Broad sense heritability
+    
+    ## Evaluate accuracy on test set
+    cv_cor <- cor(as.data.frame(dat)[fold, pheno],
+        test$g[ match(as.character(dat$accession[fold]), names(test$g)  )  ])
+    plot(y = as.data.frame(dat)[fold, pheno],
+        x =  test$g[  match(as.character(dat$accession[fold]), names(test$g)  )  ],
+        ylab = pheno, xlab = "breeding value" )
+    
+    cat("CV correlation == ", cv_cor, "... \n")
+    
+    cors[x] <- cv_cor
+    x = x + 1
+
+    }
+  
+  summary(cors)
+  
+  
+  test2 <- data.frame(g = test$g,   
+                      accession = as.numeric(names(test$g)))
+  dim(test2)
+  test2 <- left_join(test2, dat)
+  dim(test2)
+  plot(test2$tmax_sum, test2$g)
+  cor.test(test2$tmax_sum, test2$g)
+  
+  test2 %>%
+  ggplot(aes(x = pull(test2, pheno), y  = g))  +
+    geom_point() + geom_smooth() + theme_bw()
+  
+  
+  test2 %>%
+    filter(accession %in% dat$accession) %>%
+    # filter(tmax_sum > tmax_thresh) %>% 
+    ggplot(aes(x = g, y  = height_2017))  +
+    geom_point() + geom_smooth() + theme_bw()
+  
+  
+  ## Matching back to garden data
+  test2 <- data.frame(g = test$g,   
+                      accession = as.numeric(names(test$g)))
+  
+  dat_all_gen2 <- left_join(dat_all_gen, test2)
+  
+  
+  dat_all_gen2 %>%
+    select(accession, section, g, rgr, height_2017, tmax_sum, tmax_sum_dif, bioclim_18) %>%
+    group_by(accession, section) %>%
+    summarise_all("mean") %>%
+  ggplot(aes(x = g, y = rgr, color = tmax_sum_dif)) + 
+    geom_point() + 
+    facet_wrap(~section) +
+    theme_bw() + geom_smooth()
+  
+ t = lmer(rgr~ g + height_2014 + (1|section_block), dat_all_gen2)
+ summary(t)
+ 
+ ## Check predictive power of breeding value on growth in common gardens
+ fit_g <- gamm4(rgr ~ s(height_2014)
+                       + s(g),
+                       random = ~ (1 | section) +
+                         (1 | accession) +
+                         (1 | section_row) + 
+                         (1 | section_line),
+                       data = dat_all_gen2)
+ check_model(fit_g)
+ plot_gam(fit_g$gam, var = "g", var_index = 2, 
+          xlab = "g", plot_raw_pts = TRUE)
+ 
+ 
+ newdat <- expand.grid(height_2014 = 0,
+                       section_block = "IFG-1",
+                       g = seq(-3, 3, by = .1),
+                       tmax_sum= c(-2, 0, 2))
+ 
+ newdat$predictions <- predict(t, newdat = newdat, re.form = NA)
+ 
+ ggplot(newdat, aes(x = g, y = predictions, colour = factor(tmax_sum))) +
+   geom_line() + theme_bw()
+ 
+ 
+ pairs.panels(dat_all_gen2[ , c("rgr", "g", climate_vars)])
+   
+ 
+  
+  
+# Testing out QTCAT -------------------------------------------------------
+
+  # devtools::install_github("QTCAT/qtcat") 
+  # library(qtcat)
+  # 
+  # ## Create SNP matrix
+  #   ### Getting genetic data
+  #   snp_col_names <- colnames(gen_dat[, -c(1, 2)])
+  #   chrom <- sapply(strsplit(snp_col_names, "_"), function(x) x[[1]])
+  #   pos <- sapply(strsplit(snp_col_names, "_"), function(x) x[[2]])
+  #   
+  #   dat_all_gen <- dat_all_scaled %>%
+  #              dplyr::select(accession, tmax_sum) %>%
+  #              group_by(accession) %>%
+  #             summarise_all("mean") %>%
+  #            inner_join(., gen_dat)
+  #   dim(dat_all_gen)
+  #   dat_all_gen <- as.data.frame(dat_all_gen)
+  #   rownames(dat_all_gen) <- dat_all_gen$accession
+  # 
+  # 
+  # snp_mat <- as.snpMatrix(x = dat_all_gen[, snp_col_names], # a matrix with individuals in rows and SNPs in columns
+  #                         chr = as.numeric(chrom),
+  #                         pos = as.numeric(pos),
+  #                         alleleCoding = c(0, 1, 2))
+  # 
+  # ## Creating SNP cluster
+  # snpclust <- qtcatClust(snp = snp_mat, mc.cores = 6, trace = TRUE)
+  # 
+  # 
+  # # create a phenotype object for the HIT analysis
+  # pheno <- qtcatPheno(names = dat_all_gen$accession,
+  #                     pheno = dat_all_gen$tmax_sum,
+  #                     family = "gaussian")
+  # 
+  # # create a genotype object for the HIT analysis
+  # geno <- qtcatGeno(snp = snp_mat,
+  #                   snpClust = snpclust, mc.cores = 6)
+  # 
+  # # run the core analysis, the HIT
+  # hitfit <- qtcatHit(pheno, geno, mc.cores = 6)
+  # (result <- qtcatQtc(hitfit, alpha = 0.10))
+  # 
+  # 
+  # # Plot results
+  # plotQtc(hitfit, alpha = 0.05, pch = 20)
+  # plotSelFreq(hitfit, pch = 20)
+  # 
+  
+  
+
+# Testing out BGLR --------------------------------------------------------
+
+ ## Notes about BGLR
+ ## Can get 95% credible intervat from .dat files output to file but these include burn in samples
+ ## Need to learn what RKHS output means - what us uStar parameter, etc?
+ 
+ 
+library(BGLR) 
+library(rrBLUP)
+ 
+ ### Getting genetic data
+ snp_col_names <- colnames(gen_dat[, -c(1, 2)])
+ 
+ dat_all_gen <- inner_join(dat_all_scaled, gen_dat)
+ dim(dat_all_gen)
+ dat_all_gen <- as.data.frame(dat_all_gen)
+ 
+
+ # Loading and preparing the input data
+
+ Y <- dat_all_gen %>%
+      dplyr::select(accession, rgr, climate_vars) %>%
+      group_by(accession) %>%
+       summarise_all("mean")
+ 
+ # Phenotypic response
+ y <- Y$tmax_sum
+ 
+ # Genotype matrix - can't have missing data
+   ## Filter down to unique accessions
+   bglr_gen <- dat_all_gen %>%
+     dplyr::distinct(accession, .keep_all = TRUE) %>%
+     dplyr::select(accession, snp_col_names)
+   dim(bglr_gen)
+   
+   
+   ## Make sure in same row order
+     bglr_gen <- bglr_gen[match(Y$accession, bglr_gen$accession), ]
+     sum(!(bglr_gen$accession == Y$accession)) ## SHould equal 0
+   
+   #Remove accesssion column
+     bglr_gen <- bglr_gen[, -1]
+   
+   # Scale data before converting 012 to -101
+     bglr_gen_scaled <- flashpcaR::scale2(bglr_gen)
+     bglr_gen_scaled[1:10, 1:10]
+   
+   # Convert to -101
+     bglr_gen[bglr_gen == 0] <- -1
+     bglr_gen[bglr_gen == 1] <- 0
+     bglr_gen[bglr_gen == 2] <- 1
+     summary(bglr_gen[, 1:10])
+     
+   # Calculate kinship matrix
+   A <- rrBLUP::A.mat(X = bglr_gen)
+   
+
+ #2 Setting the linear predictor
+   # Options for model types - more info in manual
+   # FIXED - flat prior
+   # BL - Bayesian lasso
+   # BRR - Bayesian ridge regression
+   # BayesA - scaled-t prior
+   # BL - Double-Exponential prior
+   # BayesB - two component mixture prior with a point of mass at zero and a sclaed-t slab
+   # BayesC - two component mixture prior with a point of mass at zero and a Gaussian slab
+   ETA<-list(list(K=A, model='RKHS')) # Kinship matrix
+   
+            # list(X=bglr_gen_scaled, model='BayesC'))   # Markers
+   
+
+
+## Setting cross validation
+
+folds <- createFolds(y = 1:length(y), k = 5)
+x = 1
+cv_cors <- NA
+for(fold in folds){ 
+  
+  yNA <- y
+  yNA[fold] <- NA
+  
+  n_iter <- 10000 ## Iterations including burn in
+  n_burn <- 5000
+  
+   
+  bglr_test <- BGLR(y =  yNA,  # The data-vector 
+                    response_type = "gaussian",
+                    ETA = ETA,
+                    nIter = n_iter, burnIn = n_burn,
+                    saveAt = "./BGLR/test_")
+  
+  (summary(bglr_test))
+  
+  
+  #5# Assesment of correlation in TRN and TST data sets
+  cor(bglr_test$yHat[-fold],y[-fold]) #TST
+  
+  plot(y[fold], bglr_test$yHat[fold],
+       xlab = "observed", ylab = "predicted", pch = 19)
+  
+  cv_cors[x] <- cor(bglr_test$yHat[fold], y[fold]) #TRN
+  x = x+1
+
+}
+
+summary(bglr_test)
+summary(cv_cors)
+
+## For kinship matrices     
+    #1# Predictions
+    # Total prediction
+    yHat<-bglr_test$yHat
+    tmp<-range(c(y,yHat))
+    plot(yHat~y,xlab='Observed',ylab='Predicted',col=2,
+         xlim=tmp,ylim=tmp); abline(a=0,b=1,col=4,lwd=2)
+    #2# Godness of fit and related statistics
+    bglr_test$fit
+    bglr_test$varE # This is the residual variance
+    
+    #3# Variance components associated with the genomic and pedigree
+    # matrices
+    # Extracting some estimates & predictions
+    bglr_test$varE # residual variance
+    bglr_test$ETA[[1]]$varU # genomic variance
+    bglr_test$ETA[[1]]$u # genomic predictions
+    
+      # Heritability
+        bglr_test$ETA[[1]]$varU / (bglr_test$ETA[[1]]$varU +  bglr_test$varE)
+    
+    #4# Trace plots
+    list.files("./BGLR/")
+    # Residual variance
+    varE<-scan('./BGLR/test_varE.dat')
+    plot(varE,type='o',col=2,cex=.5);
+    
+    varA<-scan('./BGLR/test_ETA_1_varU.dat')
+    plot(varA,type='o',col=2,cex=.5);
+    
+    
+  ## Looking at marker effects
+    bHat<- bglr_test$ETA[[2]]$b
+    #SD.bHat<- bglr_test$ETA[[1]]$SD.b
+    plot(bHat^2, ylab='Estimated Squared-Marker Effect',
+         pch=19,cex=.5,col="grey20",main='Marker Effects', las = 1)
+    
+    ##  Total prediction
+    # Just the genomic part
+    gHat<-as.matrix(bglr_gen_scaled)%*%bglr_test$ETA[[2]]$b
+    plot(gHat~y,xlab='Phenotype',
+         ylab='Predicted Genomic Value',col=2); abline(a=0,b=1,col=4,lwd=2)
+    
+    plot(gHat, bglr_test$ETA[[1]]$u)
+
+    
+    ## Correlating genomic values with growth rates in common gardens
+    
+    str(bglr_test)
+    pairs.panels(cbind(bglr_test$ETA[[1]]$u, 
+                 Y))
+    
+    
+    ## Make a dataframe of breeding values
+    bvs <- data.frame(accession = Y$accession,
+                       g = bglr_test$ETA[[1]]$u)
+    
+    bvs <- left_join(bvs, dat_all_scaled, by = "accession")
+    dim(bvs)
+    
+    
+    bvs %>%
+      ggplot(aes(x = g, y = rgr, col = g, group = site)) + 
+      geom_point() + geom_smooth() + theme_bw()
+    
+    ## Check variance inflation factor
+    vif(bvs[, c("height_2014", "rgr", "tmax_sum_dif", "g")])
+    
+   
+    ## Check predictive power of breeding value on growth in common gardens with gam
+    fit_g_noint <- gamm4(rgr ~ s(height_2014)
+                   + s(tmax_sum_dif),
+                   + s(g),
+                   random = ~ (1 | section) +
+                     (1 | accession) +
+                     (1 | section_row) + 
+                     (1 | section_line),
+                   data = bvs)
+    
+    
+    fit_g_int <- gamm4(rgr ~ s(height_2014)
+                       
+                         + s(tmax_sum_dif)
+                         + s(tmax_sum_dif, by = g),
+                       
+                         random = ~ (1 | section) +
+                           (1 | accession) +
+                           (1 | section_row) + 
+                           (1 | section_line),
+                         data = bvs)
+    
+    check_model(fit_g_noint)
+    
+    check_model(fit_g_int)
+    
+    cAIC(fit_g_int)
+    cAIC(fit_g_noint)
+
+    ## Quick simulation to check how high collinearity affects interaction effects
+      # x1 = runif(1000)
+      # x2 = x1 + rnorm(mean = 0, sd = .1, n = length(x1))
+      # plot(x1, x2)
+      # cor.test(x1, x2)
+      # 
+      # y = .2 + .0*x1 + .5*x2 + rnorm(mean = 0, sd = .1, n = length(x1))
+      # 
+      # plot(x1, y)
+      # plot(x2, y)
+      # 
+      # summary(lm(y ~ x1 + x2))
+      # 
+      # summary(lm(y ~ x1*x2))
+      
+    
+    ## Survival model
+    # fit_g <- gamm4(alive_2017 ~
+    #                + s(tmax_sum_dif, by = g),
+    #                random = ~ (1 | section), 
+    #                 # (1 | accession),
+    #                family = "binomial",
+    #                data = bvs)
+    # 
+    
+    fit_g <- fit_g_int
+    
+    check_model(fit_g)
+    plot_gam(fit_g$gam, var = "g", var_index = 2, 
+             xlab = "g", plot_raw_pts = TRUE)
+    
+    
+    
+    newdat <- expand.grid(height_2014 = 0,
+                         # section_block = "IFG-1",
+                          g = c(-1.5, 0, 1.5),
+                          tmax_sum = 0,
+                          tmax_sum_dif= seq(-2, 2.75, by = .1))
+    
+    predictions <- predict(object = fit_g$gam, newdata = newdat,
+                                  se.fit = TRUE, type = "response")
+    
+    newdat$predictions <- predictions$fit
+    newdat$predictions_se <- predictions$se.fit
+    
+    bvs %>%
+      group_by(accession, section) %>%
+      summarise_all("mean") %>%
+    ggplot(data = ., aes(x = tmax_sum_dif, y = rgr, col = g, size = 1.25)) +
+      geom_point() + 
+      geom_line(data = newdat, aes(x = tmax_sum_dif, 
+                                   y = predictions, 
+                                   group = factor(g), size = 1)) + 
+      scale_color_gradient(low = "blue", high = "red") +
+      theme_bw()
+    
+    ggplot(data = newdat, 
+           aes(x = tmax_sum_dif, ymin = predictions + 1.96*predictions_se,
+                                   ymax = predictions -1.96* predictions_se, 
+               fill = factor(g))) + 
+             geom_ribbon(alpha = 0.5) + theme_bw()
+    
+    
+    # #1# Estimated Marker Effects & posterior SDs - for marker effects
+    # bHat<- bglr_test$ETA[[1]]$b
+    # SD.bHat<- bglr_test$ETA[[1]]$SD.b
+    # plot(bHat^2, ylab='Estimated Squared-Marker Effect',
+    #      type='o',cex=.5,col=4,main='Marker Effects')
+    # #2# Predictions
+    # # Total prediction
+    # yHat<-bglr_test$yHat
+    # tmp<-range(c(y,yHat))
+    # plot(yHat~y,xlab='Observed',ylab='Predicted',col=2,
+    #      xlim=tmp,ylim=tmp); abline(a=0,b=1,col=4,lwd=2)
+    # # Just the genomic part
+    # gHat<-as.matrix(X)%*%bglr_test$ETA[[1]]$b
+    # plot(gHat~y,xlab='Phenotype',
+    #      ylab='Predicted Genomic Value',col=2); abline(a=0,b=1,col=4,lwd=2)
+    # #3# Godness of fit and related statistics
+    # bglr_test$fit
+    # bglr_test$varE # compare to var(y)
+    # #4# Trace plots
+    # list.files()
+    # # Residual variance
+    # varE<-scan('./BGLR/test_varE.dat')
+    # plot(varE,type='o',col=2,cex=.5,ylab=expression(var[e]));
+    # abline(h=bglr_test$varE,col=4,lwd=2);
+    # abline(v=bglr_test$burnIn/bglr_test$thin,col=4)
+    # # lambda (regularization parameter of the Bayesian Lasso)
+    # lambda<-scan('./BGLR/test_ETA_1_lambda.dat')
+    # plot(lambda,type='o',col=2,cex=.5,ylab=expression(lambda));
+    # abline(h=bglr_test$ETA[[1]]$lambda,col=4,lwd=2);
+    # abline(v=bglr_test$burnIn/bglr_test$thin,col=4)
+    # 
+ 
+    
+    
+### Testing out environment interactions
+    
+    
+    # Do CV with BGLR gxe models
+    # Figure out how to interpret gxe interaction terms 
+    # Figure out how to link to climate - simple correlations with breeding value and climate variables?
+    
+    
+    ## Set up data so that rows are accessions and columns are environments
+    dat_all_gen_int <- dat_all_gen
+    
+    Y <- dat_all_gen_int %>%
+                      dplyr::select(accession, site, rgr, climate_vars)  %>% 
+                      group_by(accession, site) %>%
+                      summarise_all("mean") %>%
+                      tidyr::spread(site, rgr)
+    
+    Y <- as.data.frame(Y)
+    
+    # Make DF of climate differences in chico
+    chico_dif <- dat_all_gen_int %>%
+                dplyr::select(accession, site, rgr, climate_vars_dif, height_2014) %>%
+                dplyr::filter(site == "Chico") %>%
+                group_by(accession, site) %>%
+                summarise_all("mean") %>%
+                left_join(Y, ., by = "accession")
+    
+    ifg_dif <- dat_all_gen_int %>%
+                dplyr::select(accession, site, rgr, climate_vars_dif, height_2014) %>%
+                dplyr::filter(site == "IFG") %>%
+                group_by(accession, site) %>%
+                summarise_all("mean") %>%
+                left_join(Y, ., by = "accession")
+    
+    
+    # Genotype matrix - can't have missing data
+    ## Filter down to unique accessions
+      bglr_gen <- dat_all_gen %>%
+         dplyr::distinct(accession, .keep_all = TRUE) %>%
+         dplyr::filter(accession %in% dat_all_scaled$accession) %>%
+        dplyr::select(accession, snp_col_names)
+      dim(bglr_gen)
+      
+      ## Make sure in the same order as Y
+      bglr_gen <- bglr_gen[match(Y$accession, bglr_gen$accession), ]
+  
+      sum(bglr_gen$accession != Y$accession)
+      
+      dim(bglr_gen)
+      
+      rownames(bglr_gen) <- bglr_gen$accession
+      bglr_gen <- bglr_gen[, -1]
+      
+      bglr_gen[bglr_gen == 0] <- -1
+      bglr_gen[bglr_gen == 1] <- 0
+      bglr_gen[bglr_gen == 2] <- 1
+      
+      summary(bglr_gen[, 1:10])
+      
+      A <- A.mat(X = bglr_gen)
+
+    ## Choose environmental variables  
+    env <- c("Chico", "IFG") # choose any set of environments from 1:ncol(Y)
+    
+    nEnv <- length(env)
+    
+    y <- as.vector(as.matrix(Y[,env]))
+    
+    ## Adjusting rgr for differences in initial sizes
+    y_adj <- residuals(lm(y ~  c(chico_dif$height_2014, ifg_dif$height_2014),
+                          na.action = "na.exclude"))
+    plot(y, y_adj, pch = 19)
+    
+    
+    # Fixed effect (env-intercepts)
+      envID <- rep(env,each=nrow(Y))
+  
+    ## Start model descriptions  
+    ETA <- list(list(~factor(envID)-1, model="FIXED"))
+   #   ETA <- list(list(X = tmax_dif, model="FIXED"))
+    
+    # Main effects of markers
+      G0 <- kronecker(matrix(nrow=nEnv,
+                             ncol=nEnv,
+                             1), A)
+      
+      # is equivalent to fitting a genomic regression model using the average performance of each line across environments as a phenotype.
+      ETA[[2]] <- list(K=G0, model='RKHS')
+    
+    # Adding interaction terms
+      for(i in 1:nEnv){
+        tmp <- rep(0,nEnv) ; tmp[i] <- 1
+        G1 <- kronecker(diag(tmp),A)
+        ETA[[(i+2)]] <- list(K=G1, model='RKHS')
+      }
+    
+    ## Adding in fixed effect
+      
+      tmax_dif <- c(chico_dif$tmax_sum_dif, ifg_dif$tmax_sum_dif)
+       ## Mean impute NAs
+       tmax_dif[is.na(tmax_dif)] <- 0
+      
+      ETA[[length(ETA) + 1]] <- list(X = as.data.frame(tmax_dif), model = 'FIXED')
+      
+      
+    # Start cross validation
+    prefix = "./BGLR/inter_"  
+    
+    ## There are two basic cross-validation schemes used in genome-enabled prediction: (1) predicting the performance of certain proportion of lines that have not been evaluated in any of the observed environments (CV1), and (2) predicting the performance of a proportion of lines that have been evaluated in some environments, but not in others, also called sparse testing (CV2). Another prediction problem that does not involve random cross-validation is predicting one environment using another environment (pairwise environment). The fourth prediction problem consists of predicting one environment (i.e., site-year combination) that was not included in the usual set of testing environments in the evaluation system (leave-one-environment-out); the only available information on this untested environment could be certain char- acteristics that would have been previously collected such as soil type, altitude, longitude, maximum and mini- mum temperature, precipitation during other cropping cycles, etc.
+      
+    folds <- createFolds(y = 1:length(y_adj), k = 10)
+    x = 1
+    cv_cors <- NA
+    
+    for(fold in folds){ 
+        yNA <- y_adj
+        yNA[fold] <- NA
+      
+      # Model Fitting
+        # Paper did 55,000 iters and 5000 burnin
+      fm <- BGLR(y=yNA, ETA=ETA,
+                 nIter=5000,burnIn=2000,saveAt=prefix) 
+      
+      
+      #5# Assesment of correlation in TRN and TST data sets
+      cor(x = fm$yHat[-fold], y = y_adj[-fold], use = "complete.obs") #TST
+      cv_cors[x] <- cor(fm$yHat[fold], y_adj[fold], use = "complete.obs") #TRN
+      
+      cat("Correlation is:", cv_cors[x], "... \n")
+      
+      x = x+1
+    
+    }
+    
+    summary(cv_cors)
+
+    
+    ## Model fit
+    fm$fit
+    
+    # Extracting estimates of variance parameters
+      fm$varE # residual variance
+      fm$ETA[[2]]$varU # genomic variance (main effect)
+      vGInt <- rep(NA,nEnv)
+      for(i in 1:nEnv){ # interaction variances
+        vGInt[i] <- fm$ETA[[(i+2)]]$varU
+      }
+      vGInt
+      
+     # Model R2 was computed as the ratio of the sum of the main and interaction variance, relative to the total variance (residual + main effect + interaction). Env, environment.
+      (fm$ETA[[2]]$varU) /  (fm$ETA[[2]]$varU + fm$varE)
+      (fm$ETA[[2]]$varU + sum(vGInt)) / (fm$ETA[[2]]$varU + sum(vGInt) + fm$varE)
+      
+    # Predictions (this is all within training)
+      tmpEnv <- 2
+      plot(y_adj[envID==env[tmpEnv]]~fm$yHat[envID==env[tmpEnv]])
+      
+      plot(y_adj ~ fm$yHat)
+      
+      # Samples
+      varE <- scan(paste(prefix,'varE.dat',sep=''))
+      plot(varE,type='o',cex=.5,col=4)
+      varU0 <- scan(paste(prefix,'ETA_2_varU.dat',sep=''))
+      plot(varU0,type='o',cex=.5,col=4)
+      
+      varU1 <- matrix(nrow=length(varU0),ncol=nEnv,NA)
+      for(i in 1:nEnv){
+        varU1[,i] <- scan(paste(prefix,'ETA_',i+2,'_varU.dat',sep=''))
+      }
+      
+      tmpEnv <- 2
+      plot(varU1[,tmpEnv],type='o',col=4,cex=.5)
+      
+      plot(fm$ETA[[2]]$u, y, col = factor(envID), pch = 19)
+      
+      ### ## Plot both gardens
+      pairs.panels(cbind(fm$ETA[[2]]$u, rbind(chico_dif, ifg_dif)))
+      
+      plot(fm$ETA[[2]]$u, c(chico_dif$tmax_sum_dif, ifg_dif$tmax_sum_dif))
+      cor.test(fm$ETA[[2]]$u, c(chico_dif$tmax_sum_dif, ifg_dif$tmax_sum_dif))
+      
+      plot(y = c(fm$ETA[[3]]$u[envID == "Chico"],
+             fm$ETA[[4]]$u[envID == "IFG"]), 
+           x = c(chico_dif$tmax_sum, ifg_dif$tmax_sum), pch = 19)
+      cor.test(c(fm$ETA[[3]]$u[envID == "Chico"],
+                 fm$ETA[[4]]$u[envID == "IFG"]), c(chico_dif$tmax_sum, ifg_dif$tmax_sum))
+      
+      
+      test = cbind(fm$ETA[[2]]$u, rbind(chico_dif, ifg_dif))
+      
+      test <- test %>%
+        dplyr::select(-site) %>%
+        group_by(accession) %>%
+        summarise_all("mean")
+      pairs.panels(test)
+      
+      
+      
+      ## Plot variance in chico and climate vars dif
+      pairs.panels(cbind(y_adj[envID == "Chico"], 
+                         fm$ETA[[3]]$u[envID == "Chico"], 
+                         chico_dif[, climate_vars_dif]))
+      
+      
+      ## Plot variance in chico and tmax_sum_dif
+      pairs.panels(cbind(y_adj[envID == "IFG"],
+                         fm$ETA[[4]]$u[envID == "IFG"], 
+                         ifg_dif[, climate_vars_dif]))
+      
+      test <- read_tsv("./BGLR/inter_ETA_5_b.dat")
+      test
+      head(test)
+      dim(test)
+      hist(test)
+      summary(test)
+      
+      quantile(pull(test, tmax_dif), c(0.025, 0.975))
+      
+      
+ 
+ ##########
+ 
+data(mice)
+data(wheat)
+  
+
+library(BGLR); set.seed(12345); data(mice);
+n<-nrow(mice.X); p<-ncol(mice.X);
+X<-scale(mice.X,scale=TRUE,center=TRUE)
+## Toy simulation example
+nQTL<-10; p<-ncol(X); n<-nrow(X); h2<-0.5
+whichQTL<-seq(from=floor(p/nQTL/2),by=floor(p/nQTL),length=nQTL)
+b0<-rep(0,p)
+b0[whichQTL]<-rnorm(n=nQTL,sd=sqrt(h2/nQTL))
+signal<-as.vector(X%*%b0)
+error<-rnorm(n,sd=sqrt(1-h2))
+y<-signal+error
+
+
+nIter<-1000; burnIn<-500
+## Fitting models
+## Bayesian Ridge Regression (Gaussian prior), equivalent to G-BLUP
+ETA<-list(MRK=list(X=X,model="BRR"))
+fmBRR<-BGLR(y=y,ETA=ETA, nIter=nIter, burnIn=burnIn,saveAt="BRR_")
+
+
+#Residual Variance
+fmBRR$varE; fmBRR$SD.varE
+# DIC and pD
+fmBRR$fit
+fmBA$fit
+fmBB$fit
+#Predictions
+fmBRR$yHat; fmBRR$SD.yHat
+fmBA$yHat; fmBA$SD.yHat
+fmBB$yHat; fmBB$SD.yHat
+#Correlations between predicted and simulated signals
+cor(signal,fmBRR$yHat)
+cor(signal,fmBA$yHat)
+cor(signal,fmBB$yHat)
+# Estimated effects
+tmp<-range(abs(b0))
+plot(numeric()~numeric(),ylim=tmp,xlim=c(1,p),
+     ylab=expression(paste("|",beta[j],"|")),
+     xlab="Marker Possition (order)")
+abline(v=whichQTL,lty=2,col=4)
+points(x=whichQTL,y=abs(b0[whichQTL]),pch=19,col=4)
+points(x=1:p,y=abs(fmBRR$ETA$MRK$b),col=1,cex=.5)
+lines(x=1:p,y=abs(fmBRR$ETA$MRK$b),col=1,cex=.5)
+points(x=1:p,y=abs(fmBB$ETA$MRK$b),col=2,cex=.5)
+lines(x=1:p,y=abs(fmBB$ETA$MRK$b),col=2,cex=.5)
+
+## Fitting fixed and random effects
+
+#1# Loading and preparing the input data
+library(BGLR); data(mice);
+Y<-mice.pheno; X<-mice.X
+y<-Y$Obesity.BMI; y<-scale(y,center=TRUE,scale=TRUE)
+#2# Setting the linear predictor
+ETA<-list( FIXED=list(~factor(GENDER)+factor(Litter),
+                      data=Y,model="FIXED"),
+           CAGE=list(~factor(cage),data=Y, model="BRR"),
+           MRK=list(X=X, model="BL")
+)
+#3# Fitting the model
+fm<-BGLR(y=y,ETA=ETA, nIter=5000, burnIn=1000)
+save(fm,file="fm.rda")
+
+
+
+
+load("FileS1.rdata")
+library('BGLR')
+env <- 4 # choose any number in 1:ncol(Y)
+prefix <- paste(colnames(Y)[env],"_",sep="")
+# Fitting the model
+ETA <- list(G=list(K=G,model='RKHS'))
+fm <- BGLR(y=Y[,env],ETA=ETA,nIter=12000,burnIn=2000,saveAt=prefix) 
+fm 
+
+# Extracting some estimates & predictions
+fm$varE # residual variance
+fm$ETA[[1]]$varU # genomic variance
+fm$ETA[[1]]$u # genomic predictions
+# Some trace plots
+varE <- scan(paste(prefix,'varE.dat',sep=''))
+plot(varE,type='o',cex=.5,col=4)
+varU <- scan(paste(prefix,'ETA_1_varU.dat',sep=''))
+plot(varU,type='o',cex=.5,col=4)
+
+
+## WIth interaction effect from Increased prediction accuracy in wheat breeding lines using a marker × environment interaction genomic selection model
+env <- c(3,4) # choose any set of environments from 1:ncol(Y)
+nEnv <- length(env)
+prefix <- paste(c('MxE',colnames(Y)[env],''),collapse='_')
+y <- as.vector(Y[,env])
+# Fixed effect (env-intercepts)
+envID <- rep(env,each=nrow(Y))
+ETA <- list(list(~factor(envID)-1,model="FIXED"))
+# Main effects of markers
+G0 <- kronecker(matrix(nrow=nEnv,ncol=nEnv,1),G)
+ETA[[2]] <- list(K=G0,model='RKHS')
+# Adding interaction terms
+for(i in 1:nEnv){
+  tmp <- rep(0,nEnv) ; tmp[i] <- 1
+  G1 <- kronecker(diag(tmp),G)
+  ETA[[(i+2)]] <- list(K=G1, model='RKHS')
+}
+# Model Fitting
+fm <- BGLR(y=y,ETA=ETA,nIter=12000,burnIn=2000,saveAt=prefix)
+
+# Extracting estimates of variance parameters
+fm$varE # residual variance
+fm$ETA[[2]]$varU # genomic variance (main effect)
+vGInt <- rep(NA,nEnv)
+for(i in 1:nEnv){ # interaction variances
+  vGInt[i] <- fm$ETA[[(i+2)]]$varU
+}
+vGInt
+# Predictions (this is all within training)
+tmpEnv <- 1
+plot(y[envID==env[tmpEnv]]~fm$yHat[envID==env[tmpEnv]])
+# Samples
+varE <- scan(paste(prefix,'varE.dat',sep=''))
+plot(varE,type='o',cex=.5,col=4)
+varU0 <- scan(paste(prefix,'ETA_2_varU.dat',sep=''))
+plot(varU0,type='o',cex=.5,col=4)
+
+varU1 <- matrix(nrow=length(varU0),ncol=nEnv,NA)
+for(i in 1:nEnv){
+  varU1[,i] <- scan(paste(prefix,'ETA_',i+2,'_varU.dat',sep=''))
+}
+
+tmpEnv <- 1
+plot(varU1[,tmpEnv],type='o',col=4,cex=.5)
+
+
+
+
+
 
 # Testing out RDA  --------------------------------------------------------
 
@@ -367,63 +1369,6 @@ check_model <- function(gamm4_out){
   
   
 
-
-# Adding elevation to models ----------------------------------------------
-
-    ## Individual climate variables
-    fit_CMD_elev <- gamm4(rgr ~ s(height_2015)
-                           +s(CMD_dif)
-                           +s(elev)
-                           + t2(CMD_dif, elev),
-                           random = ~(1|block) + (1|locality) + (1|accession) + (1|row) + (1|line),
-                           data = dat_all_scaled)
-    
-    fit_Tmin_elev <- gamm4(rgr ~ s(height_2015)
-                            + t2(Tmin_dif, elev),
-                            random = ~(1|block) + (1|locality) + (1|accession) + (1|row) + (1|line),
-                            data = dat_all_scaled)
-    
-    fit_Tmax_elev <- gamm4(rgr ~ s(height_2015)
-                            +s(Tmax_dif)
-                            +s(elev),
-                          #  + t2(Tmax_dif, elev),
-                            random = ~(1|block) + (1|locality) + (1|accession) + (1|row) + (1|line),
-                            data = dat_all_scaled)
-    
-    ## DD5
-    fit_DD5_elev <- gamm4(rgr ~ s(height_2015)
-                           +s(DD5_dif)
-                           +s(elev)
-                           + t2(DD5_dif, elev),
-                           random = ~(1|block) + (1|locality) + (1|accession) + (1|row) + (1|line),
-                           data = dat_all_scaled)
-    
-    fit_DD5_elev_noint <- gamm4(rgr ~ s(height_2015)
-                          +s(DD5_dif)
-                          +s(elev),
-                          random = ~(1|block) + (1|locality) + (1|accession) + (1|row) + (1|line),
-                          data = dat_all_scaled)
-    
-    
-    ## Compare models with and without genetic elever interactions
-    anova(fit_CMD_elev$mer, fit_CMD$mer) ## No interaction
-    anova(fit_Tmin_elev$mer, fit_Tmin$mer) ## 
-    anova(fit_Tmax_elev$mer, fit_Tmax$mer) ## Elev but no interaction
-    anova(fit_DD5_elev$mer, fit_DD5_elev_noint$mer, fit_DD5$mer) ##  Elev but no interaction
-    
-    
-    anova(fit_Tmax$mer, fit_Tmax_old$mer)
-    
-    vis.gam(fit_Tmax_elev_int$gam, view = c("elev", "Tmax_dif"), theta = 45, phi = 25)
-    
-    vis.gam(fit_Tmax_elev_int$gam, view = c("elev", "Tmax_dif"), plot.type = "contour")
-    
-    ## Tmax
-    check_model(fit_Tmax_elev)
-    plot_gam(fit_Tmax_elev$gam, var = "elev", var_index = 3, 
-             xlab = "elev", plot_raw_pts = F)
-    
-  
 
 # Models with PC of climate variables -------------------------------------
 
@@ -565,52 +1510,59 @@ check_model <- function(gamm4_out){
 
 # Random forest models ----------------------------------------------------
 
-  # library(randomForest)
-  # library(forestFloor)
+  library(randomForest)
+  library(forestFloor)
+
+  ran_for_data <- dat_all_scaled %>%
+   # dplyr::filter(site == "chico") %>%
+    dplyr::filter(!is.na(rgr)) %>%
+    dplyr::select(rgr, tmax_sum_dif, height_2015, height_2017, site, section_block, accession, cwd_dif, latitude,
+                  section_row, section_line)
+
+  height_rf = randomForest(height_2017 ~ tmax_sum_dif + 
+                             latitude + 
+                             height_2015 +
+                             as.numeric(factor(ran_for_data$site)) +
+                             as.numeric(factor(ran_for_data$section_block)) +
+                             as.numeric(factor(ran_for_data$section_row)) +
+                             as.numeric(factor(ran_for_data$section_line)) +
+                             as.numeric(factor(ran_for_data$accession)),
+                           data = ran_for_data,
+                           keep.inbag= T,
+                           importance = TRUE)
+
+  height_rf
+
+  varImpPlot(height_rf)
+
+
+  ff = forestFloor(
+    rf.fit = height_rf, # mandatory
+    X = ran_for_data, # mandatory
+    calc_np = FALSE, # TRUE or FALSE both works, makes no difference
+    binary_reg = FALSE # takes no effect here when rfo$type="regression"
+  )
+
+  #plot partial functions of most important variables first
+  plot(ff, # forestFloor object
+       # plot_seq = 1:7, # optional sequence of features to plot
+       orderByImportance=TRUE # if TRUE index sequence by importance, else by X line
+  )
   
-  # ran_for_data <- dat_all_pca %>%
-  #   dplyr::filter(site == "chico") %>%
-  #   dplyr::filter(!is.na(rgr), !is.na(cluster_assigned)) %>%
-  #   dplyr::select(rgr, cluster_assigned, block, height_2015_scaled,
-  #                 PC1_avg:PC5_avg, PC1:PC5
-  #                 #  climate_vars_dif
-  #   )
-  # 
-  # 
-  # height_rf = randomForest(rgr ~ ., data = ran_for_data,
-  #                          keep.inbag= T,
-  #                          importance = TRUE)
-  # 
-  # height_rf
-  # 
-  # varImpPlot(height_rf)
-  # 
-  # 
-  # ff = forestFloor(
-  #   rf.fit = height_rf, # mandatory
-  #   X = ran_for_data, # mandatory
-  #   calc_np = FALSE, # TRUE or FALSE both works, makes no difference
-  #   binary_reg = FALSE # takes no effect here when rfo$type="regression"
-  # )
-  # 
-  # #plot partial functions of most important variables first
-  # plot(ff, # forestFloor object
-  #      # plot_seq = 1:7, # optional sequence of features to plot
-  #      orderByImportance=TRUE # if TRUE index sequence by importance, else by X line
-  # )
-  # 
-  
-  
-  # library(ranger)
-  # 
-  # height_ranger <- ranger(rgr ~ ., data = ran_for_data, importance = "permutation")
-  # 
-  # sort(height_ranger$variable.importance, decreasing = T)
-  # 
-  # importance_pvalues(height_ranger)
-  # 
-  # height_ranger$r.squared
-  # 
+  plot(ff, plot_seq = 3, ylim = c(-50, 50))
+
+
+
+  library(ranger)
+
+  height_ranger <- ranger(rgr ~ ., data = ran_for_data, importance = "permutation")
+
+  sort(height_ranger$variable.importance, decreasing = T)
+
+  importance_pvalues(height_ranger)
+
+  height_ranger$r.squared
+
 
 
 

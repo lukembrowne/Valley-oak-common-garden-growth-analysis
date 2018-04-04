@@ -12,11 +12,14 @@
 
   ## Read in climate data of of maternal trees - "Valley oak maternal tree climate data BCM 2018_03_08"
   ## If token is stale: gs_auth(new_user = TRUE)
-  climate_mom <- gs_read(gs_key("1lOQcBjdjUt-I4brnrD5LTCODZ2lvgzpqNnpxkYt_oSE"), ws = 2)
+ # climate_mom <- gs_read(gs_key("1lOQcBjdjUt-I4brnrD5LTCODZ2lvgzpqNnpxkYt_oSE"), ws = 2)
+  
+  ## Or read in 1921-1950 data
+  climate_mom <- read_csv("./data/cleaned_data/GBS tree climate data BCM 1921-1950 2018_03_28.csv")
 
   ## Rename columns
   climate_mom <- climate_mom %>%
-    select(-Locality) %>%
+    dplyr::select(-Locality) %>%
     rename(Elevation = `Elevation (m)`) %>%
     select_all(., tolower)
   
@@ -70,13 +73,13 @@
 ## Correlations between climate variables
     
   ## Climate variables in seedlings
-  pairs.panels(dat_all_clim[, climate_vars], scale = TRUE)
+ # pairs.panels(dat_all_clim[, climate_vars], scale = TRUE)
   
   ## Climate variables for moms
-  pairs.panels(climate_mom[, climate_vars], scale = TRUE)
+ # pairs.panels(climate_mom[, climate_vars], scale = TRUE)
   
   ## Climate distances for seedlings
-  pairs.panels(dat_all_clim[, climate_vars_dif], scale = TRUE)
+ # pairs.panels(dat_all_clim[, climate_vars_dif], scale = TRUE)
 
 
 
@@ -89,7 +92,8 @@
   scaled_var_means <- NA
   scaled_var_sds <- NA
   
-  to_scale = colnames(dplyr::select(dat_all_clim, climate_vars_dif, height_2015,
+  to_scale = colnames(dplyr::select(dat_all_clim, climate_vars_dif, 
+                                    height_2015, height_2014,
                                     climate_vars))
   
   for(var in to_scale){

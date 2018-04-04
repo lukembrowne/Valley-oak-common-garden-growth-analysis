@@ -34,11 +34,12 @@
   dat_mom <- dat_mom[!is.na(dat_mom$Accession),]
   dim(dat_mom) ## Should be 659
   
- ## unique(dat_17_raw$Accession)[which(!(unique(dat_17_raw$Accession) %in% dat_mom$Accession))]
-  
 
   ## Directory path to where 1951-1980 historical BCM climate data is located
-  dir_name <- "./data/gis/climate_data/BCM/historical/"
+  dir_name <- "./data/gis/climate_data/BCM/historical/1951-1980/"
+  
+  ## Directory path to where 1921-1950 historical BCM climate data is located
+  # dir_name <- "./data/gis/climate_data/BCM/historical/1921-1950/"
   
     ## Creates vector with list of file paths to all .tif raster files
     raster_files <- list.files(dir_name, full.names = TRUE, recursive = TRUE)
@@ -51,10 +52,14 @@
     cat("Working on file:", file, "...\n")
     
     ## Load in raster
-    raster_temp <- raster::stack(file) 
+    raster_temp <- raster::stack(file)
+    
+    ## For 1921-1950 data because some files are missing their CRS
+    # raster_temp <- raster::raster(x = file, 
+    #                              crs = "+proj=aea +lat_1=34 +lat_2=40.5 +lat_0=0 +lon_0=-120 +x_0=0 +y_0=-4000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs") 
     
     ## Project to lat long
-    raster_latlong <- raster::projectRaster(raster_temp, crs="+proj=longlat +datum=WGS84") 
+   raster_latlong <- raster::projectRaster(raster_temp, crs="+proj=longlat +datum=WGS84") 
     
     ## Extract climate values to dataframe
     col_name <-  names(raster_temp) ## Use for adding back to dataframe
@@ -138,7 +143,8 @@
   
   ## Write to file
   
-  #write_csv(dat_mom_final, path = "./data/cleaned_data/GBS tree climate data BCM 1950-1981 2018_03_08.csv")
+  # write_csv(dat_mom_final, path = "./data/cleaned_data/GBS tree climate data BCM 1950-1981 2018_03_08.csv")
+  # write_csv(dat_mom_final, path = "./data/cleaned_data/GBS tree climate data BCM 1921-1950 2018_03_28.csv")
   
 
 # Read in current BCM climate data for common garden sites ----------------------------------------
