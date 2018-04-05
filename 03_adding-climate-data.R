@@ -10,23 +10,29 @@
 # Load in climate data ----------------------------------------------------
 
 
-  ## Read in climate data of of maternal trees - "Valley oak maternal tree climate data BCM 2018_03_08"
-  ## If token is stale: gs_auth(new_user = TRUE)
- # climate_mom <- gs_read(gs_key("1lOQcBjdjUt-I4brnrD5LTCODZ2lvgzpqNnpxkYt_oSE"), ws = 2)
+  ## Read in climate data of of maternal trees in the common garden
+  ## Should be 659 trees
+  climate_garden_mom <- read_csv("./data/cleaned_data/maternal tree climate data BCM 1950-1981 2018_03_08.csv")
   
-  ## Or read in 1921-1950 data
-  climate_mom <- read_csv("./data/cleaned_data/GBS tree climate data BCM 1921-1950 2018_03_28.csv")
-
   ## Rename columns
-  climate_mom <- climate_mom %>%
+  climate_garden_mom <- climate_garden_mom %>%
     dplyr::select(-Locality) %>%
     rename(Elevation = `Elevation (m)`) %>%
     select_all(., tolower)
   
-  climate_mom
+  climate_garden_mom
+  
+  ## Read in climate data for GBS trees
+  climate_gbs_mom <- read_csv("./data/cleaned_data/GBS tree climate data BCM 1950-1981 2018_03_08.csv")
+  
+  climate_gbs_mom <- climate_gbs_mom %>%
+    select_all(., tolower)
+  
+  climate_gbs_mom
+  
     
   ## Merge data
-  dat_all_clim <- left_join(dat_all, climate_mom, by = "accession")
+  dat_all_clim <- left_join(dat_all, climate_garden_mom, by = "accession")
   dim(dat_all_clim)
   glimpse(dat_all_clim)
   
@@ -109,13 +115,12 @@
   names(scaled_var_means) <- to_scale
   names(scaled_var_sds) <- to_scale
   
-  
   summary(dat_all_scaled[, to_scale]) ## Means should all be 0
   
 
 
 
-# 
+
 # # PCA on climate variables ------------------------------------------------
 # 
 #   
