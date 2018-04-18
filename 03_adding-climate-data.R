@@ -28,7 +28,17 @@
   climate_gbs_mom <- climate_gbs_mom %>%
     select_all(., tolower)
   
-  climate_gbs_mom
+  climate_gbs_mom 
+  
+  climate_gbs_mom <- left_join(climate_gbs_mom, 
+                               dplyr::select(gen_dat, gbs_name, accession),
+                               by = c("id" = "gbs_name"))
+  
+  climate_gbs_mom$accession
+  
+  ## Filtering down individuals who's moms don't have climate data
+  dat_all <- dplyr::filter(dat_all, accession %in% climate_gbs_mom$accession)
+  
   
     
   ## Merge data
