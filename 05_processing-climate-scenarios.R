@@ -4,17 +4,118 @@ library(tidyverse)
 library(raster)
 library(sp)
 library(maptools)
+library(httr)
+library(stringr)
 
 #install.packages("climates",,'http://rforge.net/',type='source', dependencies = TRUE)
 library(climates)
 
 
-## Directory path to where 1951-1980 historical BCM climate data is located
+
+# Download future climate scenarios ---------------------------------------
+
+  ## Future climate files downloaded from:   https://geo.pointblue.org/commonsmap/index.php?ds=1129
+    
+    # Choose climate scenario
+     scenario = "CCSM4_rcp85"
+    
+    # Climate variables in bcm format
+      bcm_clim_vars <- c("aet", "cwd", "ppt", "tmn", "tmx")
+    
+    # Time periods - including water year (wy), months, and seasons (jja, djf)
+      time_periods <- c("wy", "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep",
+                        "oct", "nov", "dec", "jja", "djf")
+  
+    # Directory to save output files  
+    output_dir <- paste0("./data/gis/climate_data/BCM/future/", scenario, "/")
+    
+    errors <- NULL
+  
+  # Loop through climate vars    
+  for(climate_var in bcm_clim_vars){
+    
+    # Loop through time periods / months / seasons
+    for(time_period in time_periods){
+      
+      cat("\n Working on:", climate_var, " in ", time_period, " ...\n")
+      
+    ## Combinations to skip  
+      if((climate_var == "aet" | climate_var == "cwd") & time_period != "wy"){
+        cat("Skipping this combination...\n")
+        next
+      }
+      
+      if(climate_var == "tmn" & time_period == "jja"){
+        cat("Skipping this combination...\n")
+        next
+      }
+      
+      if(climate_var == "tmx" & time_period == "djf"){
+        cat("Skipping this combination...\n")
+        next
+      }
+      
+      if(climate_var == "ppt" & time_period %in% c("jja", "djf")){
+        cat("Skipping this combination...\n")
+        next
+      } 
+      
+      
+   # Since water years are labeled a bit differently, need to set up two separate labels for water year   
+    if(time_period != "wy"){  
+      time_period1 <- time_period
+      time_period2 <- time_period
+    } else {
+      time_period1 <- ""
+      time_period2 <- "wy"
+    }
+      
+      # Make URL to file - example from the interactive BCM map (https://geo.pointblue.org/commonsmap/index.php?ds=1129) and then copying link address on the "Download data" button
+      url <- paste0("https://geo.pointblue.org/commonsmap/add2.php?ds=1129&commonsuser=lukembrowne::lukembrowne@gmail.com&guid=bb94c436-12bd-4b82-a2ee-479b2e01205e&raster_path=/mnt/data/tif/BCM2014/&srid=3310&active_raster=", climate_var, "2070_2099", time_period1, "_ave_CCSM4_rcp85&width=null&height=null&llx=-433493.711264374&lly=-623577.7967801094&urx=654964.4482971333&ury=613350.9509733636&variable=flint_30yr&stat=ave&bounds=-13869908.243,3803287.923,-12585021.03,5366378.461&model=", scenario, "&year=2070_2099&climatevar=", climate_var, "&bcm_style=flint_", climate_var, "_ave&legend=flint_", climate_var, "_ave&month=", time_period2, "&raster=", climate_var, "2070_2099", time_period1, "_ave_", scenario)
+      
+    # Download file
+      file <- GET(url, write_disk(paste0(output_dir, "tmp.file"), 
+                                  overwrite = TRUE), progress())
+      
+    ## Check to make sure it's a big enough file
+      size = as.numeric(headers(file)$`content-length`) / 1000000
+      cat("Size of file is: ", round(size, 2), " mb... \n")
+      if(size < 5){
+        cat("**** Error: size of file is < 5mb... \n\n")
+      errors <- c(errors, paste0(climate_var, "--", time_period))
+      }
+      
+    ## Rename file  
+      filename <- str_match(headers(file)$`content-disposition`, "\"(.*)\"")[2]
+      # rename
+      file.rename(paste0(output_dir, "tmp.file"), paste0(output_dir, filename)) 
+      
+    ## Unzip the file to folder
+      unzip(paste0(output_dir, "/", filename),
+            exdir = paste0(output_dir, gsub(pattern = ".zip", "", filename)))
+    
+    ## Remove .zip file
+      file.remove(paste0(output_dir, filename))
+      
+    } # End time period loop
+    
+  } # End climate variable loop 
+    
+  errors
+   
+  
+  
+   
+  
+# Read in and process and clean raster files ------------------------------
+
+  
+  ## Directory path to where 1951-1980 historical BCM climate data is located
   dir_name_hist <- "./data/gis/climate_data/BCM/historical/1951-1980/"
   
   
-## Future climate files downloaded from:   
   dir_name_future <- "./data/gis/climate_data/BCM/future/"
+  
 
 ## Creates vector with list of file paths to all .tif raster files
   raster_files_hist <- list.files(dir_name_hist, full.names = TRUE, recursive = TRUE)
