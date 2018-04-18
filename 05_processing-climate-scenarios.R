@@ -10,7 +10,10 @@ library(climates)
 
 
 ## Directory path to where 1951-1980 historical BCM climate data is located
-  dir_name_hist <- "./data/gis/climate_data/BCM/historical/"
+  dir_name_hist <- "./data/gis/climate_data/BCM/historical/1951-1980/"
+  
+  
+## Future climate files downloaded from:   
   dir_name_future <- "./data/gis/climate_data/BCM/future/"
 
 ## Creates vector with list of file paths to all .tif raster files
@@ -164,9 +167,14 @@ library(climates)
   levelplot(raster_gebvs)
   
   
+
+  cor.test(values(raster_hist[["tmax_sum"]]), values(raster_dif[["tmax_sum_dif"]]), na.rm = T)
+
   
+  ran <- sample(1:1500000, size = 300000)
   
-  
+  plot(values(raster_hist[["tmax_sum"]])[ran],
+       values(raster_dif[["tmax_sum_dif"]])[ran], pch = ".")
   
   
   
