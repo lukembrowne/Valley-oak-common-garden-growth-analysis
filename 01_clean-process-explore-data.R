@@ -1,11 +1,10 @@
-# TODO
-# Blocks that = NA
 
 # Load libraries ----------------------------------------------------------
   library(tidyverse)
   library(googlesheets)
   library(maptools)
   library(qtlcharts)
+  
 
 
 # Load and quality check data ---------------------------------------------------------------
@@ -99,8 +98,24 @@
 
 # Formatting block --------------------------------------------------------
 
-  dat_all$section_block <- paste0(dat_all$section, "-", dat_all$block)    
-
+  # Which individuals have missing block information?
+    dat_all %>%
+      filter(!is.na(accession)) %>%
+      filter(is.na(block))  
+    
+  dat_all$block[dat_all$section == "North" & dat_all$row == "A"] <- 3
+  dat_all$block[dat_all$section == "North" & dat_all$row == "B"] <- 3
+  dat_all$block[dat_all$section == "North" & dat_all$row == "U"] <- 4
+  dat_all$block[dat_all$section == "North" & dat_all$row == "W"] <- 4
+  dat_all$block[dat_all$section == "North" & dat_all$row == "Y"] <- 4
+  
+  # Set so that all rows have the same block in North annex
+  dat_all$block[dat_all$section == "North annex" ] <- 2
+ 
+  #
+  dat_all$section_block <- paste0(dat_all$section, "_", dat_all$block)
+  table(dat_all$section_block)
+    
 
 # Formatting rows and lines -----------------------------------------------
 
@@ -279,20 +294,35 @@
     #   
     #   
     # ## Filtering out individuals without genetic data
+      ## This happens again in 03 adding climate script to filter out moms who don't have climate data!
        dat_all <- dplyr::filter(dat_all, accession %in% gen_dat$accession)
 
     ## Filtering based on RGR
 
 
     ## Individuals with negative growth rates
-      # neg_rgr <- dplyr::filter(dat_all, rgr < 0)
-      # View(dplyr::select(neg_rgr, rgr, height_2015, height_2017) )
-
-
+      neg_rgr <- dplyr::filter(dat_all, rgr < quantile(dat_all$rgr, 0.025, na.rm = TRUE)) %>% arrange(rgr)
+      #View(dplyr::select(neg_rgr, rgr, height_2015, height_2017) )
+      
+    ## Individuals with high positive growth rates
+      pos_rgr <- dplyr::filter(dat_all, rgr > quantile(dat_all$rgr, 0.975, na.rm = TRUE)) %>% arrange(rgr)
+      # View(dplyr::select(pos_rgr, accession_progeny, rgr, height_2015, height_2017) )
+      
+      
     ## Change to NA outlier values in relative growth rate
-      dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.05, na.rm = TRUE) |
-                    dat_all$rgr >= quantile(dat_all$rgr, 0.95, na.rm = TRUE)] <- NA
-    # 
+      dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.01, na.rm = TRUE) |
+                    dat_all$rgr >= quantile(dat_all$rgr, 0.99, na.rm = TRUE)] <- NA
+    
+      
+      
+   # Change to NA outlier values in height differential
+    # dat_all$height_dif[dat_all$height_dif <= quantile(dat_all$height_dif, 0.05, 
+    #                                                   na.rm = TRUE) |
+    #               dat_all$height_dif >= quantile(dat_all$height_dif, 0.95,
+    #                                              na.rm = TRUE)] <- NA
+
+      
+      
     # ## Having just one garden
     #  # dat_all <- dplyr::filter(dat_all, site == "Chico")
     # 
