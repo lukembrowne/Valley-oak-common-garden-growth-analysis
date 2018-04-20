@@ -58,8 +58,13 @@
 
   ## Core variables from Riordan et al. 2016 Am J Botany  
   ## Except we are excluding AET because it is very strongly correlated with cwd
-  climate_vars <- c("tmax_sum", "tmin_winter", "cwd", "bioclim_04", "bioclim_15",
-                    "bioclim_18", "bioclim_19")
+  climate_vars <- c("tmax_sum",
+                    "tmin_winter", 
+                    "cwd", 
+                    "bioclim_04", # Temperature seasonality
+                    "bioclim_15", # Precipitation seasonality
+                    "bioclim_18", # Precipitation of Warmest Quarter
+                    "bioclim_19") # Precipitation of Coldest Quarter
   
   climate_vars_dif <- paste(climate_vars, "_dif", sep = "")
   
