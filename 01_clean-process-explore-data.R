@@ -9,15 +9,7 @@
 
 # Load and quality check data ---------------------------------------------------------------
 
-    ## Load in california outline
-    cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
-                                  proj4string = CRS("+proj=longlat +datum=WGS84"))
     
-    lobata_range <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
-                                  proj4string = CRS("+proj=longlat +datum=WGS84"))
-    
-
-
   ## Load in garden data from 2017 - "Qlobata census measurements 2017"
 
     ## If token is stale: gs_auth(new_user = TRUE)
@@ -301,11 +293,11 @@
 
 
     ## Individuals with negative growth rates
-      neg_rgr <- dplyr::filter(dat_all, rgr < quantile(dat_all$rgr, 0.025, na.rm = TRUE)) %>% arrange(rgr)
+      # neg_rgr <- dplyr::filter(dat_all, rgr < quantile(dat_all$rgr, 0.025, na.rm = TRUE)) %>% arrange(rgr)
       #View(dplyr::select(neg_rgr, rgr, height_2015, height_2017) )
       
     ## Individuals with high positive growth rates
-      pos_rgr <- dplyr::filter(dat_all, rgr > quantile(dat_all$rgr, 0.975, na.rm = TRUE)) %>% arrange(rgr)
+      # pos_rgr <- dplyr::filter(dat_all, rgr > quantile(dat_all$rgr, 0.975, na.rm = TRUE)) %>% arrange(rgr)
       # View(dplyr::select(pos_rgr, accession_progeny, rgr, height_2015, height_2017) )
       
       
