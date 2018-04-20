@@ -5,36 +5,72 @@ library(rasterVis)
 
 
 
+
+# Loading in rasters ------------------------------------------------------
+
+## Read in elevation dem and create a hillshade for mapping
+dem <- raster("./data/gis/dem/ClimateNA_DEM_cropped.tif")
+
+slope = raster::terrain(dem, opt='slope')
+aspect = raster::terrain(dem, opt='aspect')
+hill = hillShade(slope, aspect, 40, 270)
+
+## Load in california outline
+cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
+                              proj4string = CRS("+proj=longlat +datum=WGS84"))
+
+lobata_range <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
+                              proj4string = CRS("+proj=longlat +datum=WGS84"))
+
+
+
+
 # Model predictions -------------------------------------------------------
 
   
-plot_future_growth <- function(gam_mod, PCA = FALSE){
+gam_mod <- gam_mods[["tmax_sum"]][["gam_clim_dif"]]
+gam_mod <- gam_mods[["tmax_sum"]][["gam_kin"]]
+summary(gam_mod)
+
+## Exclude values beyond
+
+
+## Have a section that excludes temperatures not more extreme than estimated by the model!!
+
+plot_future_growth <- function(gam_mod, bv_var, raster_dif_df_scaled){
   
   ## Make prediction dataframe
-  # Doesn't matter for univariate models if there are >1 climatic variables in this DF
-  #if(PCA == FALSE){
-    
     # Initialize df
-    predictions <- extracted_vals_scaled
-    summary(predictions) 
-     
-  # }  else if(PCA == TRUE){
-  #   ## PCA model
-  #   ## Make new rasters of each PC by calculating their loadings
-  #   
-  #   # predictions <- predict(clim_pca, newdata = extracted_vals_scaled)
-  #   # predictions <- as.data.frame(predictions)
-  #   # 
-  #   # colnames(predictions) <- paste(colnames(predictions), "_clim_dif", sep = "")
-  #   # 
-  #   # summary(predictions)
-  # }
+    predictions <- raster_dif_df_scaled
   
   ## Use average seedling height
-  predictions$height_2015 <-  0
+  predictions$height_2014 <-  0
   
   ## Set Chico as the baseline site
   predictions$site <- "Chico"
+  
+  # Set section block - one of most common blocks
+  predictions$section_block <- "Block1_1"
+  
+  # Set accession
+  predictions$accession <- "1"
+  
+  # Predict breeding values for each location
+  bv_lm_form <- formula(paste0())
+  bv_lm1 <- lm(bv.tmax_sum.kin ~ tmax_sum  ,data = dat_bv)
+  
+  predictions$bv.tmax_sum.kin <- predict(bv_lm1, 
+                                         newdata = data.frame(tmax_sum = raster_hist_df_scaled$tmax))
+  ## Exclude values that are outside the range in the model / observed breeding values
+  predictions$bv.tmax_sum.kin[predictions$bv.tmax_sum.kin < min(dat_bv$bv.tmax_sum.kin) | 
+                                predictions$bv.tmax_sum.kin > max(dat_bv$bv.tmax_sum.kin)] <- NA
+  
+  
+  ## Exclude climate transfer differnces beyond those observed in garden
+  predictions$tmax_sum_dif
+  
+  
+  
   
   ## Make a null predictions set for comparison
   predictions_null <- predictions
@@ -45,146 +81,70 @@ plot_future_growth <- function(gam_mod, PCA = FALSE){
      predictions_null[, var] <- ( 0 - scaled_var_means[[var]]) / scaled_var_sds[[var]]
     }
   }
-  summary(predictions_null)
   
-  ## Convert to PCs
-  if(PCA == TRUE){
-    # predictions_null <- predict(clim_pca, newdata = predictions_null)
-    # 
-    # colnames(predictions_null) <- paste(colnames(predictions_null), "_clim_dif", sep = "")
-    # 
-    # predictions_null <- as.data.frame(predictions_null)
-    # 
-    # predictions_null$height_2016 <-  0 ## Use average seedling height
-  }
   
   ## Generate predictions
   rgr_predictions =  predict(gam_mod, predictions, 
                                 re.form = NA, type = "response",
-                                se.fit = TRUE)
+                                se.fit = FALSE)
   
-  summary(rgr_predictions$fit)
-  hist(rgr_predictions$fit)
+  summary(rgr_predictions)
+  hist(rgr_predictions)
   
   ## Null model
-  rgr_predictions_null <-  predict(gam_mod, predictions_null[1, ], # Using just first row
-                                      re.form = NA, type = "response",
-                                      se.fit = TRUE)
-  summary(rgr_predictions_null$fit)
-  hist(rgr_predictions_null$fit)
+  rgr_predictions_null <-  predict(gam_mod, predictions_null, # Using just first row
+                                      re.form = NA, type = "response")
+  summary(rgr_predictions_null)
+  hist(rgr_predictions_null)
   
-  ## Calculating points where SEs don't overlap
-  rgr_predictions$upper <- (rgr_predictions$fit + 2 * rgr_predictions$se.fit)
-  rgr_predictions_null$lower <- (rgr_predictions_null$fit - 2 *
-                                   rgr_predictions_null$se.fit)
-  rgr_predictions$noSE_overlap <- rgr_predictions$upper <= rgr_predictions_null$lower
+  ## Calculate percent change in rgr
+  rgr_predictions_change <- ((c(rgr_predictions) - c(rgr_predictions_null)) / c(rgr_predictions_null) ) * 100
+  summary(rgr_predictions_change)
+  hist(rgr_predictions_change)
   
-  cat("Whether SE overlap or not - if TRUE  == SE doesn't overlap \n")
-  print(table(rgr_predictions$noSE_overlap)) ## IF TRUE THIS MEANS SE DON'T OVERLAP
+
+  ## Getting rid of outliers
+  rgr_predictions_change[rgr_predictions_change < quantile(rgr_predictions_change, 0.01,
+                                                           na.rm = TRUE) |
+                           rgr_predictions_change > quantile(rgr_predictions_change, 0.99,
+                                                             na.rm = TRUE)] <- NA
+  
+  hist(rgr_predictions_change)
   
 
   ## Save values into raster
-  rgr_rast <- raster_dif[[1]] ## Initialize raster
-  rgr_rast_null <- raster_dif[[1]]
-  rgr_rast_SEoverlap <- raster_dif[[1]]
+  raster_init <- raster("./data/gis/climate_data/BCM/future/CCSM4_rcp85/aet2070_2099_ave_CCSM4_rcp85_1524086336/aet2070_2099_ave_CCSM4_rcp85_1524086336.tif")
   
-  values(rgr_rast) <- NA # Just in case the next line doesn't work
-  values(rgr_rast) <- c(rgr_predictions$fit) # Save in real predictions
-  
-  values(rgr_rast_null) <- NA # Just in case the next line doesn't work
-  values(rgr_rast_null) <- c(rgr_predictions_null$fit) # Save in real predictions
-  
-  values(rgr_rast_SEoverlap) <- NA
-  values(rgr_rast_SEoverlap) <- c(rgr_predictions$noSE_overlap)
-  
-  ## Percent change in growth rates in comparison to no change 
-  ## Formula == (new value - old value) / old value
-  rgr_rast_change <- ((rgr_rast - rgr_rast_null) / rgr_rast_null ) * 100
-  
-  ## Getting rid of outliers
-  rgr_rast_change[rgr_rast_change < quantile(rgr_rast_change, 0.025) | 
-                    rgr_rast_change > quantile(rgr_rast_change, 0.975)] <- NA
-  
-  rgr_rast_change[rgr_rast_change < -100 | 
-                    rgr_rast_change > 100] <- NA
-  summary(rgr_rast_change)
-  hist(rgr_rast_change)
-  
-  ## Problem cells [1] 1068038 1361177 1486313
+  rgr_change_rast <- raster_init ## Initialize raster
+
+  values(rgr_change_rast) <- NA # Just in case the next line doesn't work
+  values(rgr_change_rast) <- c(rgr_predictions_change) # Save in real predictions
   
   
   ## Plot of predicted growth rates
-  hsTheme <- modifyList(GrTheme(), list(regions=list(alpha=.15)))
-  rgrTheme <- modifyList(RdBuTheme(), list(regions=list(alpha=1)))
+    hsTheme <- modifyList(GrTheme(), list(regions=list(alpha=.15)))
+    rgrTheme <- modifyList(RdBuTheme(), list(regions=list(alpha=1)))
   
   pixel_num = 1e6 ## Can make resolution better by making this 1e6 
   
   ## Plot
   cat("Plotting % change in growth rates...")
   
-  p = levelplot(rgr_rast_change, 
+  p = levelplot(rgr_change_rast, 
     #  levelplot(raster::mask(rgr_rast, rgeos::gBuffer(lobata_range, width = 0, byid = TRUE)),
             contour = FALSE, margin = FALSE, par.settings = rgrTheme, 
             maxpixels = pixel_num, colorkey = TRUE, main = "% Change in Relative Growth Rate") +
     levelplot(hill,  margin = FALSE, par.settings=hsTheme, maxpixels = pixel_num) +
-    latticeExtra::layer(sp.polygons(cali_outline, lwd=2)) +
+    latticeExtra::layer(sp.polygons(cali_outline, lwd=2)) + # Need to convert raster to lat long for these to show up
     latticeExtra::layer(sp.polygons(lobata_range,fill = "black", alpha = 0.15))
   
   print(p)
   
-  # ### Plot of areas where SEs don't overlap
-  # p = levelplot(rgr_rast_SEoverlap, 
-  #               contour = FALSE, margin = FALSE,
-  #               maxpixels = pixel_num, colorkey = TRUE, at = seq(0, 2, 1),
-  #               main = "% Change in Relative Growth Rate") +
-  #   levelplot(hill,  margin = FALSE, par.settings=hsTheme, maxpixels = pixel_num) +
-  #   latticeExtra::layer(sp.polygons(cali_outline, lwd=2)) +
-  #   latticeExtra::layer(sp.polygons(lobata_range,fill = "black", alpha = 0.15))
-  # 
-  # print(p)
-  
-  
-  
-  ## Histogram of changes in relative rgr
-  
-  ## Across all of california
-  rgr_change_range = unlist(raster::extract(rgr_rast_change, lobata_range))
-  rgr_change_cali = unlist(raster::extract(rgr_rast_change, 1:ncell(rgr_rast)))
-  
-  cat("Summary of rgr change within Valley oak range \n")
-  print(summary(rgr_change_range))
-  
-  cat("Summary of rgr change across California \n")
-  print(summary(rgr_change_cali))
-  
-  ## Growth within range
-  p = ggplot(data.frame(rgr_change_range),
-         aes(rgr_change_range)) + 
-    geom_histogram(color = "black", fill = "steelblue2") +
-    geom_vline(xintercept = 0, lty = 2) + 
-    xlab("% change in relative growth rate") + 
-    ggtitle("Within Valley oak range") +
-    theme_bw() +
-    theme(axis.text=element_text(size=12),
-                axis.title=element_text(size=14),
-                plot.margin = unit(c(1,1,1,1), "cm"))
-  
+  pdf("./output/tmax_climate_transfer_with_breeding_value.pdf")
   print(p)
-  
-  ## Growth within Cali
-  p = ggplot(data.frame(rgr_change_cali),
-         aes(rgr_change_cali)) + 
-    geom_histogram(color = "black", fill = "steelblue2") + 
-    geom_vline(xintercept = 0, lty = 2) +
-    xlab("% change in relative growth rate") + 
-    ggtitle("Across California") +
-    theme_bw() +
-    theme(axis.text=element_text(size=12),
-                axis.title=element_text(size=14),
-                plot.margin = unit(c(1,1,1,1), "cm"))
-  
-  print(p)
-  
+  dev.off()
+ 
+
 } # End function
   
   
