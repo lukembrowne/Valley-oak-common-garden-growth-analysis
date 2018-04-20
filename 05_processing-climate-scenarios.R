@@ -10,6 +10,7 @@ library(stringr)
 #install.packages("climates",,'http://rforge.net/',type='source', dependencies = TRUE)
 library(climates)
 
+## Some maybe useful rasters like DD5 can be calculated with the envirem package http://envirem.github.io/ENVIREM_tutorial.html
 
 
 # Download future climate scenarios ---------------------------------------
@@ -114,7 +115,7 @@ library(climates)
   dir_name_hist <- "./data/gis/climate_data/BCM/historical/1951-1980/"
   
   
-  dir_name_future <- "./data/gis/climate_data/BCM/future/"
+  dir_name_future <- "./data/gis/climate_data/BCM/future/CCSM4_rcp85/"
   
 
 ## Creates vector with list of file paths to all .tif raster files
@@ -126,6 +127,10 @@ library(climates)
   raster_files_future <- raster_files_future[grep("*[[:digit:]].tif$", raster_files_future)] # Only those with .tif extension
   raster_files_future
   
+## Check to make sure they are the same length
+  length(raster_files_hist) == length(raster_files_future)
+  
+  
 ## Load into raster stacks
   raster_hist <- raster::stack(raster_files_hist)
   raster_hist
@@ -133,111 +138,125 @@ library(climates)
   raster_future <- raster::stack(raster_files_future)
   raster_future
   
-## Project to lat long - maybe not necessary until the end
+## Project to lat long - maybe not necessary until the end since it takes a long time
   # raster_hist <- raster::projectRaster(raster_hist, crs="+proj=longlat +datum=WGS84") 
   # raster_future <- raster::projectRaster(raster_future, crs="+proj=longlat +datum=WGS84")
   
 
-## Rename variables
+## Write function to process raster stacks
+  process_raster_stack <-   function(raster_stack, years){
+    
+    ## Remove second half of colname -
+    names(raster_stack) <- unlist(lapply(strsplit(x = names(raster_stack), 
+                                                  split = "_ave_"), '[[', 1))
+    
+    ## Take out years
+    names(raster_stack) <- gsub(years, "", names(raster_stack))
+    
+    ## Add month number to monthly variables
+    names(raster_stack) <- gsub("jan", "_jan", names(raster_stack))
+    names(raster_stack) <- gsub("feb", "_feb", names(raster_stack))
+    names(raster_stack) <- gsub("mar", "_mar", names(raster_stack))
+    names(raster_stack) <- gsub("apr", "_apr", names(raster_stack))
+    names(raster_stack) <- gsub("may", "_may", names(raster_stack))
+    names(raster_stack) <- gsub("jun", "_jun", names(raster_stack))
+    names(raster_stack) <- gsub("jul", "_jul", names(raster_stack))
+    names(raster_stack) <- gsub("aug", "_aug", names(raster_stack))
+    names(raster_stack) <- gsub("sep", "_sep", names(raster_stack))
+    names(raster_stack) <- gsub("oct", "_oct", names(raster_stack))
+    names(raster_stack) <- gsub("nov", "_nov", names(raster_stack))
+    names(raster_stack) <- gsub("dec", "_dec", names(raster_stack))
+    
+    ## For seasonal variables
+    names(raster_stack) <- gsub("djf", "_winter", names(raster_stack))
+    names(raster_stack) <- gsub("jja", "_sum", names(raster_stack))
+    
+    ## Replace tmn with tmin and tmx with tmax
+    names(raster_stack) <- gsub("tmn", "tmin", names(raster_stack))
+    names(raster_stack) <- gsub("tmx", "tmax", names(raster_stack))
+    
+    
+    ## Convert to data frame
+    cat("Converting to data frame... \n")
+    raster_df <- as.data.frame(raster_stack)
+    
+    ## Reorder columns
+    raster_df <- raster_df[, c(
+      "aet",
+      "cwd", "ppt", "tmin_winter", "tmax_sum", "tmax", "tmin",
+      "ppt_jan","ppt_feb","ppt_mar","ppt_apr","ppt_may","ppt_jun",
+      "ppt_jul","ppt_aug","ppt_sep","ppt_oct","ppt_nov","ppt_dec",
+      "tmax_jan","tmax_feb","tmax_mar","tmax_apr","tmax_may","tmax_jun",
+      "tmax_jul","tmax_aug","tmax_sep","tmax_oct","tmax_nov","tmax_dec",
+      "tmin_jan","tmin_feb","tmin_mar","tmin_apr","tmin_may","tmin_jun",
+      "tmin_jul","tmin_aug","tmin_sep","tmin_oct","tmin_nov","tmin_dec")]
+    
+    
+    ## Calculate bioclimatic variables
+    cat("Calculat bioclim variables... \n")
+     bioclim_vars <-  climates::bioclim2(tmin = as.data.frame(dplyr::select(raster_df, tmin_jan:tmin_dec)),
+                                        tmax = as.data.frame(dplyr::select(raster_df, tmax_jan:tmax_dec)),
+                                        prec = as.data.frame(dplyr::select(raster_df, ppt_jan:ppt_dec)),
+                                        files.as.inputs = FALSE)
+     
+     # Bind with climate variables
+     raster_df <- bind_cols(raster_df, as.data.frame(bioclim_vars))
+     
+     # Add in 'random' climate variable
+     if("random" %in% climate_vars){
+       raster_df$random <- rnorm(n = nrow(raster_df))
+       raster_df$random[is.na(raster_df$tmax_sum)] <- NA # Set same NAs
+     }
+     
+     
+     ## Reorder columns
+     raster_df <-  raster_df %>%
+      # dplyr::select(tmax, tmax_sum, tmin, tmin_winter,
+      #               ppt, cwd, aet, bioclim_01:bioclim_19, tmax_jan:tmax_dec, 
+     #                tmin_jan:tmin_dec, ppt_jan:ppt_dec)
+       dplyr::select(climate_vars)
+    
+    return(raster_df)
   
-  ## HISTORICAL
-  
-  ## Remove second half of colname - e.g. "_ave_HST_1513043823"
-  names(raster_hist) <- unlist(lapply(strsplit(x = names(raster_hist), split = "_ave_"), '[[', 1))
-  
-  ## Take out years
-  names(raster_hist) <- gsub("1951_1980", "", names(raster_hist))
-  
-  ## Add month number to monthly variables
-  names(raster_hist) <- gsub("jan", "_jan", names(raster_hist))
-  names(raster_hist) <- gsub("feb", "_feb", names(raster_hist))
-  names(raster_hist) <- gsub("mar", "_mar", names(raster_hist))
-  names(raster_hist) <- gsub("apr", "_apr", names(raster_hist))
-  names(raster_hist) <- gsub("may", "_may", names(raster_hist))
-  names(raster_hist) <- gsub("jun", "_jun", names(raster_hist))
-  names(raster_hist) <- gsub("jul", "_jul", names(raster_hist))
-  names(raster_hist) <- gsub("aug", "_aug", names(raster_hist))
-  names(raster_hist) <- gsub("sep", "_sep", names(raster_hist))
-  names(raster_hist) <- gsub("oct", "_oct", names(raster_hist))
-  names(raster_hist) <- gsub("nov", "_nov", names(raster_hist))
-  names(raster_hist) <- gsub("dec", "_dec", names(raster_hist))
-  
-  ## For seasonal variables
-  names(raster_hist) <- gsub("djf", "_winter", names(raster_hist))
-  names(raster_hist) <- gsub("jja", "_sum", names(raster_hist))
-  
-  ## Replace tmn with tmin and tmx with tmax
-  names(raster_hist) <- gsub("tmn", "tmin", names(raster_hist))
-  names(raster_hist) <- gsub("tmx", "tmax", names(raster_hist))
-  
-  names(raster_hist)
-  
-  
-  ## FUTURE
-  ## Remove second half of colname - e.g. "_ave_HST_1513043823"
-  names(raster_future) <- unlist(lapply(strsplit(x = names(raster_future), split = "_ave_"), '[[', 1))
-  
-  ## Take out years
-  names(raster_future) <- gsub("2070_2099", "", names(raster_future)) ## Will have to change d
-  
-  ## Add month number to monthly variables
-  names(raster_future) <- gsub("jan", "_jan", names(raster_future))
-  names(raster_future) <- gsub("feb", "_feb", names(raster_future))
-  names(raster_future) <- gsub("mar", "_mar", names(raster_future))
-  names(raster_future) <- gsub("apr", "_apr", names(raster_future))
-  names(raster_future) <- gsub("may", "_may", names(raster_future))
-  names(raster_future) <- gsub("jun", "_jun", names(raster_future))
-  names(raster_future) <- gsub("jul", "_jul", names(raster_future))
-  names(raster_future) <- gsub("aug", "_aug", names(raster_future))
-  names(raster_future) <- gsub("sep", "_sep", names(raster_future))
-  names(raster_future) <- gsub("oct", "_oct", names(raster_future))
-  names(raster_future) <- gsub("nov", "_nov", names(raster_future))
-  names(raster_future) <- gsub("dec", "_dec", names(raster_future))
-  
-  ## For seasonal variables
-  names(raster_future) <- gsub("djf", "_winter", names(raster_future))
-  names(raster_future) <- gsub("jja", "_sum", names(raster_future))
-  
-  ## Replace tmn with tmin and tmx with tmax
-  names(raster_future) <- gsub("tmn", "tmin", names(raster_future))
-  names(raster_future) <- gsub("tmx", "tmax", names(raster_future))
-  
-  names(raster_future)
-  
-
-## Will need a section here to calculate bioclimatic variables in future climates
-  
-  
-## Calculate difference between future and historical  
-  raster_dif <- raster_future # Initialize
-  
-  for(var in names(raster_dif)){
-    cat("Working on", var, "...\n")
-    raster_dif[[var]] <- raster_future[[var]] - raster_hist[[var]]
   }
   
-  names(raster_dif) <- paste0(names(raster_dif), "_dif") ## Add _dif to raster names
-  
+# Historical rasters
+  raster_hist_df <- process_raster_stack(raster_stack = raster_hist,
+                                       years = "1951_1980")
+  dim(raster_hist_df)
 
-# Extract and scale values ------------------------------------------------
+# Future raster
+  raster_future_df <- process_raster_stack(raster_stack = raster_future,
+                                       years = "2070_2099")
+  dim(raster_future_df)
   
-  ## Extract values from raster into dataframe
-  extracted_vals = raster::extract(raster_dif, 1:ncell(raster_dif))
-  extracted_vals <- as.data.frame(extracted_vals)
   
-  ### Scale extracted values to match with scaled variables
-  extracted_vals_scaled <- extracted_vals
+## Calculate difference between future and historical   
+  raster_dif_df <- raster_future_df - raster_hist_df
+  colnames(raster_dif_df) <- paste0(colnames(raster_dif_df), "_dif")
   
-  for(var in climate_vars_dif){
-    if(var %in% colnames(extracted_vals_scaled)){
-    extracted_vals_scaled[, var] <- (extracted_vals[, var] - scaled_var_means[var]) / 
-      scaled_var_sds[var]
+## Scale extracted values to match with scaled variables
+  raster_dif_df_scaled <- raster_dif_df
+  raster_hist_df_scaled <- raster_hist_df
+  
+  for(var in c(climate_vars_dif, climate_vars)){
+    if(var %in% colnames(raster_dif_df_scaled)){
+      raster_dif_df_scaled[, var] <- (raster_dif_df[, var] - scaled_var_means[var]) / 
+        scaled_var_sds[var]
+    }
+    
+    if(var %in% colnames(raster_hist_df)){
+      raster_hist_df_scaled[, var] <- (raster_hist_df[, var] - scaled_var_means[var]) / 
+        scaled_var_sds[var]
     }
   }
   
-  summary(extracted_vals_scaled)
-  
-  
+## Save raster objects to file  
+  save(raster_hist_df, raster_future_df, 
+       raster_dif_df, raster_dif_df_scaled,
+       file = paste0("./output/raster_dfs_", Sys.Date(), ".RData"))
+
+
   
 ## Testing out predicting breeding values from raster maps
   
