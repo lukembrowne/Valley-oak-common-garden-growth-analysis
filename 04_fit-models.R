@@ -1,7 +1,5 @@
 # TODO
 
-# Make interaction plots when visualizing the results of the gams
-
 # - make marker models where BV is predicted using only the top 100 (xxx) SNPs?
 
 # - run survival models?
@@ -14,8 +12,6 @@
 # Add in a PCNM component to breeding models as a covariate to isolate / remove spatial effect?
 
 # Filter out future climate values beyond the scope range esimtated in the gam models
-
-# add in latitude and longitude and elevation to the genomic selection models?
 
 # Figure out how to best integrate breeding values and climate transfer - probably through interactions?
 
@@ -53,15 +49,24 @@ library(rrBLUP) # Calculate kinship matrix
 # Formatting genetic data and calculating kinship matrix
   
   # Joining climate and genetic data
-    gen_dat_clim <- left_join(climate_gbs_mom, dplyr::select(gen_dat, -accession), 
+  # Do an inner join to avoid having GBS moms with climate data but poor genotyping data
+    gen_dat_clim <- inner_join(climate_gbs_mom, dplyr::select(gen_dat, -accession), 
                               by = c("id" = "gbs_name"))
     dim(gen_dat_clim)
 
   # Getting genetic data
     snp_col_names <- colnames(gen_dat[, -c(1, 2)])
+    
+  # Calculate percent missing data  
+    missing <- gen_dat_clim %>%
+      dplyr::select(id, accession) %>%
+      mutate(missing = apply(gen_dat_clim[, snp_col_names], 1, function(x) sum(is.na(x))/length(x)))
+    
+    missing %>%
+      arrange(desc(missing))
   
   # Scale data and impute missing before converting 012 to -101
-    bglr_gen_scaled <- flashpcaR::scale2(gen_dat_clim[, snp_col_names])
+    bglr_gen_scaled <- flashpcaR::scale2(gen_dat_clim[, snp_col_names], impute = 2)
     bglr_gen_scaled[1:10, 1:10]
   
   # Convert to -101 from 012
@@ -73,7 +78,10 @@ library(rrBLUP) # Calculate kinship matrix
   
   # Calculate kinship matrix
     A <- rrBLUP::A.mat(X = bglr_gen101)
-  
+    
+    # Check to see if any rows are all 0s
+    sum(apply(A, 1, function(x) all(x == 0)))
+
     
 ## Adding a random variable
   gen_dat_clim$random <- rnorm(n = nrow(gen_dat_clim))    
@@ -87,160 +95,157 @@ mod_out <- list() # Save list that will hold model outputs and such
 climate_vars <- c(climate_vars, "random")
 
 # Started at 10:14 - takes ~ 1.5 hours per climate variable with 50000 iterations
-
-for(var in climate_vars){
   
-  # Initialize list
-  mod_out[[var]] <- list()
-  
-  #cat("Working on:", var, "... \n")
-  say(paste0("Working on: ", var, " ..."),  "trilobite")
-  
-  # Phenotypic response - cimate of origin
-   y <- dplyr::pull(gen_dat_clim, var)
- 
-  # Setting the linear predictor
-    # Options for model types - more info in manual
-    # FIXED - flat prior
-    # BL - Bayesian lasso
-    # BRR - Bayesian ridge regression
-    # BayesA - scaled-t prior
-    # BL - Double-Exponential prior
-    # BayesB - two component mixture prior with a point of mass at zero and a sclaed-t slab
-    # BayesC - two component mixture prior with a point of mass at zero and a Gaussian slab
-  
-   ETA_kin <- list(list(K = A, model='RKHS')) # Kinship matrix
+  for(var in climate_vars){
+    
+    # Initialize list
+    mod_out[[var]] <- list()
+    
+    #cat("Working on:", var, "... \n")
+    say(paste0("Working on: ", var, " ..."),  "trilobite")
+    
+    # Phenotypic response - cimate of origin
+     y <- dplyr::pull(gen_dat_clim, var)
    
-   ETA_marker <- list(list(X = bglr_gen_scaled, 
-                            model='BRR')) # Markers
-   
-   ETA_kinmarker <- list(list(K = A, model = "RKHS"), # Kinship matrix
-                           list(X = bglr_gen_scaled, model = "BRR")) # Markers
-  
-  ## Setting cross validation
-    k_folds <- 10 # Set number of folds
-    folds <- createFolds(y = 1:length(y), k = k_folds)
+    # Setting the linear predictor
+      # Options for model types - more info in manual
+      # FIXED - flat prior
+      # BL - Bayesian lasso
+      # BRR - Bayesian ridge regression
+      # BayesA - scaled-t prior
+      # BL - Double-Exponential prior
+      # BayesB - two component mixture prior with a point of mass at zero and a sclaed-t slab
+      # BayesC - two component mixture prior with a point of mass at zero and a Gaussian slab
     
-    ## Iterations include burn in
-    n_iter <- 50000 
-    n_burn <- 10000
-    thin <- 5
-    
-  # Set output prefixes   
-    prefix_kin <- paste0("./output/BGLR/", var, "_kin_")
-    prefix_marker <- paste0("./output/BGLR/", var, "_marker_")  
-    prefix_kinmarker <- paste0("./output/BGLR/", var, "_kinmarker_") 
-    
-  ## Cross validation in parallel  
-    
-    # First create a function that fits one fold
-    fitFold <-  function(y, ETA, folds, fold){
+     ETA_kin <- list(list(K = A, model='RKHS')) # Kinship matrix
      
-      tst = folds[[fold]]
-      yNA = y
-      yNA[tst] = NA
-      
-      fm <- BGLR(y = yNA,
-                 ETA = ETA,
-                 nIter = n_iter,
-                 burnIn = n_burn,
-                 thin = thin,
-                 verbose=F)
-      
-      cor_cv <- cor(y[tst], fm$yHat[tst])
-      return(cor_cv)
-    }
+     ETA_marker <- list(list(X = bglr_gen_scaled, 
+                              model='BRR')) # Markers
+     
+     ETA_kinmarker <- list(list(K = A, model = "RKHS"), # Kinship matrix
+                              list(X = bglr_gen_scaled, model = "BRR")) # Markers
     
-    # Kinship matrix
-      cv_kin <- mclapply(FUN = fitFold, 
-                    y = y,
-                    ETA = ETA_kin,
-                    folds = folds,
-                    X = 1:length(folds),
-                    mc.cores = 10)
-      cv_kin <- unlist(cv_kin)
+    ## Setting cross validation
+      k_folds <- 10 # Set number of folds
+      folds <- createFolds(y = 1:length(y), k = k_folds)
       
-      # Save to list
-      mod_out[[var]] <- append(mod_out[[var]], list("cv_kin" = cv_kin))
+      ## Iterations include burn in
+      n_iter <- 1000
+      n_burn <- 500
+      thin <- 5
       
-    
-    # Marker scores
-      cv_marker <- mclapply(FUN = fitFold, 
-                            y = y,
-                            ETA = ETA_marker,
-                            folds = folds,
-                            X = 1:length(folds),
-                            mc.cores = 10)
-      cv_marker <- unlist(cv_marker)
+    # Set output prefixes   
+      prefix_kin <- paste0("./output/BGLR/", var, "_kin_")
+      prefix_marker <- paste0("./output/BGLR/", var, "_marker_")  
+      prefix_kinmarker <- paste0("./output/BGLR/", var, "_kinmarker_") 
       
-      # Save to list
-      mod_out[[var]] <- append(mod_out[[var]], list("cv_marker" = cv_marker))
+    ## Cross validation in parallel  
       
-    # Combining kin & Marker scores
-      cv_kinmarker <- mclapply(FUN = fitFold, 
-                            y = y,
-                            ETA = ETA_kinmarker,
-                            folds = folds,
-                            X = 1:length(folds),
-                            mc.cores = 10)
-      cv_kinmarker <- unlist(cv_kinmarker)
+      # First create a function that fits one fold
+      fitFold <-  function(y, ETA, folds, fold){
+       
+        tst = folds[[fold]]
+        yNA = y
+        yNA[tst] = NA
+        
+        fm <- BGLR(y = yNA,
+                   ETA = ETA,
+                   nIter = n_iter,
+                   burnIn = n_burn,
+                   thin = thin,
+                   verbose=F)
+        
+        cor_cv <- cor(y[tst], fm$yHat[tst])
+        rmse <-  sqrt(mean((fm$yHat[tst] - y[tst])^2))
+        return(list(cor_cv = cor_cv, rmse = rmse))
+      }
       
-      # Save to list
-      mod_out[[var]] <- append(mod_out[[var]], list("cv_kinmarker" = cv_kinmarker))
-      
-      
-  ## Running full models
-      
-      ## Kinship model
-      cat("Fitting full kinship model... \n")
-      mod_kin <- BGLR(y =  y,  # The data-vector 
-                      response_type = "gaussian",
+      # Kinship matrix
+        cv_kin <- mclapply(FUN = fitFold, 
+                      y = y,
                       ETA = ETA_kin,
-                      nIter = n_iter, 
-                      burnIn = n_burn,
-                      thin = thin,
-                      saveAt = prefix_kin, verbose=F)
+                      folds = folds,
+                      X = 1:length(folds),
+                      mc.cores = 10)
+        cv_kin <- unlist(cv_kin)
+        
+        # Save to list
+        mod_out[[var]] <- append(mod_out[[var]], list("cv_kin" = cv_kin))
+        
       
-      # Save to list
-      mod_out[[var]] <- append(mod_out[[var]], list("mod_kin" = mod_kin))
-      
-      
-      ## Marker model
-      cat("Fitting full marker model... \n")
-      mod_marker <- BGLR(y =  y,  # The data-vector 
-                         response_type = "gaussian",
-                         ETA = ETA_marker,
-                         nIter = n_iter, 
-                         burnIn = n_burn,
-                         thin = thin,
-                         saveAt = prefix_marker, verbose=F)
-      
-      mod_out[[var]] <- append(mod_out[[var]], list("mod_marker" = mod_marker))
-      
-      ## Kin-Marker model
-      cat("Fitting full kinship & marker model... \n")
-      mod_kinmarker <- BGLR(y =  y,  # The data-vector 
-                         response_type = "gaussian",
-                         ETA = ETA_kinmarker,
-                         nIter = n_iter, 
-                         burnIn = n_burn,
-                         thin = thin,
-                         saveAt = prefix_kinmarker, verbose=F)
-      
-      mod_out[[var]] <- append(mod_out[[var]], list("mod_kinmarker" = mod_kinmarker))
-      
-} # End climate variable loop   
+      # Marker scores
+        cv_marker <- mclapply(FUN = fitFold, 
+                              y = y,
+                              ETA = ETA_marker,
+                              folds = folds,
+                              X = 1:length(folds),
+                              mc.cores = 10)
+        cv_marker <- unlist(cv_marker)
+        
+        # Save to list
+        mod_out[[var]] <- append(mod_out[[var]], list("cv_marker" = cv_marker))
+        
+      # Combining kin & Marker scores
+        cv_kinmarker <- mclapply(FUN = fitFold,
+                              y = y,
+                              ETA = ETA_kinmarker,
+                              folds = folds,
+                              X = 1:length(folds),
+                              mc.cores = 10)
+        cv_kinmarker <- unlist(cv_kinmarker)
+
+        # Save to list
+        mod_out[[var]] <- append(mod_out[[var]], list("cv_kinmarker" = cv_kinmarker))
+        
+        
+    ## Running full models
+        
+        ## Kinship model
+        cat("Fitting full kinship model... \n")
+        mod_kin <- BGLR(y =  y,  # The data-vector 
+                        response_type = "gaussian",
+                        ETA = ETA_kin,
+                        nIter = n_iter, 
+                        burnIn = n_burn,
+                        thin = thin,
+                        saveAt = prefix_kin, verbose=F)
+        
+        # Save to list
+        mod_out[[var]] <- append(mod_out[[var]], list("mod_kin" = mod_kin))
+        
+        
+        ## Marker model
+          cat("Fitting full marker model... \n")
+          mod_marker <- BGLR(y =  y,  # The data-vector 
+                             response_type = "gaussian",
+                             ETA = ETA_marker,
+                             nIter = n_iter, 
+                             burnIn = n_burn,
+                             thin = thin,
+                             saveAt = prefix_marker, verbose=F)
+          
+          mod_out[[var]] <- append(mod_out[[var]], list("mod_marker" = mod_marker))
+        
+        ## Kin-Marker model
+          cat("Fitting full kinship & marker model... \n")
+          mod_kinmarker <- BGLR(y =  y,  # The data-vector
+                             response_type = "gaussian",
+                             ETA = ETA_kinmarker,
+                             nIter = n_iter,
+                             burnIn = n_burn,
+                             thin = thin,
+                             saveAt = prefix_kinmarker, verbose=F)
+  
+          mod_out[[var]] <- append(mod_out[[var]], list("mod_kinmarker" = mod_kinmarker))
+        
+  } # End climate variable loop   
 
 
 ## Save model output?
-# save(mod_out, file = paste0("./output/mod_out_", Sys.Date(), ".Rdata"))
+ save(mod_out, file = paste0("./output/mod_out_", Sys.Date(), ".Rdata"))
 
- load("./output/mod_out_2018-04-19.Rdata")
- 
- 
- 
- 
- 
+ load("./output/mod_out_2018-04-19.Rdata") # 50,000 iter; includes precip variables
+ load("./output/mod_out_2018-05-01.Rdata") # 50,000 iter; includes temp + lat, long, elev, inner join
  
  
 # Check out trace plots for convergance
@@ -259,29 +264,37 @@ for(var in climate_vars){
 ## Extract and compare CV scores
     
   # Kinship
-    cv_kin <- as.data.frame(lapply(mod_out, "[[", "cv_kin"))
-    # summary(cv_kin)
-    colMeans(cv_kin)
+    cv_kin <- data.frame(lapply(mod_out, "[[", "cv_kin"), 
+                            type = names(lapply(mod_out, "[[", "cv_kin")[[1]]))
+    cv_kin %>%
+      group_by(type) %>%
+      summarise_all(mean)
+
     
   # Marker scores  
-    cv_marker <- as.data.frame(lapply(mod_out, "[[", "cv_marker"))
-    # summary(cv_marker)
-    colMeans(cv_marker)
+    cv_marker <- data.frame(lapply(mod_out, "[[", "cv_marker"), 
+                            type = names(lapply(mod_out, "[[", "cv_marker")[[1]]))
+    cv_marker %>%
+      group_by(type) %>%
+      summarise_all(mean)
     
   # Kinmarker scores  
-    cv_kinmarker <- as.data.frame(lapply(mod_out, "[[", "cv_kinmarker"))
-    # summary(cv_marker)
-    colMeans(cv_kinmarker)
+    cv_kinmarker <- data.frame(lapply(mod_out, "[[", "cv_kinmarker"), 
+                               type = names(lapply(mod_out, "[[", "cv_kinmarker")[[1]]))
+   
+    cv_kinmarker %>%
+      group_by(type) %>%
+      summarise_all(mean)
     
   # Combine into table and output
-    cv_out <-   gather(cv_kin, key = "clim_var", value = "cv_kin") %>%
-        bind_cols(gather(cv_marker, key = "clim_var", value = "cv_marker")) %>%
-        bind_cols(gather(cv_kinmarker, key = "clim_var", value = "cv_kinmarker")) %>%
-        dplyr::select(clim_var, cv_kin, cv_marker, cv_kinmarker)
+    cv_out <-   gather(cv_kin, key = "clim_var", value = "cv_kin", -type) %>%
+        bind_cols(gather(cv_marker, key = "clim_var", value = "cv_marker", -type)) %>%
+        bind_cols(gather(cv_kinmarker, key = "clim_var", value = "cv_kinmarker", -type)) %>%
+        dplyr::select(clim_var, type, cv_kin, cv_marker, cv_kinmarker)
   
   # Average over climate variable and round
     cv_out_avg <- cv_out %>%
-                  group_by(clim_var) %>%
+                  group_by(clim_var, type) %>%
                   summarise_all(mean) %>%
                   mutate_if(is.numeric, funs(round(., 2)))
   
@@ -300,8 +313,8 @@ for(var in climate_vars){
                                   t(unlist(lapply(lapply(mod_out, "[[", "mod_marker"),
                                                   function(x) x$fit)))))
   
-  mod_fits_df <- rbind(mod_fits_df, 
-                       data.frame(mod = "mod_kinmarker", 
+  mod_fits_df <- rbind(mod_fits_df,
+                       data.frame(mod = "mod_kinmarker",
                                   t(unlist(lapply(lapply(mod_out, "[[", "mod_kinmarker"),
                                                   function(x) x$fit)))))
   
@@ -334,8 +347,9 @@ for(var in climate_vars){
     
     # Plotting top SNPs
     top_snp <- names(sort(var_list$mod_marker$ETA[[1]]$b^2, decreasing = TRUE))[1]
-    g = ggplot(gen_dat_clim, aes(y = pull(gen_dat_clim, top_snp), x = tmax_sum)) +
-      ggtitle(paste0(var, ":", top_snp)) + ylab("Allele freq") +
+    g = ggplot(gen_dat_clim, aes(y = pull(gen_dat_clim, top_snp), 
+                                 x = pull(gen_dat_clim, var))) +
+      ggtitle(paste0(var, ":", top_snp)) + ylab("Allele freq") + xlab(var) +
       geom_jitter() + geom_smooth() + theme_bw()
     print(g)
   }  
@@ -348,16 +362,21 @@ for(var in climate_vars){
      u <- as.matrix(bglr_gen_scaled) %*% mod_out[[var]]$mod_marker$ETA[[1]]$b
      
     # Breeding value with only top 100 snps
-     top100 <- names(sort(var_list$mod_marker$ETA[[1]]$b^2, decreasing = TRUE))[1:100]
+     top100 <- names(sort(mod_out[[var]]$mod_marker$ETA[[1]]$b^2, decreasing = TRUE))[1:100]
      u_top100 <- as.matrix(bglr_gen_scaled[, top100]) %*% mod_out[[var]]$mod_marker$ETA[[1]]$b[top100]
+     
+    # Breeding value of only top 1000 snps
+     top1000 <- names(sort(mod_out[[var]]$mod_marker$ETA[[1]]$b^2, decreasing = TRUE))[1:1000]
+     u_top1000 <- as.matrix(bglr_gen_scaled[, top1000]) %*% mod_out[[var]]$mod_marker$ETA[[1]]$b[top1000]
     
     # Save back into list
       mod_out[[var]]$mod_marker$ETA[[1]]$u <- u
       mod_out[[var]]$mod_marker$ETA[[1]]$u_top100 <- u_top100
+      mod_out[[var]]$mod_marker$ETA[[1]]$u_top1000 <- u_top1000
   
     # Plot breeding values vs phenotype
-      # Need to add in intercept (mu)
-      plot(mod_out[[var]]$mod_marker$ETA[[1]]$u + mod_out[[var]]$mod_marker$mu, 
+      # Need to add in intercept (mu) to get 1:1 line to match up
+      plot(c(mod_out[[var]]$mod_marker$ETA[[1]]$u), 
            mod_out[[var]]$mod_marker$y,
            col = "grey50", las = 1, main = paste0("Marker mod: ", var),
            ylab = var, xlab = "Breeding value", pch = 19) 
@@ -368,33 +387,49 @@ for(var in climate_vars){
 # Plot breeding values vs. phenotype for kinship models
   for(var in names(mod_out)){
     # Need to add in intercept (mu)
-    plot(mod_out[[var]]$mod_kin$ETA[[1]]$u + mod_out[[var]]$mod_kin$mu, 
+    plot(mod_out[[var]]$mod_kin$ETA[[1]]$u, 
          mod_out[[var]]$mod_kin$y,
          col = "grey50", las = 1, main = paste0("Kinship mod: ", var),
          ylab = var, xlab = "Breeding value", pch = 19) 
     abline(a = 0, b = 1, lwd = 2)
   }
   
+## Look at residuals more closely
   
-# Calculate breeding values for kin-marker models  
+  var = "latitude"
+  resids <- mod_out[[var]]$mod_kin$y - (mod_out[[var]]$mod_kin$ETA[[1]]$u + mod_out[[var]]$mod_kin$mu)
+  View(bind_cols(dplyr::select(gen_dat_clim, id, var), data.frame(resids = resids)))
+
+      
+# Calculate breeding values for kin-marker models
+  
   for(var in names(mod_out)){
-    
-    # Matrix multiplaction - genotypes times marker effects 
+
+    # Matrix multiplaction - genotypes times marker effects
     u <- as.matrix(bglr_gen_scaled) %*% mod_out[[var]]$mod_kinmarker$ETA[[2]]$b
     
+    # Breeding value with only top 100 snps
+    top100 <- names(sort(mod_out[[var]]$mod_kinmarker$ETA[[2]]$b^2, decreasing = TRUE))[1:100]
+    u_top100 <- as.matrix(bglr_gen_scaled[, top100]) %*% 
+              mod_out[[var]]$mod_kinmarker$ETA[[2]]$b[top100]
+
     # Save back into list
     mod_out[[var]]$mod_kinmarker$ETA[[2]]$u <- u
+    mod_out[[var]]$mod_kinmarker$ETA[[2]]$u_top100 <- u_top100
     
+    # Comparing marker u for all snps and top100 SNPs
+    plot(u, u_top100, pch = 19, main = var)
+
     # Plot breeding values vs phenotype
     # Need to add in intercept (mu)
-    plot(mod_out[[var]]$mod_kinmarker$ETA[[1]]$u + 
+    plot(mod_out[[var]]$mod_kinmarker$ETA[[1]]$u +
            mod_out[[var]]$mod_kinmarker$ETA[[2]]$u +
-           mod_out[[var]]$mod_kinmarker$mu, 
+           mod_out[[var]]$mod_kinmarker$mu,
            mod_out[[var]]$mod_kinmarker$y,
          col = "grey50", las = 1, main = paste0("Marker mod: ", var),
-         ylab = var, xlab = "Breeding value", pch = 19) 
+         ylab = var, xlab = "Breeding value", pch = 19)
     abline(a=0,b=1,lwd=2)
-  }
+   }
   
   
 # Make a dataframe of breeding values that will match up growth data
@@ -402,16 +437,30 @@ for(var in climate_vars){
   
   for(var in names(mod_out)){
     bvs[ , paste0("bv.", var, ".kin")] <- c(mod_out[[var]]$mod_kin$ETA[[1]]$u)
-    bvs[ , paste0("bv.", var, ".marker")] <- c(mod_out[[var]]$mod_marker$ETA[[1]]$u_top100)
-    # Calculating kinship & marker BV by summing them together
-    bvs[ , paste0("bv.", var, ".kin.marker")] <- c(mod_out[[var]]$mod_kinmarker$ETA[[1]]$u + 
-                                              mod_out[[var]]$mod_kinmarker$ETA[[2]]$u)
+    bvs[ , paste0("bv.", var, ".marker")] <- c(mod_out[[var]]$mod_marker$ETA[[1]]$u)
+    bvs[ , paste0("bv.", var, ".marker100")] <- c(mod_out[[var]]$mod_marker$ETA[[1]]$u_top100)
+    bvs[ , paste0("bv.", var, ".marker1000")] <- c(mod_out[[var]]$mod_marker$ETA[[1]]$u_top1000)
+ 
+     # Calculating marker BV by summing them together controlling for kinship
+  bvs[ , paste0("bv.", var, ".kin.marker")] <-mod_out[[var]]$mod_kinmarker$ETA[[2]]$u
+  
+  bvs[ , paste0("bv.", var, ".kin.marker100")] <- mod_out[[var]]$mod_kinmarker$ETA[[2]]$u_top100
   }
   
   dim(bvs)
   summary(bvs)
   head(bvs)
   
+ # Make plots of correlations in breeding values
+  for(var in climate_vars){
+   sub <-  bvs %>%
+      dplyr::select(contains(var))
+   
+   colnames(sub) <- gsub(paste0("bv.", var), "", colnames(sub))
+
+      pairs.panels(sub, main = var)
+  }
+
   
   
 # Correlating BVs with growth data ----------------------------------------
@@ -440,8 +489,8 @@ for(var in climate_vars){
      
   ## Check variance inflation factor
      vif(as.data.frame(dat_bv[, c("height_2014", "rgr", 
-                                  "tmax_sum_dif", "bv.tmax_sum.marker", "bv.tmax_sum.kin")]))
-     
+                                  "tmax_sum_dif", "bv.tmax_sum.marker")]))
+
 # For each climate variable fit 5 game models
    # 1) Null model with just Height 2014
    # 2) Model with climate transfer
@@ -466,7 +515,9 @@ for(var in climate_vars){
        # Get variable names
        bv_var_kin <- paste0("bv.", climate_var, ".kin")
        bv_var_marker <- paste0("bv.", climate_var, ".marker")
+       bv_var_marker100 <- paste0("bv.", climate_var, ".marker100")
        bv_var_kin_marker <- paste0("bv.", climate_var, ".kin.marker")
+       bv_var_kin_marker100 <- paste0("bv.", climate_var, ".kin.marker100")
        
          if(climate_var != "random"){
            climate_var_dif <- paste0(climate_var, "_dif")
@@ -475,29 +526,42 @@ for(var in climate_vars){
          }
        
        ## Set formulas for fixed effects / smoothed terms
-       fixed_null <- "rgr ~ site + s(height_2014)"
+       fixed_null <- "height_2017 ~ site + s(height_2014)"
        
-       fixed_clim_dif <- paste0("rgr ~ site + s(height_2014) + s(", 
+       fixed_clim_dif <- paste0("height_2017 ~ site + s(height_2014) + s(", 
                                      climate_var_dif,")")
        
-       fixed_bv_kin <- paste0("rgr ~ site + s(height_2014) + s(", 
+       fixed_bv_kin <- paste0("height_2017 ~ site + s(height_2014) + s(", 
                                       climate_var_dif,") +s(", bv_var_kin, ")")
        
-       fixed_bv_marker <- paste0("rgr ~ site +  s(height_2014) + s(", 
+       fixed_bv_marker <- paste0("height_2017 ~ site +  s(height_2014) + s(", 
                                          climate_var_dif,") +s(", bv_var_marker, ")")
        
-       fixed_bv_kin_marker <-  paste0("rgr ~ site +  s(height_2014) + s(", 
-                                              climate_var_dif,") +s(", bv_var_kin_marker, ")")
+       fixed_bv_marker100 <- paste0("height_2017 ~ site +  s(height_2014) + s(", 
+                                 climate_var_dif,") +s(", bv_var_marker100, ")")
+       
+      fixed_bv_kin_marker <-  paste0("height_2017 ~ site +  s(height_2014) + s(",
+                                          climate_var_dif,") +s(", bv_var_kin_marker, ")")
+      
+      fixed_bv_kin_marker100 <-  paste0("height_2017 ~ site +  s(height_2014) + s(",
+                                     climate_var_dif,") +s(", bv_var_kin_marker100, ")")
+       
       ## Interaction models 
-       fixed_bv_kin_int <- paste0("rgr ~ site + s(height_2014) + te(", 
+       fixed_bv_kin_int <- paste0("height_2017 ~ site + s(height_2014) + te(", 
                               climate_var_dif,") + te(", bv_var_kin, ") + ti(",
                               climate_var_dif, ", ", bv_var_kin, ")")
-       fixed_bv_marker_int <- paste0("rgr ~ site + s(height_2014) + te(", 
+       fixed_bv_marker_int <- paste0("height_2017 ~ site + s(height_2014) + te(", 
                                   climate_var_dif,") + te(", bv_var_marker, ") + ti(",
                                   climate_var_dif, ", ", bv_var_marker, ")")
-       fixed_bv_kin_marker_int <- paste0("rgr ~ site + s(height_2014) + te(", 
-                                  climate_var_dif,") + te(", bv_var_kin_marker, ") + ti(",
-                                  climate_var_dif, ", ", bv_var_kin_marker, ")")
+       fixed_bv_marker100_int <- paste0("height_2017 ~ site + s(height_2014) + te(", 
+                                     climate_var_dif,") + te(", bv_var_marker100, ") + ti(",
+                                     climate_var_dif, ", ", bv_var_marker100, ")")
+     fixed_bv_kin_marker_int <- paste0("height_2017 ~ site + s(height_2014) + te(",
+                                climate_var_dif,") + te(", bv_var_kin_marker, ") + ti(",
+                                 climate_var_dif, ", ", bv_var_kin_marker, ")")
+     fixed_bv_kin_marker100_int <- paste0("height_2017 ~ site + s(height_2014) + te(",
+                                       climate_var_dif,") + te(", bv_var_kin_marker100, ") + ti(",
+                                       climate_var_dif, ", ", bv_var_kin_marker100, ")")
        
        # Formula for random effects
        random <-  '+ s(section_block, bs="re")  + s(accession, bs = "re")'
@@ -530,10 +594,21 @@ for(var in climate_vars){
                          nthreads = 8,
                          method = "fREML")
        
+       gam_marker100 <- bam(formula = make_formula(fixed_bv_marker100, random),
+                         data = dat_bv,
+                         nthreads = 8,
+                         method = "fREML")
+       
        gam_kin_marker <- bam(formula = make_formula(fixed_bv_kin_marker, random),
                              data = dat_bv,
                              nthreads = 8,
                              method = "fREML")
+       gam_kin_marker100 <- bam(formula = make_formula(fixed_bv_kin_marker100, random),
+                             data = dat_bv,
+                             nthreads = 8,
+                             method = "fREML")
+       
+       
        ## Interaction models
        gam_kin_int <- bam(formula = make_formula(fixed_bv_kin_int, random),
                       data = dat_bv,
@@ -545,33 +620,49 @@ for(var in climate_vars){
                          nthreads = 8,
                          method = "fREML")
        
+       gam_marker100_int <- bam(formula = make_formula(fixed_bv_marker100_int, random),
+                             data = dat_bv,
+                             nthreads = 8,
+                             method = "fREML")
+       
        gam_kin_marker_int <- bam(formula = make_formula(fixed_bv_kin_marker_int, random),
                              data = dat_bv,
                              nthreads = 8,
                              method = "fREML")
        
+       gam_kin_marker100_int <- bam(formula = make_formula(fixed_bv_kin_marker100_int, 
+                                                           random),
+                                 data = dat_bv,
+                                 nthreads = 8,
+                                 method = "fREML")
+       
        list_out <- list(list(gam_null = gam_null, 
                              gam_clim_dif = gam_clim_dif, 
                              gam_kin = gam_kin,
                              gam_marker = gam_marker,
+                             gam_marker100 = gam_marker100,
                              gam_kin_marker = gam_kin_marker,
+                             gam_kin_marker100 = gam_kin_marker100,
                              gam_kin_int = gam_kin_int,
                              gam_marker_int = gam_marker_int,
-                             gam_kin_marker_int = gam_kin_marker_int))
+                             gam_marker100_int = gam_marker100_int,
+                             gam_kin_marker_int = gam_kin_marker_int,
+                             gam_kin_marker100_int = gam_kin_marker100_int))
        
        names(list_out) <- climate_var
        
        gam_mods[[x]] <- list_out
        
        x = x +1
+       
      } # End climate vars loop 
      
      gam_mods <- unlist(gam_mods, recursive = FALSE)
      
  # Save gam mods
-   #save(gam_mods, file = paste0("./output/gam_mods_out_", Sys.Date(), ".Rdata"))
+  # save(gam_mods, file = paste0("./output/gam_mods_out_", Sys.Date(), ".Rdata"))
  
-   load("./output/gam_mods_out_2018-04-19.Rdata")
+  # load("./output/gam_mods_out_2018-04-19.Rdata")
    
  
  # Extract AIC values from each model
@@ -590,7 +681,90 @@ for(var in climate_vars){
    
    AIC_df %>%
      arrange(climate_var, AIC)   
- 
+   
+   
+   
+## Testing model selection 
+   library(MuMIn)
+   
+   AICc(gam_mods$tmax_sum$gam_clim_dif)
+   AIC(gam_mods$tmax_sum$gam_clim_dif)
+   
+   test = model.sel(gam_mods$tmax_sum)
+   
+   test = subset(test, delta < 5)
+   
+   plot(test)
+   
+    avg = model.avg(test)
+    
+    predictions = dat_bv[1, ]
+    
+    predictions <- predictions %>%
+      mutate_if(is.numeric, round)
+    
+    ## Use average seedling height
+    predictions$height_2014 <-  0
+    
+    ## Set Chico as the baseline site
+    predictions$site <- "Chico"
+    
+    # Set section block - one of most common blocks
+    predictions$section_block <- "Block1_1"
+    
+    # Set accession
+    predictions$accession <- "1"
+    
+   predictions <-  expand.grid(height_2014 = 0,
+                site = "Chico",
+                accession = "1",
+                section_block = "Block1_1",
+                tmax_sum_dif = seq(-3, 3, by = .1),
+                bv.tmax_sum.kin = 0,
+                bv.tmax_sum.kin.marker = 0,
+                bv.tmax_sum.kin.marker100 = 0,
+                bv.tmax_sum.marker = seq(-5, 1, by = .1),
+                bv.tmax_sum.marker100 = 0)
+   
+   predictions
+
+   predictions$pred <-  predict(avg, newdata = predictions)
+   
+   plot(predictions$tmax_sum_dif, predictions$pred)
+
+     ggplot(predictions, aes(tmax_sum_dif, bv.tmax_sum.marker, z = pred)) + geom_tile(aes(fill =  pred)) + stat_contour(bins = 15) + theme_bw()
+   
+     
+     library(plotly)
+     
+     test = predictions %>%
+       dplyr::select(tmax_sum_dif, bv.tmax_sum.marker, pred) %>%
+     spread(key = tmax_sum_dif, value = pred)
+       
+     test <- as.matrix(test[, -1])
+     
+     plot_ly(z = ~test) %>% layout(
+       title = "Layout options in a 3d scatter plot",
+       scene = list(
+         xaxis = list(title = "tmax_dif"),
+         yaxis = list(title = "bv"),
+         zaxis = list(title = "Prediction")
+       )) %>% 
+       add_surface() 
+   
+   
+   
+  ## Model averaged coefficients 
+   preds_by_model <- sapply(gam_mods$tmax_sum, predict)
+   
+   preds <- preds_by_model %*% Weights(test)
+   
+   plot(dat_bv$height_2017, preds)
+   
+  # Using their predict method 
+   preds2 <- predict(model.avg(test))
+    
+   plot(preds, preds2) # The same as multiplying by the weight
    
    
  # Extract P values for terms 
@@ -648,7 +822,9 @@ for(var in climate_vars){
        grepl(pattern = "random)", parameter) ~ "climate_transfer",
        grepl(pattern = "\\.kin)", parameter) ~ "kinship",
        grepl(pattern = "\\.kin\\.marker)", parameter) ~ "kin_marker",
+       grepl(pattern = "\\.kin\\.marker100)", parameter) ~ "kin_marker",
        grepl(pattern = "\\.marker)", parameter) ~ "marker",
+       grepl(pattern = "\\.marker100)", parameter) ~ "marker",
        grepl(pattern = "section_block", parameter) ~ "section_block",
        grepl(pattern = "accession", parameter) ~ "accession",
        TRUE                      ~  "height_2014")
@@ -676,104 +852,173 @@ for(var in climate_vars){
 
 
 ## Print out model outputs
+  
+  # Remove previous output
+  unlink("./output/model_visualizations/*")
+  
   for(var in names(gam_mods)){
     for(mod in names(gam_mods[[1]])){
+      
       filename <- paste0("./output/model_visualizations/", var, "_", mod, ".pdf")
+      
       pdf(filename)   
-      cat("Working on..", var, "...", mod, "...\n")
+     
+       cat("Working on..", var, "...", mod, "...\n")
+      
+      # With partial residuals
       visreg::visreg(gam_mods[[var]][[mod]],
-                     main = paste0(var, " - ", mod))
+                     main = paste0(var, " - ", mod),
+                     ylab = "Relative growth rate")
+      
+      # If there is an interaction term
+      if(grepl("int", mod)){
+        
+      # If not random variable, paste on the suffix _dif  
+        xvar <- ifelse(grepl("random", var), var, paste0(var, "_dif")) # climate var
+       
+         # Set BV var
+        if(grepl("gam_kin_int", mod)){
+          yvar <- paste0("bv.",var,".kin")
+        } else if (grepl("gam_marker_int", mod)){
+          yvar <- paste0("bv.",var,".marker")
+        }  else if (grepl("gam_marker100_int", mod)){
+          yvar <- paste0("bv.",var,".marker100")
+        } else if (grepl("gam_kin_marker_int", mod)){
+          yvar <- paste0("bv.",var,".kin.marker")
+        } else if (grepl("gam_kin_marker100_int", mod)){
+          yvar <- paste0("bv.",var,".kin.marker100")
+        }
+        
+        
+        # Interaction plot
+        visreg::visreg2d(gam_mods[[var]][[mod]], 
+                 x = xvar, 
+                 y = yvar, 
+                 plot.type = "persp",
+                 zlab = "Relative growth rate",
+                 theta = 30) # 4 plot types: image = countour plot, gg = filled contour plot,
+                                    # persp = 3d plot, rgl = 3d rotatable plot
+        
+        
+        # 2 d interaction plot
+        visreg::visreg2d(gam_mods[[var]][[mod]], 
+                         x = xvar, 
+                         y = yvar, 
+                         plot.type = "image",
+                         zlab = "Relative growth rate") 
+      
+      } # End interaction IF
+
+      # Without partial residuals 
       visreg::visreg(gam_mods[[var]][[mod]],
-                     main = paste0(var, " - ", mod), partial = FALSE)
+                     main = paste0(var, " - ", mod), partial = FALSE,
+                     ylab = "Relative growth rate")
+      
+      # Model diagnostics
       gam.check(gam_mods[[var]][[mod]], pch = 19, cex = 0.5)
+      
       dev.off()
     }
   }    
 
   
-  
 ## Experimenting with excel output
-  
-  
-    
-  # Create hyper links to model output
-  
-    # Make all combinations of climate vars and mods
-    links = expand.grid(model = names(gam_mods[[1]]),
-               climate_var = names(gam_mods))
-    
-    # Link text
-    links$model_visualization <-  paste0("model_visualizations/", links$climate_var, "_", 
-                          links$mod, ".pdf")
-    
-    # Join to mod stats
-    mod_stats4 <- mod_stats3 %>%
-      left_join(., links, by = c("climate_var", "model"))
-    
-    # Need to reclass as hyperlink for it to work
-    class(mod_stats4$model_visualization) <- "hyperlink"
-    
-#### Out put as excel spreadsheet  
-# Header style 
-  hs1 <- createStyle(fgFill = "#DCE6F1", textDecoration = "bold",
-                     border = "Bottom")
-  posStyle <- createStyle(fontColour = "#006100", bgFill = "#C6EFCE")
-  
-  
-## Initialize workbook  
-  wb <- createWorkbook()
-  
-## Genomic selection CV SCORES  
-  addWorksheet(wb, "genomic selection CV scores")
-  writeData(wb, 1, 
-            x = as.data.frame(cv_out_avg), 
-            headerStyle = hs1, borders = "all",
-            withFilter = TRUE,
-            keepNA = TRUE)
-  
 
-
+    # Create hyper links to model output
+    
+      # Make all combinations of climate vars and mods
+      links = expand.grid(model = names(gam_mods[[1]]),
+                 climate_var = names(gam_mods))
+      
+      # Link text
+      links$model_visualization <-  paste0("model_visualizations/", links$climate_var, "_", 
+                            links$mod, ".pdf")
+      
+      # Join to mod stats
+      mod_stats4 <- mod_stats3 %>%
+        left_join(., links, by = c("climate_var", "model"))
+      
+      # Need to reclass as hyperlink for it to work
+      class(mod_stats4$model_visualization) <- "hyperlink"
+      
+  #### Out put as excel spreadsheet  
+  # Header style 
+    hs1 <- createStyle(fgFill = "#DCE6F1", textDecoration = "bold",
+                       border = "Bottom")
+    posStyle <- createStyle(fontColour = "#006100", bgFill = "#C6EFCE")
+    
+    
+  ## Initialize workbook  
+    wb <- createWorkbook()
+    
   ## Genomic selection CV SCORES  
-  addWorksheet(wb, "genomic selection model fits")
-  writeData(wb, 2, 
-            x = mod_fits_out, 
-            headerStyle = hs1, borders = "all",
-            withFilter = TRUE,
-            keepNA = TRUE)  
-  
-# Add gam model results
-  addWorksheet(wb, "GAM model results")
-  writeData(wb, 3, 
-            x = mod_stats4, 
-            headerStyle = hs1, borders = "all",
-            withFilter = TRUE,
-            keepNA = TRUE)  
-  
-  # Conditional formatting for P values less than 0.05
-  conditionalFormatting(wb, 3, cols=6:ncol(mod_stats4), rows=1:nrow(mod_stats4)+1,
-                        rule="<=0.05", style = posStyle)
-  
-  # 
-  # writeFormula(wb, , startRow = 4
-  #              , x = makeHyperlinkString(sheet = "testing", row = 3, col = 10
-  #                                        , file = system.file("loadExample.xlsx", package = "openxlsx")))
-
-## Set column widths
-  setColWidths(wb, 1, cols = c(1:50), widths = "auto")
-  setColWidths(wb, 2, cols = c(1:50), widths = "auto")
-  setColWidths(wb, 3, cols = c(1:50), widths = "auto")
-  
-## Freeze panes
-  freezePane(wb, 1, firstRow = TRUE)
-  freezePane(wb, 2, firstRow = TRUE)
-  freezePane(wb, 3, firstRow = TRUE)
-  
-## Save workbook  
-  saveWorkbook(wb, paste0("./output/model_summary_", Sys.Date(), ".xlsx"), overwrite = TRUE)
+    addWorksheet(wb, "genomic selection CV scores")
+    writeData(wb, 1, 
+              x = as.data.frame(cv_out_avg), 
+              headerStyle = hs1, borders = "all",
+              withFilter = TRUE,
+              keepNA = TRUE)
+    
   
   
+    ## Genomic selection CV SCORES  
+    addWorksheet(wb, "genomic selection model fits")
+    writeData(wb, 2, 
+              x = mod_fits_out, 
+              headerStyle = hs1, borders = "all",
+              withFilter = TRUE,
+              keepNA = TRUE)  
+    
+  # Add gam model results
+    addWorksheet(wb, "GAM model results")
+    writeData(wb, 3, 
+              x = mod_stats4, 
+              headerStyle = hs1, borders = "all",
+              withFilter = TRUE,
+              keepNA = TRUE)  
+    
+    # Conditional formatting for P values less than 0.05
+    conditionalFormatting(wb, 3, cols=5:ncol(mod_stats4), rows=1:nrow(mod_stats4)+1,
+                          rule="<=0.05", style = posStyle)
+    
+    
+    # Testing aic tables
+    addWorksheet(wb, "AIC table")
+    writeData(wb, 4,
+              x = model.sel(gam_mods$tmax_sum),
+              headerStyle = hs1, borders = "all",
+              withFilter = TRUE,
+              keepNA = TRUE)
+    
+    # 
+    # writeFormula(wb, , startRow = 4
+    #              , x = makeHyperlinkString(sheet = "testing", row = 3, col = 10
+    #                                        , file = system.file("loadExample.xlsx", package = "openxlsx")))
   
-  
+  ## Set column widths
+    setColWidths(wb, 1, cols = c(1:50), widths = "auto")
+    setColWidths(wb, 2, cols = c(1:50), widths = "auto")
+    setColWidths(wb, 3, cols = c(1:50), widths = "auto")
+    setColWidths(wb, 4, cols = c(1:50), widths = "auto")
+    
+  ## Freeze panes
+    freezePane(wb, 1, firstRow = TRUE)
+    freezePane(wb, 2, firstRow = TRUE)
+    freezePane(wb, 3, firstRow = TRUE)
+    freezePane(wb, 4, firstRow = TRUE)
+    
+  ## Save workbook  
+    saveWorkbook(wb, paste0("./output/model_summary_", Sys.Date(), ".xlsx"), overwrite = TRUE)
+    
+    
+    
+    summary(gam_mods[["tmax_sum"]]$gam_marker100)
+    
+    
+    
+    
+    
+     
 
 # Simulating data ---------------------------------------------------------
   

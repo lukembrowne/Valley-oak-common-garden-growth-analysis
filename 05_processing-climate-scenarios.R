@@ -252,9 +252,12 @@ library(climates)
   }
   
 ## Save raster objects to file  
-  save(raster_hist_df, raster_future_df, 
-       raster_dif_df, raster_dif_df_scaled,
-       file = paste0("./output/raster_dfs_", Sys.Date(), ".RData"))
+  # save(raster_hist_df, raster_future_df, 
+  #      raster_dif_df, raster_dif_df_scaled,
+  #      file = paste0("./output/raster_dfs_", Sys.Date(), ".RData"))
+  
+  
+  load("./output/raster_dfs_2018-04-20.RData")
 
 
   

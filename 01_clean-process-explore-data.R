@@ -302,8 +302,8 @@
       
       
     ## Change to NA outlier values in relative growth rate
-      dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.01, na.rm = TRUE) |
-                    dat_all$rgr >= quantile(dat_all$rgr, 0.99, na.rm = TRUE)] <- NA
+      dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.025, na.rm = TRUE) |
+                    dat_all$rgr >= quantile(dat_all$rgr, 0.975, na.rm = TRUE)] <- NA
     
       
       
