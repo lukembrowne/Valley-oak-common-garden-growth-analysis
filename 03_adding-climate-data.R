@@ -60,8 +60,8 @@
   ## Except we are excluding AET because it is very strongly correlated with cwd
   climate_vars <- c("tmax_sum",
                     "tmin_winter",
-                    "tmax",
-                    "tmin",
+                  #  "tmax",
+                  #  "tmin",
                    # "latitude",
                   #  "longitude",
                   #  "elevation")

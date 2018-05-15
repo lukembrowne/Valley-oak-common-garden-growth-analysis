@@ -303,6 +303,16 @@ library(climates)
   
   
   
+  raster_init <- raster("./data/gis/climate_data/BCM/future/CCSM4_rcp85/aet2070_2099_ave_CCSM4_rcp85_1524086336/aet2070_2099_ave_CCSM4_rcp85_1524086336.tif")
+  
+  raster_init ## Initialize raster
+  values(raster_init) <- raster_dif_df$tmax_sum_dif
+  
+  mask(raster_init, lobata_range)
+  
+  
+  
+  
   
   
   

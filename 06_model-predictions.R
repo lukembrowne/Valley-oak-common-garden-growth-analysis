@@ -4,32 +4,28 @@ library(raster)
 library(rasterVis)
 
 
-
-
 # Loading in rasters ------------------------------------------------------
 
-## Read in elevation dem and create a hillshade for mapping
-dem <- raster("./data/gis/dem/ClimateNA_DEM_cropped.tif")
-
-slope = raster::terrain(dem, opt='slope')
-aspect = raster::terrain(dem, opt='aspect')
-hill = hillShade(slope, aspect, 40, 270)
-
-## Load in california outline
-cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
-                              proj4string = CRS("+proj=longlat +datum=WGS84"))
-
-lobata_range <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
-                              proj4string = CRS("+proj=longlat +datum=WGS84"))
-
-
+  ## Read in elevation dem and create a hillshade for mapping
+  dem <- raster("./data/gis/dem/ClimateNA_DEM_cropped.tif")
+  
+  slope = raster::terrain(dem, opt='slope')
+  aspect = raster::terrain(dem, opt='aspect')
+  hill = hillShade(slope, aspect, 40, 270)
+  
+  ## Load in california outline
+  cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
+                                proj4string = CRS("+proj=longlat +datum=WGS84"))
+  
+  lobata_range <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
+                                proj4string = CRS("+proj=longlat +datum=WGS84"))
 
 
 # Model predictions -------------------------------------------------------
 
   
 gam_mod <- gam_mods[["tmax_sum"]][["gam_clim_dif"]]
-gam_mod <- gam_mods[["tmax_sum"]][["gam_kin"]]
+#gam_mod <- gam_mods[["tmax_sum"]][["gam_kin_int"]]
 summary(gam_mod)
 
 ## Exclude values beyond
@@ -37,7 +33,6 @@ summary(gam_mod)
 
 ## Have a section that excludes temperatures not more extreme than estimated by the model!!
 
-plot_future_growth <- function(gam_mod, bv_var, raster_dif_df_scaled){
   
   ## Make prediction dataframe
     # Initialize df
@@ -56,22 +51,19 @@ plot_future_growth <- function(gam_mod, bv_var, raster_dif_df_scaled){
   predictions$accession <- "1"
   
   # Predict breeding values for each location
-  bv_lm_form <- formula(paste0())
-  bv_lm1 <- lm(bv.tmax_sum.kin ~ tmax_sum  ,data = dat_bv)
+ # bv_lm_form <- formula(paste0())
+  bv_lm1 <- lm(bv.tmax_sum.kin ~ tmax_sum, data = dat_bv)
   
   predictions$bv.tmax_sum.kin <- predict(bv_lm1, 
-                                         newdata = data.frame(tmax_sum = raster_hist_df_scaled$tmax))
+                               newdata = data.frame(tmax_sum = raster_hist_df_scaled$tmax))
   ## Exclude values that are outside the range in the model / observed breeding values
   predictions$bv.tmax_sum.kin[predictions$bv.tmax_sum.kin < min(dat_bv$bv.tmax_sum.kin) | 
                                 predictions$bv.tmax_sum.kin > max(dat_bv$bv.tmax_sum.kin)] <- NA
   
   
   ## Exclude climate transfer differnces beyond those observed in garden
-  predictions$tmax_sum_dif
-  
-  
-  
-  
+
+
   ## Make a null predictions set for comparison
   predictions_null <- predictions
   
@@ -82,18 +74,31 @@ plot_future_growth <- function(gam_mod, bv_var, raster_dif_df_scaled){
     }
   }
   
+  ## Links on how to parallelize the predict function
+  # https://stackoverflow.com/questions/28695076/parallel-predict
+  
+  
+  ###indicate number of cores used for parallel processing
+  if (detectCores()>1) {
+    cl <- makeCluster(detectCores()-1)
+  } else cl <- NULL
+  
+  cl
+  
+  
   
   ## Generate predictions
-  rgr_predictions =  predict(gam_mod, predictions, 
+  rgr_predictions =  predict.bam(gam_mod, predictions, 
                                 re.form = NA, type = "response",
-                                se.fit = FALSE)
+                                se.fit = FALSE, cluster = cl, n.threads = 7)
   
   summary(rgr_predictions)
   hist(rgr_predictions)
   
   ## Null model
-  rgr_predictions_null <-  predict(gam_mod, predictions_null, # Using just first row
-                                      re.form = NA, type = "response")
+  rgr_predictions_null <-  predict.bam(gam_mod, predictions_null, # Using just first row
+                                      re.form = NA, type = "response", se.fit = FALSE,
+                                   cluster = cl, n.threads = 7)
   summary(rgr_predictions_null)
   hist(rgr_predictions_null)
   
@@ -109,7 +114,9 @@ plot_future_growth <- function(gam_mod, bv_var, raster_dif_df_scaled){
                            rgr_predictions_change > quantile(rgr_predictions_change, 0.99,
                                                              na.rm = TRUE)] <- NA
   
-  hist(rgr_predictions_change)
+  hist(rgr_predictions_change, col = "steelblue2", las = 1, xlab = "Percent change in growth",
+       main = "")
+  
   
 
   ## Save values into raster
@@ -133,40 +140,19 @@ plot_future_growth <- function(gam_mod, bv_var, raster_dif_df_scaled){
   p = levelplot(rgr_change_rast, 
     #  levelplot(raster::mask(rgr_rast, rgeos::gBuffer(lobata_range, width = 0, byid = TRUE)),
             contour = FALSE, margin = FALSE, par.settings = rgrTheme, 
-            maxpixels = pixel_num, colorkey = TRUE, main = "% Change in Relative Growth Rate") +
+            maxpixels = pixel_num, colorkey = TRUE, main = "% Change in Height") +
     levelplot(hill,  margin = FALSE, par.settings=hsTheme, maxpixels = pixel_num) +
     latticeExtra::layer(sp.polygons(cali_outline, lwd=2)) + # Need to convert raster to lat long for these to show up
     latticeExtra::layer(sp.polygons(lobata_range,fill = "black", alpha = 0.15))
   
   print(p)
   
-  pdf("./output/tmax_climate_transfer_with_breeding_value.pdf")
+  pdf("./output/tmax_climate_transfer_without_breeding_value.pdf")
   print(p)
   dev.off()
  
 
-} # End function
-  
-  
-  
-  
-  ## CMD
-  plot_future_growth(fit_CMD$gam)
-  
-  ## Tmax
-  plot_future_growth(fit_Tmax$gam)
-  plot_future_growth(fit_Tmax_elev$gam)
-  
-  ## Tmin
-  plot_future_growth(fit_Tmin$gam)
-  
-  ## DD5
-  plot_future_growth(fit_DD5$gam)
-  
-  ## PCA model
-  plot_future_growth(fit_clim_pca$gam, PCA = TRUE)
-  
-  
+
 
 # Graveyard ---------------------------------------------------------------
 

@@ -62,7 +62,7 @@
                          by = c("Accession_2017" = "Accession_2014", 
                                 "Progeny_2017" = "Progeny_2014"))
     
-    dim(dat_all) ## Adding so many rows?
+    dim(dat_all) 
     
 
   ## Make sure 2015 and 2017 data match up - should all sum to 0
@@ -164,9 +164,9 @@
       cor.test(dat_all$height_2015, dat_all$rgr)
       
       ## Histogram of RGR
-      ggplot(dat_all, aes(rgr)) + geom_histogram(fill = "steelblue", 
-                                                 col = "black") + theme_bw() +
-        xlab("Relative growth rate (rgr)")
+        ggplot(dat_all, aes(rgr)) + geom_histogram(fill = "steelblue2",
+                                                   col = "black") + theme_bw() +
+          xlab("Relative growth rate (rgr)")
       
       ## View 'outliers
       # View(dat_all[dat_all$rgr < -1 & !is.na(dat_all$rgr), ])
@@ -245,19 +245,7 @@
   ## Subset gen_dat to just individuals we have GBS data for
     gen_dat <- gen_dat %>%
       filter(gbs_name %in% indv$ID)
-    
-    
-    ## Mean impute genetic data
-    # for(col in 3:ncol(gen_dat)){
-    #   if(col %% 1000 == 0) cat("Working on SNP:", col, "...\n")
-    #   mean <- mean(dplyr::pull(gen_dat[, col]), na.rm = TRUE)
-    #   nas <- which(is.na(gen_dat[, col]))
-    #   gen_dat[nas, col] <- mean
-    #  # cat("Imputed mean value is:", mean, "..\n")
-    # }
   
-    hist(pull(gen_dat, 5500))
-    
       
       
   
@@ -266,61 +254,57 @@
     ## Remove inviduals without an accession or progeny number
       dat_all <- dplyr::filter(dat_all, !is.na(accession))
     
-    
     ## Remove individuals with mechanical damage
-    mech <- dplyr::filter(dat_all, grepl('mechanical', comments_2015) |
-                            grepl('mechanical', comments_2017))
-    mech$comments_2017
-    dat_all <- dplyr::filter(dat_all, !(accession_progeny %in% mech$accession_progeny))
+      mech <- dplyr::filter(dat_all, grepl('mechanical', comments_2015) |
+                              grepl('mechanical', comments_2017))
+      mech$comments_2017
+      dat_all <- dplyr::filter(dat_all, !(accession_progeny %in% mech$accession_progeny))
 
     ## Filtering based on height
-      # dat_all$height_2017[dat_all$height_2017 <= quantile(dat_all$height_2017, 0.01,
-      #                                                     na.rm = TRUE) |
-      #               dat_all$height_2017 >= quantile(dat_all$height_2017, 0.99,
-      #                                               na.rm = TRUE)] <- NA
-      # dat_all <- dplyr::filter(dat_all, !is.na(height_2017))
+      
+      if(response_variable == "height"){
+      
+        ## Filter out NA heights
+        dat_all <- dplyr::filter(dat_all, !is.na(height_2017))
+        dat_all <- dplyr::filter(dat_all, !is.na(height_2014))  
+  
+        # dat_all$height_2017[dat_all$height_2017 <= quantile(dat_all$height_2017, 0.01,
+        #                                                     na.rm = TRUE) |
+        #               dat_all$height_2017 >= quantile(dat_all$height_2017, 0.99,
+        #                                               na.rm = TRUE)] <- NA
+      
+      }
 
-    # ## Filter out NA heights
-      dat_all <- dplyr::filter(dat_all, !is.na(height_2017))
-      dat_all <- dplyr::filter(dat_all, !is.na(height_2014))
-    #   
-    #   
-    # ## Filtering out individuals without genetic data
-      ## This happens again in 03 adding climate script to filter out moms who don't have climate data!
-       dat_all <- dplyr::filter(dat_all, accession %in% gen_dat$accession)
-
+    
     ## Filtering based on RGR
 
+      if(response_variable == "rgr"){
 
     ## Individuals with negative growth rates
       # neg_rgr <- dplyr::filter(dat_all, rgr < quantile(dat_all$rgr, 0.025, na.rm = TRUE)) %>% arrange(rgr)
       #View(dplyr::select(neg_rgr, rgr, height_2015, height_2017) )
       
     ## Individuals with high positive growth rates
-      # pos_rgr <- dplyr::filter(dat_all, rgr > quantile(dat_all$rgr, 0.975, na.rm = TRUE)) %>% arrange(rgr)
+      # pos_rgr <- dplyr::filter(dat_all, rgr > quantile(dat_all$rgr, 0.99, na.rm = TRUE)) %>% arrange(rgr)
       # View(dplyr::select(pos_rgr, accession_progeny, rgr, height_2015, height_2017) )
       
-      
-    ## Change to NA outlier values in relative growth rate
+      # Change to NA outlier values in relative growth rate
       dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.025, na.rm = TRUE) |
                     dat_all$rgr >= quantile(dat_all$rgr, 0.975, na.rm = TRUE)] <- NA
-    
+  
+  
+      ## Filter out individuals without an estimated RGR
+       dat_all <- dplyr::filter(dat_all, !is.na(rgr))
+      }
       
       
-   # Change to NA outlier values in height differential
-    # dat_all$height_dif[dat_all$height_dif <= quantile(dat_all$height_dif, 0.05, 
-    #                                                   na.rm = TRUE) |
-    #               dat_all$height_dif >= quantile(dat_all$height_dif, 0.95,
-    #                                              na.rm = TRUE)] <- NA
-
+  ## Filtering out individuals without genetic data
+      ## This happens again in 03 adding climate script to filter out moms who don't have climate data!
+      dat_all <- dplyr::filter(dat_all, accession %in% gen_dat$accession)    
       
       
-    # ## Having just one garden
-    #  # dat_all <- dplyr::filter(dat_all, site == "Chico")
-    # 
-
-    # ## Filter out individuals without an estimated RGR
-      dat_all <- dplyr::filter(dat_all, !is.na(rgr))
+    ## Filtering based on survival  
+      
 
     dim(dat_all)
   

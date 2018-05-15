@@ -1,9 +1,5 @@
 # TODO
 
-# - make marker models where BV is predicted using only the top 100 (xxx) SNPs?
-
-# - run survival models?
-
 # - On combining MAS and GS models: From Lasky 2015
 # each environmental variable tested, we calculated z scores of marker predictions and z scores of kinship predictions and then took the aver- age of the two predictions for each genotype. Accession
 
@@ -13,13 +9,19 @@
 
 # Filter out future climate values beyond the scope range esimtated in the gam models
 
-# Figure out how to best integrate breeding values and climate transfer - probably through interactions?
 
+# Model type --------------------------------------------------------------
+
+ response_variable = "height"
+# response_variable = "rgr"
+# response_variable = "survival"
 
 # Source files ------------------------------------------------------------
 
 source("./01_clean-process-explore-data.R")
 source("./03_adding-climate-data.R")
+ 
+dim(dat_all)
 
 
 # Load libraries ----------------------------------------------------------
@@ -130,8 +132,8 @@ climate_vars <- c(climate_vars, "random")
       folds <- createFolds(y = 1:length(y), k = k_folds)
       
       ## Iterations include burn in
-      n_iter <- 1000
-      n_burn <- 500
+      n_iter <- 50000
+      n_burn <- 10000
       thin <- 5
       
     # Set output prefixes   
@@ -156,6 +158,14 @@ climate_vars <- c(climate_vars, "random")
                    verbose=F)
         
         cor_cv <- cor(y[tst], fm$yHat[tst])
+    
+        # Example plot of cross validation  
+          # plot(y, fm$yHat, pch = 19, ylab = "Predicted", xlab = "Observed",
+          #      main = "Random", las = 1, cex = 0.5)
+          # points(y[tst], fm$yHat[tst], bg = "steelblue", pch = 21, cex = 1.5)
+          # abline(lm(fm$yHat[tst] ~ y[tst]), lwd = 2, lty = 2)
+          # abline(b = 1)
+        
         rmse <-  sqrt(mean((fm$yHat[tst] - y[tst])^2))
         return(list(cor_cv = cor_cv, rmse = rmse))
       }
@@ -242,10 +252,11 @@ climate_vars <- c(climate_vars, "random")
 
 
 ## Save model output?
- save(mod_out, file = paste0("./output/mod_out_", Sys.Date(), ".Rdata"))
+ # save(mod_out, file = paste0("./output/mod_out_", Sys.Date(), ".Rdata"))
 
- load("./output/mod_out_2018-04-19.Rdata") # 50,000 iter; includes precip variables
- load("./output/mod_out_2018-05-01.Rdata") # 50,000 iter; includes temp + lat, long, elev, inner join
+# load("./output/mod_out_2018-04-19.Rdata") # 50,000 iter; includes precip variables
+# load("./output/mod_out_2018-05-01.Rdata") # 50,000 iter; includes temp + lat, long, elev, inner join
+# load("./output/mod_out_2018-05-08.Rdata") # 50,000 iter; tmax_sum, tmax_winter, bioclim_04, random
  
  
 # Check out trace plots for convergance
@@ -259,7 +270,6 @@ climate_vars <- c(climate_vars, "random")
    abline(v = n_burn/thin, col =  "firebrick")
  }
 
-      
       
 ## Extract and compare CV scores
     
@@ -350,7 +360,7 @@ climate_vars <- c(climate_vars, "random")
     g = ggplot(gen_dat_clim, aes(y = pull(gen_dat_clim, top_snp), 
                                  x = pull(gen_dat_clim, var))) +
       ggtitle(paste0(var, ":", top_snp)) + ylab("Allele freq") + xlab(var) +
-      geom_jitter() + geom_smooth() + theme_bw()
+      geom_jitter(width = 0, height = .10) + geom_smooth(method = "lm") + theme_bw()
     print(g)
   }  
   
@@ -511,57 +521,70 @@ climate_vars <- c(climate_vars, "random")
        
        say(paste0("Working on: ", climate_var, " ..."),  "trilobite")
        
+       # Set family for error terms
+         if(response_variable == "height") {
+           family = "tw"
+          # family = "gaussian"
+           response = "height_2017"
+         } else if(response_variable == "rgr") {
+           family = "gaussian"
+           response = "rgr"
+         } else if(response_variable == "survival"){
+           family = "binomial"
+           response = "alive_2017"
+         }
+         
        
        # Get variable names
-       bv_var_kin <- paste0("bv.", climate_var, ".kin")
-       bv_var_marker <- paste0("bv.", climate_var, ".marker")
-       bv_var_marker100 <- paste0("bv.", climate_var, ".marker100")
-       bv_var_kin_marker <- paste0("bv.", climate_var, ".kin.marker")
-       bv_var_kin_marker100 <- paste0("bv.", climate_var, ".kin.marker100")
-       
-         if(climate_var != "random"){
-           climate_var_dif <- paste0(climate_var, "_dif")
-         } else {
-           climate_var_dif = "random" # For random variable only
-         }
+         bv_var_kin <- paste0("bv.", climate_var, ".kin")
+         bv_var_marker <- paste0("bv.", climate_var, ".marker")
+         bv_var_marker100 <- paste0("bv.", climate_var, ".marker100")
+         bv_var_kin_marker <- paste0("bv.", climate_var, ".kin.marker")
+         bv_var_kin_marker100 <- paste0("bv.", climate_var, ".kin.marker100")
+         
+           if(climate_var != "random"){
+             climate_var_dif <- paste0(climate_var, "_dif")
+           } else {
+             climate_var_dif = "random" # For random variable only
+           }
        
        ## Set formulas for fixed effects / smoothed terms
-       fixed_null <- "height_2017 ~ site + s(height_2014)"
-       
-       fixed_clim_dif <- paste0("height_2017 ~ site + s(height_2014) + s(", 
-                                     climate_var_dif,")")
-       
-       fixed_bv_kin <- paste0("height_2017 ~ site + s(height_2014) + s(", 
-                                      climate_var_dif,") +s(", bv_var_kin, ")")
-       
-       fixed_bv_marker <- paste0("height_2017 ~ site +  s(height_2014) + s(", 
-                                         climate_var_dif,") +s(", bv_var_marker, ")")
-       
-       fixed_bv_marker100 <- paste0("height_2017 ~ site +  s(height_2014) + s(", 
-                                 climate_var_dif,") +s(", bv_var_marker100, ")")
-       
-      fixed_bv_kin_marker <-  paste0("height_2017 ~ site +  s(height_2014) + s(",
-                                          climate_var_dif,") +s(", bv_var_kin_marker, ")")
-      
-      fixed_bv_kin_marker100 <-  paste0("height_2017 ~ site +  s(height_2014) + s(",
-                                     climate_var_dif,") +s(", bv_var_kin_marker100, ")")
+         fixed_null <- paste0(response, " ~ site + s(height_2014)")
+         
+         fixed_clim_dif <- paste0(paste0(response, " ~ site + s(height_2014) + s(", 
+                                       climate_var_dif,")"))
+         
+         fixed_bv_kin <- paste0(paste0(response, " ~ site + s(height_2014) + s(", 
+                                        climate_var_dif,") +s(", bv_var_kin, ")"))
+         
+         fixed_bv_marker <- paste0(paste0(response, " ~ site + s(height_2014) + s(", 
+                                           climate_var_dif,") +s(", bv_var_marker, ")"))
+         
+         fixed_bv_marker100 <- paste0(paste0(response, " ~ site + s(height_2014) + s(", 
+                                   climate_var_dif,") +s(", bv_var_marker100, ")"))
+         
+        fixed_bv_kin_marker <-  paste0(paste0(response, " ~ site + s(height_2014) + s(",
+                                            climate_var_dif,") +s(", bv_var_kin_marker, ")"))
+        
+        fixed_bv_kin_marker100 <-  paste0(paste0(response, " ~ site + s(height_2014) + s(",
+                                       climate_var_dif,") +s(", bv_var_kin_marker100, ")"))
        
       ## Interaction models 
-       fixed_bv_kin_int <- paste0("height_2017 ~ site + s(height_2014) + te(", 
+       fixed_bv_kin_int <- paste0(paste0(response, " ~ site + s(height_2014) + te(", 
                               climate_var_dif,") + te(", bv_var_kin, ") + ti(",
-                              climate_var_dif, ", ", bv_var_kin, ")")
-       fixed_bv_marker_int <- paste0("height_2017 ~ site + s(height_2014) + te(", 
+                              climate_var_dif, ", ", bv_var_kin, ")"))
+       fixed_bv_marker_int <- paste0(paste0(response, " ~ site + s(height_2014) + te(", 
                                   climate_var_dif,") + te(", bv_var_marker, ") + ti(",
-                                  climate_var_dif, ", ", bv_var_marker, ")")
-       fixed_bv_marker100_int <- paste0("height_2017 ~ site + s(height_2014) + te(", 
+                                  climate_var_dif, ", ", bv_var_marker, ")"))
+       fixed_bv_marker100_int <- paste0(paste0(response, " ~ site + s(height_2014) + te(", 
                                      climate_var_dif,") + te(", bv_var_marker100, ") + ti(",
-                                     climate_var_dif, ", ", bv_var_marker100, ")")
-     fixed_bv_kin_marker_int <- paste0("height_2017 ~ site + s(height_2014) + te(",
+                                     climate_var_dif, ", ", bv_var_marker100, ")"))
+     fixed_bv_kin_marker_int <- paste0(paste0(response, " ~ site + s(height_2014) + te(",
                                 climate_var_dif,") + te(", bv_var_kin_marker, ") + ti(",
-                                 climate_var_dif, ", ", bv_var_kin_marker, ")")
-     fixed_bv_kin_marker100_int <- paste0("height_2017 ~ site + s(height_2014) + te(",
+                                 climate_var_dif, ", ", bv_var_kin_marker, ")"))
+     fixed_bv_kin_marker100_int <- paste0(paste0(response, " ~ site + s(height_2014) + te(",
                                        climate_var_dif,") + te(", bv_var_kin_marker100, ") + ti(",
-                                       climate_var_dif, ", ", bv_var_kin_marker100, ")")
+                                       climate_var_dif, ", ", bv_var_kin_marker100, ")"))
        
        # Formula for random effects
        random <-  '+ s(section_block, bs="re")  + s(accession, bs = "re")'
@@ -577,76 +600,77 @@ climate_vars <- c(climate_vars, "random")
        gam_null <- bam(formula = make_formula(fixed_null, random),
                        data = dat_bv,
                        nthreads = 8,
-                       method = "fREML")
+                       method = "fREML", family = family)
        
        gam_clim_dif <- bam(formula = make_formula(fixed_clim_dif, random),
                         data = dat_bv,
                         nthreads = 8,
-                        method = "fREML")
+                        method = "fREML", family = family)
        
-       gam_kin <- bam(formula = make_formula(fixed_bv_kin, random),
-                      data = dat_bv,
-                      nthreads = 8,
-                      method = "fREML")
+       # gam_kin <- bam(formula = make_formula(fixed_bv_kin, random),
+       #                data = dat_bv,
+       #                nthreads = 8,
+       #                method = "fREML", family = family)
        
-       gam_marker <- bam(formula = make_formula(fixed_bv_marker, random),
-                         data = dat_bv,
-                         nthreads = 8,
-                         method = "fREML")
+       # gam_marker <- bam(formula = make_formula(fixed_bv_marker, random),
+       #                   data = dat_bv,
+       #                   nthreads = 8,
+       #                   method = "fREML", family = family)
        
-       gam_marker100 <- bam(formula = make_formula(fixed_bv_marker100, random),
-                         data = dat_bv,
-                         nthreads = 8,
-                         method = "fREML")
+       # gam_marker100 <- bam(formula = make_formula(fixed_bv_marker100, random),
+       #                   data = dat_bv,
+       #                   nthreads = 8,
+       #                   method = "fREML", family = family)
        
-       gam_kin_marker <- bam(formula = make_formula(fixed_bv_kin_marker, random),
-                             data = dat_bv,
-                             nthreads = 8,
-                             method = "fREML")
-       gam_kin_marker100 <- bam(formula = make_formula(fixed_bv_kin_marker100, random),
-                             data = dat_bv,
-                             nthreads = 8,
-                             method = "fREML")
+       # gam_kin_marker <- bam(formula = make_formula(fixed_bv_kin_marker, random),
+       #                       data = dat_bv,
+       #                       nthreads = 8,
+       #                       method = "fREML", family = family)
+       
+       # gam_kin_marker100 <- bam(formula = make_formula(fixed_bv_kin_marker100, random),
+       #                       data = dat_bv,
+       #                       nthreads = 8,
+       #                       method = "fREML", family = family)
        
        
        ## Interaction models
        gam_kin_int <- bam(formula = make_formula(fixed_bv_kin_int, random),
                       data = dat_bv,
                       nthreads = 8,
-                      method = "fREML")
+                      method = "fREML", family = family)
        
-       gam_marker_int <- bam(formula = make_formula(fixed_bv_marker_int, random),
-                         data = dat_bv,
-                         nthreads = 8,
-                         method = "fREML")
+       # gam_marker_int <- bam(formula = make_formula(fixed_bv_marker_int, random),
+       #                   data = dat_bv,
+       #                   nthreads = 8,
+       #                   method = "fREML", family = family)
        
        gam_marker100_int <- bam(formula = make_formula(fixed_bv_marker100_int, random),
                              data = dat_bv,
                              nthreads = 8,
-                             method = "fREML")
+                             method = "fREML", family = family)
        
-       gam_kin_marker_int <- bam(formula = make_formula(fixed_bv_kin_marker_int, random),
-                             data = dat_bv,
-                             nthreads = 8,
-                             method = "fREML")
+       # gam_kin_marker_int <- bam(formula = make_formula(fixed_bv_kin_marker_int, random),
+       #                       data = dat_bv,
+       #                       nthreads = 8,
+       #                       method = "fREML", family = family)
        
        gam_kin_marker100_int <- bam(formula = make_formula(fixed_bv_kin_marker100_int, 
                                                            random),
                                  data = dat_bv,
                                  nthreads = 8,
-                                 method = "fREML")
+                                 method = "fREML", family = family)
        
        list_out <- list(list(gam_null = gam_null, 
                              gam_clim_dif = gam_clim_dif, 
-                             gam_kin = gam_kin,
-                             gam_marker = gam_marker,
-                             gam_marker100 = gam_marker100,
-                             gam_kin_marker = gam_kin_marker,
-                             gam_kin_marker100 = gam_kin_marker100,
+                          #   gam_kin = gam_kin,
+                          #   gam_marker = gam_marker,
+                         #    gam_marker100 = gam_marker100,
+                          #  gam_kin_marker = gam_kin_marker,
+                         #     gam_kin_marker100 = gam_kin_marker100,
                              gam_kin_int = gam_kin_int,
-                             gam_marker_int = gam_marker_int,
+                         #    gam_marker_int = gam_marker_int,
                              gam_marker100_int = gam_marker100_int,
-                             gam_kin_marker_int = gam_kin_marker_int,
+                          #   gam_kin_marker_int = gam_kin_marker_int,
                              gam_kin_marker100_int = gam_kin_marker100_int))
        
        names(list_out) <- climate_var
@@ -663,8 +687,8 @@ climate_vars <- c(climate_vars, "random")
   # save(gam_mods, file = paste0("./output/gam_mods_out_", Sys.Date(), ".Rdata"))
  
   # load("./output/gam_mods_out_2018-04-19.Rdata")
-   
- 
+     
+     
  # Extract AIC values from each model
    AIC_scores <- numeric()
    for(mod in names(gam_mods[[1]])){
@@ -681,91 +705,7 @@ climate_vars <- c(climate_vars, "random")
    
    AIC_df %>%
      arrange(climate_var, AIC)   
-   
-   
-   
-## Testing model selection 
-   library(MuMIn)
-   
-   AICc(gam_mods$tmax_sum$gam_clim_dif)
-   AIC(gam_mods$tmax_sum$gam_clim_dif)
-   
-   test = model.sel(gam_mods$tmax_sum)
-   
-   test = subset(test, delta < 5)
-   
-   plot(test)
-   
-    avg = model.avg(test)
-    
-    predictions = dat_bv[1, ]
-    
-    predictions <- predictions %>%
-      mutate_if(is.numeric, round)
-    
-    ## Use average seedling height
-    predictions$height_2014 <-  0
-    
-    ## Set Chico as the baseline site
-    predictions$site <- "Chico"
-    
-    # Set section block - one of most common blocks
-    predictions$section_block <- "Block1_1"
-    
-    # Set accession
-    predictions$accession <- "1"
-    
-   predictions <-  expand.grid(height_2014 = 0,
-                site = "Chico",
-                accession = "1",
-                section_block = "Block1_1",
-                tmax_sum_dif = seq(-3, 3, by = .1),
-                bv.tmax_sum.kin = 0,
-                bv.tmax_sum.kin.marker = 0,
-                bv.tmax_sum.kin.marker100 = 0,
-                bv.tmax_sum.marker = seq(-5, 1, by = .1),
-                bv.tmax_sum.marker100 = 0)
-   
-   predictions
-
-   predictions$pred <-  predict(avg, newdata = predictions)
-   
-   plot(predictions$tmax_sum_dif, predictions$pred)
-
-     ggplot(predictions, aes(tmax_sum_dif, bv.tmax_sum.marker, z = pred)) + geom_tile(aes(fill =  pred)) + stat_contour(bins = 15) + theme_bw()
-   
-     
-     library(plotly)
-     
-     test = predictions %>%
-       dplyr::select(tmax_sum_dif, bv.tmax_sum.marker, pred) %>%
-     spread(key = tmax_sum_dif, value = pred)
-       
-     test <- as.matrix(test[, -1])
-     
-     plot_ly(z = ~test) %>% layout(
-       title = "Layout options in a 3d scatter plot",
-       scene = list(
-         xaxis = list(title = "tmax_dif"),
-         yaxis = list(title = "bv"),
-         zaxis = list(title = "Prediction")
-       )) %>% 
-       add_surface() 
-   
-   
-   
-  ## Model averaged coefficients 
-   preds_by_model <- sapply(gam_mods$tmax_sum, predict)
-   
-   preds <- preds_by_model %*% Weights(test)
-   
-   plot(dat_bv$height_2017, preds)
-   
-  # Using their predict method 
-   preds2 <- predict(model.avg(test))
-    
-   plot(preds, preds2) # The same as multiplying by the weight
-   
+  
    
  # Extract P values for terms 
    mod_stats <- data.frame(NULL)
@@ -861,14 +801,15 @@ climate_vars <- c(climate_vars, "random")
       
       filename <- paste0("./output/model_visualizations/", var, "_", mod, ".pdf")
       
-      pdf(filename)   
+      pdf(filename, height = 5, width = 7)   
      
        cat("Working on..", var, "...", mod, "...\n")
       
       # With partial residuals
       visreg::visreg(gam_mods[[var]][[mod]],
                      main = paste0(var, " - ", mod),
-                     ylab = "Relative growth rate")
+                     ylab = response_variable,
+                     scale = "response")
       
       # If there is an interaction term
       if(grepl("int", mod)){
@@ -895,7 +836,8 @@ climate_vars <- c(climate_vars, "random")
                  x = xvar, 
                  y = yvar, 
                  plot.type = "persp",
-                 zlab = "Relative growth rate",
+                 scale = "response",
+                 zlab = response_variable,
                  theta = 30) # 4 plot types: image = countour plot, gg = filled contour plot,
                                     # persp = 3d plot, rgl = 3d rotatable plot
         
@@ -904,15 +846,17 @@ climate_vars <- c(climate_vars, "random")
         visreg::visreg2d(gam_mods[[var]][[mod]], 
                          x = xvar, 
                          y = yvar, 
+                         scale = "response",
                          plot.type = "image",
-                         zlab = "Relative growth rate") 
+                         zlab = response_variable) 
       
       } # End interaction IF
 
       # Without partial residuals 
       visreg::visreg(gam_mods[[var]][[mod]],
                      main = paste0(var, " - ", mod), partial = FALSE,
-                     ylab = "Relative growth rate")
+                     ylab = response_variable,
+                     scale = "response")
       
       # Model diagnostics
       gam.check(gam_mods[[var]][[mod]], pch = 19, cex = 0.5)
@@ -983,23 +927,43 @@ climate_vars <- c(climate_vars, "random")
     
     
     # Testing aic tables
-    addWorksheet(wb, "AIC table")
+    addWorksheet(wb, "Tmax_sum AIC tables")
     writeData(wb, 4,
-              x = model.sel(gam_mods$tmax_sum),
-              headerStyle = hs1, borders = "all",
-              withFilter = TRUE,
+              x = round(model.avg(gam_mods$tmax_sum)$msTable, 2),
+              headerStyle = hs1, borders = "all", rowNames = TRUE,
               keepNA = TRUE)
     
-    # 
-    # writeFormula(wb, , startRow = 4
-    #              , x = makeHyperlinkString(sheet = "testing", row = 3, col = 10
-    #                                        , file = system.file("loadExample.xlsx", package = "openxlsx")))
+    # Testing aic tables
+    addWorksheet(wb, "Tmin_winter AIC tables")
+    writeData(wb, 5,
+              x = round(model.avg(gam_mods$tmin_winter)$msTable, 2),
+              headerStyle = hs1, borders = "all", rowNames = TRUE,
+              keepNA = TRUE)
+    
+    # Testing aic tables
+    addWorksheet(wb, "bioclim_04 AIC tables")
+    writeData(wb, 6,
+              x = round(model.avg(gam_mods$bioclim_04)$msTable, 2),
+              headerStyle = hs1, borders = "all", rowNames = TRUE,
+              keepNA = TRUE)
+    
+    
+    # Testing aic tables
+    addWorksheet(wb, "random AIC tables")
+    writeData(wb, 7,
+              x = round(model.avg(gam_mods$random)$msTable, 2),
+              headerStyle = hs1, borders = "all", rowNames = TRUE,
+              keepNA = TRUE)
+   
   
   ## Set column widths
     setColWidths(wb, 1, cols = c(1:50), widths = "auto")
     setColWidths(wb, 2, cols = c(1:50), widths = "auto")
     setColWidths(wb, 3, cols = c(1:50), widths = "auto")
     setColWidths(wb, 4, cols = c(1:50), widths = "auto")
+    setColWidths(wb, 5, cols = c(1:50), widths = "auto")
+    setColWidths(wb, 6, cols = c(1:50), widths = "auto")
+    setColWidths(wb, 7, cols = c(1:50), widths = "auto")
     
   ## Freeze panes
     freezePane(wb, 1, firstRow = TRUE)
@@ -1009,78 +973,283 @@ climate_vars <- c(climate_vars, "random")
     
   ## Save workbook  
     saveWorkbook(wb, paste0("./output/model_summary_", Sys.Date(), ".xlsx"), overwrite = TRUE)
+   
+ 
     
     
     
-    summary(gam_mods[["tmax_sum"]]$gam_marker100)
+
+# Model averaging ---------------------------------------------------------
+
+    
+       
+    
+## Figuring out AIC situation   
+    test <- bam(height_2017 ~ s(height_2014) + site + s(section_block, bs = "re") +
+                  s(accession, bs = "re"), 
+                data = dat_bv,
+                nthreads = 8,
+                method = "fREML",
+                # family = gaussian(link = "log"))
+                family = "tw")
+    #  family = "nb")
+    
+    test2 <- bam(height_2017 ~ s(height_2014)  + s(section_block, bs = "re"), 
+                 data = dat_bv,
+                 nthreads = 8,
+                 method = "fREML",
+                 # family = gaussian(link = "log"))
+                 family = "tw")
+    #  family = "nb")
+    
+    
+    gam.check(test)
+    summary(test)
+    
+    AIC(test)
+    
+    model.sel(test)
+    
+    AICc(test)
+    
+    Weights(c(AIC(test), AIC(test2)))
+    
+    avg <- model.avg(list(test, test2))
+    avg
+    
+    avg <- model.avg(gam_mods$tmax_sum, ct.args  = list(labels = names(gam_mods$tmax_sum)))
+    avg
+    
+    summary(avg)
+    avg$msTable
+    avg$msTable
+
+    cb(avg$msTable)
+    
+    attributes(avg$msTable, "term.codes")
+    
+    
+    
+
+    
+    ## Testing model selection 
+    library(MuMIn)
+    
+    test = model.sel(gam_mods$tmax_sum)
+    
+    test = subset(test, delta < 6) # 6 Suggested in Harrison et al. 2017 peerj -- . Some of the early literature suggested that models were poor (relative to the best model), and might be dismissed if they had Δ>2. This arbitrary cutoff rule is now known to be poor, in general. Models where Δ is in the 2–7 range have some support and should rarely be dismissed (see Fig. 2). Inference can be better based on the model like- lihoods, probabilities, and evidence ratios and, in general, based on all the models in the set. From these quantitative measures one can then assign their own value judgment if they wish
+    
+    plot(test)
+    
+    avg =  model.avg(gam_mods$tmax_sum)
+    
+    predictions = dat_bv[1, ]
+    
+    predictions <- predictions %>%
+      mutate_if(is.numeric, round)
+    
+    ## Use average seedling height
+    predictions$height_2014 <-  0
+    
+    ## Set Chico as the baseline site
+    predictions$site <- "Chico"
+    
+    # Set section block - one of most common blocks
+    predictions$section_block <- "Block1_1"
+    
+    # Set accession
+    predictions$accession <- "1"
+    
+    predictions <-  expand.grid(height_2014 = 0,
+                                site = "Chico",
+                                accession = "1",
+                                section_block = "Block1_1",
+                                tmax_sum_dif = seq(-3, 3, by = .1),
+                                bv.tmax_sum.kin = seq(-5, 1, by = .1),
+                                bv.tmax_sum.kin.marker = 0,
+                                bv.tmax_sum.kin.marker100 = 0,
+                                bv.tmax_sum.marker = 0,
+                                bv.tmax_sum.marker100 = 0)
+    
+    predictions
+    
+    predictions$pred <-  predict(avg, newdata = predictions)
+    
+    plot(predictions$tmax_sum_dif, predictions$pred)
+    
+    ggplot(predictions, aes(tmax_sum_dif, bv.tmax_sum.marker, z = pred)) + geom_tile(aes(fill =  pred)) + stat_contour(bins = 15) + theme_bw()
+    
+    
+    library(plotly)
+    
+    test = predictions %>%
+      dplyr::select(tmax_sum_dif, bv.tmax_sum.marker, pred) %>%
+      spread(key = tmax_sum_dif, value = pred)
+    
+    test <- as.matrix(test[, -1])
+    
+    plot_ly(z = ~test) %>% layout(
+      title = "Layout options in a 3d scatter plot",
+      scene = list(
+        xaxis = list(title = "tmax_dif"),
+        yaxis = list(title = "bv"),
+        zaxis = list(title = "Prediction")
+      )) %>% 
+      add_surface() 
+    
+    
+    
+    ## Model averaged coefficients 
+    preds_by_model <- sapply(gam_mods$tmax_sum, predict)
+    
+    preds <- preds_by_model %*% Weights(test)
+    
+    plot(dat_bv$height_2017, preds)
+    
+    # Using their predict method 
+    preds2 <- predict(model.avg(test))
+    
+    plot(preds, preds2) # The same as multiplying by the weight
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
     
     
     
     
      
+    
+    
+## Visualize model output
+    
+  ## For lab meeting presentation
+    var = "tmax_sum_dif"
+    visreg(gam_mods$tmax_sum$gam_clim_dif, xvar = var, 
+           scale = "response",
+           xtrans = function(x)  (x * scaled_var_sds[var]) + 
+             scaled_var_means[var])
+    abline(v= 0, lty = 2)
+    
+    
+    var = "tmin_winter_dif"
+    visreg(gam_mods$tmin_winter$gam_clim_dif, xvar = var, 
+           scale = "response",
+           xtrans = function(x)  (x * scaled_var_sds[var]) + 
+             scaled_var_means[var])
+    abline(v= 0, lty = 2)
+    
+    var = "bioclim_04_dif"
+    visreg(gam_mods$bioclim_04$gam_clim_dif, xvar = var, 
+           scale = "response",
+           xtrans = function(x)  (x * scaled_var_sds[var]) + 
+             scaled_var_means[var])
+    abline(v= 0, lty = 2)
+    
+    
+    
+  # Interaction plot
+    visreg::visreg2d(gam_mods$tmax_sum$gam_kin_int, 
+                     x = "tmax_sum_dif", 
+                     ylab = "genomic value-tmax_sum",
+                     y = "bv.tmax_sum.kin", 
+                     plot.type = "persp",
+                     scale = "response",
+                     zlab = "height_2017",
+                     theta = 50) 
+    
+    visreg::visreg2d(gam_mods$tmin_winter$gam_kin_int, 
+                     x = "tmin_winter_dif", 
+                     ylab = "genomic value-tmin_winter",
+                     y = "bv.tmin_winter.kin", 
+                     plot.type = "persp",
+                     scale = "response",
+                     zlab = "height_2017",
+                     theta = 50) 
+    
+    visreg::visreg2d(gam_mods$bioclim_04$gam_kin_int, 
+                     x = "bioclim_04_dif", 
+                     ylab = "genomic value-bioclim_04",
+                     y = "bv.bioclim_04.kin", 
+                     plot.type = "persp",
+                     scale = "response",
+                     zlab = "height_2017",
+                     theta = 50) 
 
-# Simulating data ---------------------------------------------------------
-  
-  # To see if able to pick up interaction terms, etc with only 2 garden sites  
     
-  nSites <- 10  
     
-  sim <- expand.grid(accession = 1:350, site = 1:nSites)  
+    
+    
+  # Simulating data ---------------------------------------------------------
   
-  sim <- sim %>%
-    left_join(., data.frame(accession = 1:350, 
-                            tmax_sum = rnorm(n = 350, mean = 0, sd = 1)))
-  
-  tmax_sites <- seq(-3, 3, length.out = nSites)
-  
-  for(site in unique(sim$site)){
-    sim$tmax_sum_site[sim$site == site] <- tmax_sites[site]
-  }
-  
-  sim$tmax_sum_dif <- sim$tmax_sum_site - sim$tmax_sum
-  
-  
-  plot(sim$tmax_sum_dif, sim$tmax_sum)
-  
-  ## simulate growth rates
-  
-  intercept = 0.5
-  
-  sim$rgr <- intercept + 
-              #  .25  * sim$tmax_sum_dif + -.25 * sim$tmax_sum_dif^2 + # Polynomial transfer
-                    -.5 * sim$tmax_sum_dif +
-                    -.5 * sim$tmax_sum +  # Linear effect
-                    -.15 *sim$tmax_sum * sim$tmax_sum_dif + # Interaction effect
-                    rnorm(n = nrow(sim), mean = 0, sd = 1) # Residuals
-  
-  # plot(sim$tmax_sum_dif, y = .25  * sim$tmax_sum_dif + -.25 * sim$tmax_sum_dif^2 +
-  #        -.25 * sim$tmax_sum +  # Linear effect
-  #        -.15 *sim$tmax_sum * sim$tmax_sum_dif)
+  # # To see if able to pick up interaction terms, etc with only 2 garden sites  
+  #   
+  # nSites <- 10  
+  #   
+  # sim <- expand.grid(accession = 1:350, site = 1:nSites)  
   # 
-  
-  pairs.panels(sim[, -c(1,2)])
-  
-  
-  gam1 <- bam(rgr ~ s(tmax_sum_dif) + 
-                    s(tmax_sum),
-              
-              data = sim[sim$site %in% c(3,5),])
-  
-  gam1 <- bam(rgr ~ ti(tmax_sum_dif) + 
-                ti(tmax_sum) +
-                te(tmax_sum_dif, tmax_sum),
-              
-              data = sim[sim$site %in% c(3,8),])
-  
-  summary(gam1)
-  gam.check(gam1)
-  visreg(gam1)
-  visreg(gam1, xvar = "tmax_sum", by = "tmax_sum_dif", overlay = FALSE)
-  
-  
-  plot(sim[sim$site %in% c(3, 5),]$tmax_sum_dif, sim[sim$site %in% c(3, 5),]$tmax_sum)
-  
+  # sim <- sim %>%
+  #   left_join(., data.frame(accession = 1:350, 
+  #                           tmax_sum = rnorm(n = 350, mean = 0, sd = 1)))
+  # 
+  # tmax_sites <- seq(-3, 3, length.out = nSites)
+  # 
+  # for(site in unique(sim$site)){
+  #   sim$tmax_sum_site[sim$site == site] <- tmax_sites[site]
+  # }
+  # 
+  # sim$tmax_sum_dif <- sim$tmax_sum_site - sim$tmax_sum
+  # 
+  # 
+  # plot(sim$tmax_sum_dif, sim$tmax_sum)
+  # 
+  # ## simulate growth rates
+  # 
+  # intercept = 0.5
+  # 
+  # sim$rgr <- intercept + 
+  #             #  .25  * sim$tmax_sum_dif + -.25 * sim$tmax_sum_dif^2 + # Polynomial transfer
+  #                   -.5 * sim$tmax_sum_dif +
+  #                   -.5 * sim$tmax_sum +  # Linear effect
+  #                   -.15 *sim$tmax_sum * sim$tmax_sum_dif + # Interaction effect
+  #                   rnorm(n = nrow(sim), mean = 0, sd = 1) # Residuals
+  # 
+  # # plot(sim$tmax_sum_dif, y = .25  * sim$tmax_sum_dif + -.25 * sim$tmax_sum_dif^2 +
+  # #        -.25 * sim$tmax_sum +  # Linear effect
+  # #        -.15 *sim$tmax_sum * sim$tmax_sum_dif)
+  # # 
+  # 
+  # pairs.panels(sim[, -c(1,2)])
+  # 
+  # 
+  # gam1 <- bam(rgr ~ s(tmax_sum_dif) + 
+  #                   s(tmax_sum),
+  #             
+  #             data = sim[sim$site %in% c(3,5),])
+  # 
+  # gam1 <- bam(rgr ~ ti(tmax_sum_dif) + 
+  #               ti(tmax_sum) +
+  #               te(tmax_sum_dif, tmax_sum),
+  #             
+  #             data = sim[sim$site %in% c(3,8),])
+  # 
+  # summary(gam1)
+  # gam.check(gam1)
+  # visreg(gam1)
+  # visreg(gam1, xvar = "tmax_sum", by = "tmax_sum_dif", overlay = FALSE)
+  # 
+  # 
+  # plot(sim[sim$site %in% c(3, 5),]$tmax_sum_dif, sim[sim$site %in% c(3, 5),]$tmax_sum)
+  # 
     
   
  
