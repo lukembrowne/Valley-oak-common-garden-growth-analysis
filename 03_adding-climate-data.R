@@ -5,35 +5,36 @@
 # Load libraries ----------------------------------------------------------
 
   library(psych)
+  library(factoextra)
 
 
 # Load in climate data ----------------------------------------------------
 
   ## Read in climate data of of maternal trees in the common garden
   ## Should be 659 trees
-  climate_garden_mom <- read_csv("./data/cleaned_data/maternal tree climate data BCM 1950-1981 2018_03_08.csv")
+    climate_garden_mom <- read_csv("./data/cleaned_data/maternal tree climate data BCM 1950-1981 2018_03_08.csv")
   
   ## Rename columns
-  climate_garden_mom <- climate_garden_mom %>%
-    dplyr::select(-Locality) %>%
-    rename(Elevation = `Elevation (m)`) %>%
-    select_all(., tolower)
-  
-  climate_garden_mom
+    climate_garden_mom <- climate_garden_mom %>%
+      dplyr::select(-Locality) %>%
+      rename(Elevation = `Elevation (m)`) %>%
+      select_all(., tolower)
+    
+    climate_garden_mom
   
   ## Read in climate data for GBS trees
-  climate_gbs_mom <- read_csv("./data/cleaned_data/GBS tree climate data BCM 1950-1981 2018_03_08.csv")
-  
-  climate_gbs_mom <- climate_gbs_mom %>%
-    select_all(., tolower)
-  
-  climate_gbs_mom 
-  
-  climate_gbs_mom <- left_join(climate_gbs_mom, 
-                               dplyr::select(gen_dat, gbs_name, accession),
-                               by = c("id" = "gbs_name"))
-  
-  climate_gbs_mom$accession
+    climate_gbs_mom <- read_csv("./data/cleaned_data/GBS tree climate data BCM 1950-1981 2018_03_08.csv")
+    
+    climate_gbs_mom <- climate_gbs_mom %>%
+      select_all(., tolower)
+    
+    climate_gbs_mom 
+    
+    climate_gbs_mom <- left_join(climate_gbs_mom, 
+                                 dplyr::select(gen_dat, gbs_name, accession),
+                                 by = c("id" = "gbs_name"))
+    
+    climate_gbs_mom$accession
   
   ## Merge data to give climate of origin for each seedling
     dat_all_clim <- left_join(dat_all, climate_garden_mom, by = "accession")
@@ -41,17 +42,11 @@
     dim(dat_all_clim)
   
     
-  ## Load in climate of common garden locations - 2010 to 2015
+  ## Load in climate of common garden locations - 2014-2016
     garden_climate <- read_csv("./data/cleaned_data/common garden climate data BCM 2014-2016 2018_03_08.csv")
     glimpse(garden_climate)
 
     
-# Filter down to seedlings with and without GBS data ----------------------
-    
-    ## Filtering down individuals who's moms don't have climate data and has GBS data
-    dat_gbs_only_clim <- dplyr::filter(dat_all_clim, accession %in% climate_gbs_mom$accession)
-    dim(dat_gbs_only_clim)
-
 
 # Choose climate variables ------------------------------------------------
    
@@ -74,50 +69,79 @@
     
 # PCA on climate variables ------------------------------------------------
 
-    library(factoextra)
-
-    clim_pca_home <- prcomp(dat_all_clim[, climate_vars], scale = TRUE)
-    summary(clim_pca_home)
-    
+    # PCA based on climate data of maternal trees in provenance trial
+      clim_pca_home <- prcomp(climate_garden_mom[, climate_vars], scale = TRUE)
+      summary(clim_pca_home)
+      
     
     ## Format as dataframe
-    clim_pca_home_vals <- as.data.frame(clim_pca_home$x)
+      clim_pca_home_vals <- as.data.frame(clim_pca_home$x)
     
     ## Scree plot of PCA
-    fviz_screeplot(clim_pca_home)
+      fviz_screeplot(clim_pca_home)
     
     ## Contributions of each axis
-    fviz_contrib(clim_pca_home, choice = "var", axes = c(1))
-    fviz_contrib(clim_pca_home, choice = "var", axes = c(2))
-    fviz_contrib(clim_pca_home, choice = "var", axes = c(3))
-    fviz_contrib(clim_pca_home, choice = "var", axes = c(4))
-    fviz_contrib(clim_pca_home, choice = "var", axes = c(5))
+      # fviz_contrib(clim_pca_home, choice = "var", axes = c(1))
+      # fviz_contrib(clim_pca_home, choice = "var", axes = c(2))
+      # fviz_contrib(clim_pca_home, choice = "var", axes = c(3))
+      # fviz_contrib(clim_pca_home, choice = "var", axes = c(4))
+      # fviz_contrib(clim_pca_home, choice = "var", axes = c(5))
     
     ## Arrows plot
-    fviz_pca_var(clim_pca_home, axes = c(1,2))
+      fviz_pca_var(clim_pca_home, axes = c(1,2))
     
-    ## Join back to main dataframe
-    dat_all_clim <- bind_cols(dat_all_clim, clim_pca_home_vals)
-    
-    ## Predict PC values at Chico  & IFG based on pca of climate of origin
+    ## Predict PC values for
+    # 1) Seedlings in common garden
+    # 2) Chico  & IFG based on pca of climate of origin
+    # 3) GBS moms
     # Need to be sure that the garden climate variables are scaled first
     
+    dat_all_clim_scaled <- dat_all_clim  
     garden_climate_scaled <- garden_climate # Scaled based on seedling climate of origin!!!
+    climate_gbs_mom_scaled <- climate_gbs_mom
     
     for(var in climate_vars){
+      
+      dat_all_clim_scaled[, var] <- (pull(dat_all_clim_scaled, var) - mean(pull(dat_all_clim, var))) / sd(pull(dat_all_clim, var))
+      
       garden_climate_scaled[, var] <- (pull(garden_climate_scaled, var) - mean(pull(dat_all_clim, var))) / sd(pull(dat_all_clim, var))
+      
+      climate_gbs_mom_scaled[, var] <- (pull( climate_gbs_mom_scaled, var) - mean(pull(dat_all_clim, var))) / sd(pull(dat_all_clim, var))
+      
     }
     
+    dat_all_clim_scaled[, climate_vars]
     garden_climate_scaled[, climate_vars]
+    climate_gbs_mom_scaled[, climate_vars]
+    
+  # Predict PCA values  
+   
+    dat_all_clim_pca_vals <-   as.data.frame(predict(clim_pca_home, dat_all_clim_scaled))
+    dat_all_clim_pca_vals
     
     garden_climate_pca_vals <-   as.data.frame(predict(clim_pca_home, garden_climate_scaled))
     garden_climate_pca_vals
     
-    garden_climate <- bind_cols(garden_climate, garden_climate_pca_vals)
+    climate_gbs_mom_pca_vals <- as.data.frame(predict(clim_pca_home, climate_gbs_mom_scaled))
+    climate_gbs_mom_pca_vals
     
-    ## Add PCs to climate vars
+  # Join back to main dataframes
+    dat_all_clim <- bind_cols(dat_all_clim, dat_all_clim_pca_vals)
+    garden_climate <- bind_cols(garden_climate, garden_climate_pca_vals)
+    climate_gbs_mom <- bind_cols(climate_gbs_mom, climate_gbs_mom_pca_vals)
+    
+    
+    
+  ## Add PCs to list of climate vars
       climate_vars <- c(climate_vars, colnames(garden_climate_pca_vals))
     
+      
+      
+# Filter down to seedlings with and without GBS data ----------------------
+      
+      ## Filtering down individuals who's moms don't have climate data and has GBS data
+      dat_gbs_only_clim <- dplyr::filter(dat_all_clim, accession %in% climate_gbs_mom$accession)
+      dim(dat_gbs_only_clim)
     
 # Calculating difference in climate variables -----------------------------
 
@@ -128,9 +152,17 @@
   ## Calculate difference in climate as ## GARDEN - PROVENANCE
     for(var in climate_vars){
       
+      
+    # For all seedlings    
       dat_all_clim[dat_all_clim$site == "Chico", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "Chico", var]) - dat_all_clim[dat_all_clim$site == "Chico", var]
       
-      dat_all_clim[dat_all_clim$site == "IFG", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "IFG", var]) - dat_all_clim[dat_all$site == "IFG", var]
+      dat_all_clim[dat_all_clim$site == "IFG", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "IFG", var]) - dat_all_clim[dat_all_clim$site == "IFG", var]
+      
+      
+    # For GBS seedlings  
+      dat_gbs_only_clim[dat_gbs_only_clim$site == "Chico", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "Chico", var]) - dat_gbs_only_clim[dat_gbs_only_clim$site == "Chico", var]
+      
+      dat_gbs_only_clim[dat_gbs_only_clim$site == "IFG", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "IFG", var]) - dat_gbs_only_clim[dat_gbs_only_clim$site == "IFG", var]
       
       x = x + 1
     }

@@ -5,9 +5,15 @@
   library(maptools)
   library(qtlcharts)
 
-# Load and quality check data ---------------------------------------------------------------
 
-  response_variable = "height"
+
+# Choose model type -------------------------------------------------------
+
+response_variable = "height"
+# response_variable = "rgr"
+# response_variable = "survival"
+
+# Load and quality check data ---------------------------------------------------------------
     
   ## Load in garden data from 2017 - "Qlobata census measurements 2017"
 
