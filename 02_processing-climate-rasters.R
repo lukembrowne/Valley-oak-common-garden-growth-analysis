@@ -26,6 +26,10 @@
   # dat_mom <- read_tsv("./data/GBS_data/Qlobata_GBS_Rangewide.txt")
   # dat_mom
   
+  ## Samples from Sorel
+    # dat_mom <- read_tsv("~/Desktop/2015rrbs.locations")
+    # dat_mom
+  
 
 ## Get locations of maternal trees in common garden
   dat_mom <- gs_read(gs_key("1DUEV-pqV28D6qJl6vJM6S1VLWbxc9E71afufulDRbIc"), ws = 2)
@@ -108,8 +112,9 @@
   ## Reorder columns so monthly variables are sequential
   dat_mom <- dat_mom[, c(
                         "Locality full name", "Locality", "Sample #","Accession", 
-                         "Latitude", "Longitude", "Elevation (m)", 
+                       #  "Latitude", "Longitude", "Elevation (m)", 
                       #  "ID", "Latitude", "Longitude", "Elevation", 
+                       #"Sample", "Longitude", "Latitude", "Elevation", # For sorel's samples
                          "aet",
                          "cwd", "ppt", "tmin_winter", "tmax_sum", "tmax", "tmin",
                          "ppt_jan","ppt_feb","ppt_mar","ppt_apr","ppt_may","ppt_jun",
@@ -136,15 +141,23 @@
   ## Reorder columns
   dat_mom_final <- dat_mom %>%
     dplyr::select(`Locality`,Accession, Latitude, Longitude, `Elevation (m)`, 
-                  #`ID`, Latitude, Longitude, Elevation,
+                  #`ID`, Latitude, Longitude, Elevation, # For pauls samples
+                 # Sample, Longitude, Latitude, Elevation, # For sorel's samples
                   tmax, tmax_sum, tmin, tmin_winter,
                   ppt, cwd, aet, bioclim_01:bioclim_19, tmax_jan:tmax_dec, 
                   tmin_jan:tmin_dec, ppt_jan:ppt_dec)
   
+  dat_mom_final2 <- dat_mom_final
+  
+  dat_mom_final2 %>%
+    mutate_if(is.numeric, scale)
+  
+  
   ## Write to file
   
-  # write_csv(dat_mom_final, path = "./data/cleaned_data/GBS tree climate data BCM 1950-1981 2018_03_08.csv")
-  # write_csv(dat_mom_final, path = "./data/cleaned_data/GBS tree climate data BCM 1921-1950 2018_03_28.csv")
+  # write_csv(dat_mom_final, path = "./data/cleaned_data/GBS tree climate data BCM 1951-1980 2018_03_08.csv")
+   write_csv(dat_mom_final2 %>%
+               mutate_if(is.numeric, scale), path = "./data/cleaned_data/Sorel tree climate data BCM 1950-1981 2018_05_16.csv")
   
 
 # Read in current BCM climate data for common garden sites ----------------------------------------
