@@ -3,25 +3,13 @@
 # - On combining MAS and GS models: From Lasky 2015
 # each environmental variable tested, we calculated z scores of marker predictions and z scores of kinship predictions and then took the aver- age of the two predictions for each genotype. Accession
 
-# Generalize raster code / predictions for any / all variables
-
-# Add in a PCNM component to breeding models as a covariate to isolate / remove spatial effect?
-
-# Filter out future climate values beyond the scope range esimtated in the gam models
-
-
-# Model type --------------------------------------------------------------
-
- response_variable = "height"
-# response_variable = "rgr"
-# response_variable = "survival"
-
 # Source files ------------------------------------------------------------
 
 source("./01_clean-process-explore-data.R")
 source("./03_adding-climate-data.R")
  
-dim(dat_all)
+dim(dat_all_scaled)
+dim(dat_gbs_only_scaled)
 
 
 # Load libraries ----------------------------------------------------------
@@ -86,17 +74,13 @@ library(rrBLUP) # Calculate kinship matrix
 
     
 ## Adding a random variable
-  gen_dat_clim$random <- rnorm(n = nrow(gen_dat_clim))    
-    
-    
-    
+  gen_dat_clim$random <- rnorm(n = nrow(gen_dat_clim)) 
+  climate_vars <- c(climate_vars, "random")
+  
+
 ## Write a loop that goes through each climate variable and calculates marker and kinship models, calculates the CV accuracy, and saves output into usable formats    
 
 mod_out <- list() # Save list that will hold model outputs and such
-  
-climate_vars <- c(climate_vars, "random")
-
-# Started at 10:14 - takes ~ 1.5 hours per climate variable with 50000 iterations
   
   for(var in climate_vars){
     
@@ -128,15 +112,16 @@ climate_vars <- c(climate_vars, "random")
                               list(X = bglr_gen_scaled, model = "BRR")) # Markers
     
     ## Setting cross validation
-      k_folds <- 10 # Set number of folds
+      k_folds <- 5 # Set number of folds
       folds <- createFolds(y = 1:length(y), k = k_folds)
       
       ## Iterations include burn in
-      n_iter <- 50000
-      n_burn <- 10000
+      n_iter <- 1000
+      n_burn <- 500
       thin <- 5
       
-    # Set output prefixes   
+    # Set output prefixes 
+      prefix_cv <- paste0("./output/BGLR/", var, "_cv_")
       prefix_kin <- paste0("./output/BGLR/", var, "_kin_")
       prefix_marker <- paste0("./output/BGLR/", var, "_marker_")  
       prefix_kinmarker <- paste0("./output/BGLR/", var, "_kinmarker_") 
@@ -155,7 +140,7 @@ climate_vars <- c(climate_vars, "random")
                    nIter = n_iter,
                    burnIn = n_burn,
                    thin = thin,
-                   verbose=F)
+                   verbose=F, saveAt = prefix_cv)
         
         cor_cv <- cor(y[tst], fm$yHat[tst])
     
@@ -497,6 +482,12 @@ climate_vars <- c(climate_vars, "random")
      dat_bv$section_line <- factor(dat_bv$section_line)
      dat_bv$accession <- factor(dat_bv$accession)
      
+     dat_all_scaled$section <- factor(dat_all_scaled$section)
+     dat_all_scaled$section_block <- factor(dat_all_scaled$section_block) 
+     dat_all_scaled$section_row <- factor(dat_all_scaled$section_row)
+     dat_all_scaled$section_line <- factor(dat_all_scaled$section_line)
+     dat_all_scaled$accession <- factor(dat_all_scaled$accession)
+     
   ## Check variance inflation factor
      vif(as.data.frame(dat_bv[, c("height_2014", "rgr", 
                                   "tmax_sum_dif", "bv.tmax_sum.marker")]))
@@ -549,45 +540,45 @@ climate_vars <- c(climate_vars, "random")
            }
        
        ## Set formulas for fixed effects / smoothed terms
-         fixed_null <- paste0(response, " ~ site + s(height_2014)")
+         fixed_null <- paste0(response, " ~ site + section_block + s(height_2014)")
          
-         fixed_clim_dif <- paste0(paste0(response, " ~ site + s(height_2014) + s(", 
+         fixed_clim_dif <- paste0(paste0(response, " ~ site + section_block + s(height_2014) + s(", 
                                        climate_var_dif,")"))
          
-         fixed_bv_kin <- paste0(paste0(response, " ~ site + s(height_2014) + s(", 
+         fixed_bv_kin <- paste0(paste0(response, " ~ site + section_block + s(height_2014) + s(", 
                                         climate_var_dif,") +s(", bv_var_kin, ")"))
          
-         fixed_bv_marker <- paste0(paste0(response, " ~ site + s(height_2014) + s(", 
+         fixed_bv_marker <- paste0(paste0(response, " ~ site + section_block + s(height_2014) + s(", 
                                            climate_var_dif,") +s(", bv_var_marker, ")"))
          
-         fixed_bv_marker100 <- paste0(paste0(response, " ~ site + s(height_2014) + s(", 
+         fixed_bv_marker100 <- paste0(paste0(response, " ~ site + section_block + s(height_2014) + s(", 
                                    climate_var_dif,") +s(", bv_var_marker100, ")"))
          
-        fixed_bv_kin_marker <-  paste0(paste0(response, " ~ site + s(height_2014) + s(",
+        fixed_bv_kin_marker <-  paste0(paste0(response, " ~ site + section_block + s(height_2014) + s(",
                                             climate_var_dif,") +s(", bv_var_kin_marker, ")"))
         
-        fixed_bv_kin_marker100 <-  paste0(paste0(response, " ~ site + s(height_2014) + s(",
+        fixed_bv_kin_marker100 <-  paste0(paste0(response, " ~ site + section_block + s(height_2014) + s(",
                                        climate_var_dif,") +s(", bv_var_kin_marker100, ")"))
        
       ## Interaction models 
-       fixed_bv_kin_int <- paste0(paste0(response, " ~ site + s(height_2014) + te(", 
+       fixed_bv_kin_int <- paste0(paste0(response, " ~ site + section_block + s(height_2014) + te(", 
                               climate_var_dif,") + te(", bv_var_kin, ") + ti(",
                               climate_var_dif, ", ", bv_var_kin, ")"))
-       fixed_bv_marker_int <- paste0(paste0(response, " ~ site + s(height_2014) + te(", 
+       fixed_bv_marker_int <- paste0(paste0(response, " ~ site + section_block + s(height_2014) + te(", 
                                   climate_var_dif,") + te(", bv_var_marker, ") + ti(",
                                   climate_var_dif, ", ", bv_var_marker, ")"))
-       fixed_bv_marker100_int <- paste0(paste0(response, " ~ site + s(height_2014) + te(", 
+       fixed_bv_marker100_int <- paste0(paste0(response, " ~ site + section_block + s(height_2014) + te(", 
                                      climate_var_dif,") + te(", bv_var_marker100, ") + ti(",
                                      climate_var_dif, ", ", bv_var_marker100, ")"))
-     fixed_bv_kin_marker_int <- paste0(paste0(response, " ~ site + s(height_2014) + te(",
-                                climate_var_dif,") + te(", bv_var_kin_marker, ") + ti(",
-                                 climate_var_dif, ", ", bv_var_kin_marker, ")"))
-     fixed_bv_kin_marker100_int <- paste0(paste0(response, " ~ site + s(height_2014) + te(",
-                                       climate_var_dif,") + te(", bv_var_kin_marker100, ") + ti(",
-                                       climate_var_dif, ", ", bv_var_kin_marker100, ")"))
+       fixed_bv_kin_marker_int <- paste0(paste0(response, " ~ site + section_block + s(height_2014) + te(",
+                                  climate_var_dif,") + te(", bv_var_kin_marker, ") + ti(",
+                                   climate_var_dif, ", ", bv_var_kin_marker, ")"))
+       fixed_bv_kin_marker100_int <- paste0(paste0(response, " ~ site + section_block + s(height_2014) + te(",
+                                         climate_var_dif,") + te(", bv_var_kin_marker100, ") + ti(",
+                                         climate_var_dif, ", ", bv_var_kin_marker100, ")"))
        
        # Formula for random effects
-       random <-  '+ s(section_block, bs="re")  + s(accession, bs = "re")'
+       random <-  '+ s(accession, bs = "re")'
        
 
      ## Convert fixed and random parts of formula to actual formula objetc
@@ -606,6 +597,12 @@ climate_vars <- c(climate_vars, "random")
                         data = dat_bv,
                         nthreads = 8,
                         method = "fREML", family = family)
+       
+       # With all 5,000+ seedlings
+       gam_clim_dif_all <- bam(formula = make_formula(fixed_clim_dif, random),
+                               data = dat_all_scaled,
+                               nthreads = 8,
+                               method = "fREML", family = family)
        
        # gam_kin <- bam(formula = make_formula(fixed_bv_kin, random),
        #                data = dat_bv,
@@ -662,6 +659,7 @@ climate_vars <- c(climate_vars, "random")
        
        list_out <- list(list(gam_null = gam_null, 
                              gam_clim_dif = gam_clim_dif, 
+                             gam_clim_dif_all = gam_clim_dif_all,
                           #   gam_kin = gam_kin,
                           #   gam_marker = gam_marker,
                          #    gam_marker100 = gam_marker100,
@@ -682,7 +680,11 @@ climate_vars <- c(climate_vars, "random")
      } # End climate vars loop 
      
      gam_mods <- unlist(gam_mods, recursive = FALSE)
+ 
      
+     
+     
+         
  # Save gam mods
   # save(gam_mods, file = paste0("./output/gam_mods_out_", Sys.Date(), ".Rdata"))
  
