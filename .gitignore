@@ -12,4 +12,6 @@
 *.Rproj
 .httr-oauth
 /gemma
-
+/manuscript
+*.sublime-project
+*.sublime-workspace
