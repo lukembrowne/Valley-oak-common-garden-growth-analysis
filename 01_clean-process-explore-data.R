@@ -4,11 +4,10 @@
   library(googlesheets)
   library(maptools)
   library(qtlcharts)
-  
-
 
 # Load and quality check data ---------------------------------------------------------------
 
+  response_variable = "height"
     
   ## Load in garden data from 2017 - "Qlobata census measurements 2017"
 
@@ -135,10 +134,9 @@
         }
       }
       
-      
       #### Round height values to the nearest 5
-      dat_all$height_2015 <- round(dat_all$height_2015 / 5) * 5
-      dat_all$height_2017 <- round(dat_all$height_2017 / 5) * 5
+      # dat_all$height_2015 <- round(dat_all$height_2015 / 5) * 5
+      # dat_all$height_2017 <- round(dat_all$height_2017 / 5) * 5
       
       ## Calculate height difference
       dat_all$height_dif <- dat_all$height_2017 - dat_all$height_2015
@@ -234,7 +232,6 @@
     
       
     ## Join individual names and genotype data and subset to those that are in the common garden
-
     gen_dat <- dplyr::left_join(dplyr::select(sample_key, gbs_name, accession),
                                 dplyr::bind_cols(indv, genotypes),
                                                  by = c("gbs_name" = "ID")) 
@@ -247,8 +244,7 @@
       filter(gbs_name %in% indv$ID)
   
       
-      
-  
+    
 # Filtering data ----------------------------------------------------------
       
     ## Remove inviduals without an accession or progeny number
@@ -296,16 +292,8 @@
       ## Filter out individuals without an estimated RGR
        dat_all <- dplyr::filter(dat_all, !is.na(rgr))
       }
-      
-      
-  ## Filtering out individuals without genetic data
-      ## This happens again in 03 adding climate script to filter out moms who don't have climate data!
-      dat_all <- dplyr::filter(dat_all, accession %in% gen_dat$accession)    
-      
-      
-    ## Filtering based on survival  
-      
 
-    dim(dat_all)
+    ## Filtering based on survival  
+      dim(dat_all)
   
 
