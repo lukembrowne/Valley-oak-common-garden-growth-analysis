@@ -7,7 +7,6 @@
   library(psych)
   library(factoextra)
 
-
 # Load in climate data ----------------------------------------------------
 
   ## Read in climate data of of maternal trees in the common garden
@@ -36,6 +35,12 @@
     
     climate_gbs_mom$accession
   
+      
+  ## Add random climate variable for testing
+    climate_gbs_mom$random <- rnorm(n = nrow(climate_gbs_mom))
+    climate_garden_mom$random <- rnorm(n = nrow(climate_garden_mom))
+    
+    
   ## Merge data to give climate of origin for each seedling
     dat_all_clim <- left_join(dat_all, climate_garden_mom, by = "accession")
     glimpse(dat_all_clim)
@@ -45,6 +50,9 @@
   ## Load in climate of common garden locations - 2014-2016
     garden_climate <- read_csv("./data/cleaned_data/common garden climate data BCM 2014-2016 2018_03_08.csv")
     glimpse(garden_climate)
+    
+    # Add random variable
+    garden_climate$random <- rnorm(n = nrow(garden_climate))
 
     
 
@@ -54,6 +62,7 @@
     ## Except we are excluding AET because it is very strongly correlated with cwd
     climate_vars <- c("tmax_sum",
                       "tmin_winter",
+                      "random",
                       #  "tmax",
                       #"tmin",
                       # "latitude",
@@ -70,7 +79,8 @@
 # PCA on climate variables ------------------------------------------------
 
     # PCA based on climate data of maternal trees in provenance trial
-      clim_pca_home <- prcomp(climate_garden_mom[, climate_vars], scale = TRUE)
+      clim_pca_home <- prcomp(climate_garden_mom[, 
+                                                 climate_vars[-which(climate_vars == "random")]], scale = TRUE)
       summary(clim_pca_home)
       
     

@@ -72,11 +72,6 @@ library(rrBLUP) # Calculate kinship matrix
     # Check to see if any rows are all 0s
     sum(apply(A, 1, function(x) all(x == 0)))
 
-    
-## Adding a random variable
-  gen_dat_clim$random <- rnorm(n = nrow(gen_dat_clim)) 
-  climate_vars <- c(climate_vars, "random")
-  
 
 ## Write a loop that goes through each climate variable and calculates marker and kinship models, calculates the CV accuracy, and saves output into usable formats    
 
@@ -116,8 +111,8 @@ mod_out <- list() # Save list that will hold model outputs and such
       folds <- createFolds(y = 1:length(y), k = k_folds)
       
       ## Iterations include burn in
-      n_iter <- 1000
-      n_burn <- 500
+      n_iter <- 500
+      n_burn <- 250
       thin <- 5
       
     # Set output prefixes 
@@ -242,7 +237,7 @@ mod_out <- list() # Save list that will hold model outputs and such
 # load("./output/mod_out_2018-04-19.Rdata") # 50,000 iter; includes precip variables
 # load("./output/mod_out_2018-05-01.Rdata") # 50,000 iter; includes temp + lat, long, elev, inner join
 # load("./output/mod_out_2018-05-08.Rdata") # 50,000 iter; tmax_sum, tmax_winter, bioclim_04, random
- 
+
  
 # Check out trace plots for convergance
  samps <- list.files("./output/BGLR/", full.names = TRUE)
@@ -463,11 +458,6 @@ mod_out <- list() # Save list that will hold model outputs and such
   dat_bv <- left_join(dat_all_scaled, bvs, by = "accession")
   dim(dat_bv)
   
-  # Add in random climate variable
-    dat_bv<- left_join(dat_bv, dplyr::select(gen_dat_clim, accession, random))
-  
-    dim(dat_bv)
-  
   # Check for missing data in breeding values - there shouldn't be any
    dat_bv %>%
       filter(is.na(bv.tmax_sum.marker)) %>%
@@ -533,11 +523,8 @@ mod_out <- list() # Save list that will hold model outputs and such
          bv_var_kin_marker <- paste0("bv.", climate_var, ".kin.marker")
          bv_var_kin_marker100 <- paste0("bv.", climate_var, ".kin.marker100")
          
-           if(climate_var != "random"){
-             climate_var_dif <- paste0(climate_var, "_dif")
-           } else {
-             climate_var_dif = "random" # For random variable only
-           }
+        # Add dif suffix  
+           climate_var_dif <- paste0(climate_var, "_dif")
        
        ## Set formulas for fixed effects / smoothed terms
          fixed_null <- paste0(response, " ~ site + section_block + s(height_2014)")
@@ -681,15 +668,12 @@ mod_out <- list() # Save list that will hold model outputs and such
      
      gam_mods <- unlist(gam_mods, recursive = FALSE)
  
-     
-     
-     
-         
+      
  # Save gam mods
   # save(gam_mods, file = paste0("./output/gam_mods_out_", Sys.Date(), ".Rdata"))
  
   # load("./output/gam_mods_out_2018-04-19.Rdata")
-     
+  # load("./output/gam_mods_out_2018-05-16.Rdata")   
      
  # Extract AIC values from each model
    AIC_scores <- numeric()
@@ -761,7 +745,7 @@ mod_out <- list() # Save list that will hold model outputs and such
      mutate(parameter_general = case_when(
        grepl(pattern = "ti\\(", parameter) ~ "interaction",
        grepl(pattern = "_dif", parameter) ~ "climate_transfer",
-       grepl(pattern = "random)", parameter) ~ "climate_transfer",
+      # grepl(pattern = "random)", parameter) ~ "climate_transfer",
        grepl(pattern = "\\.kin)", parameter) ~ "kinship",
        grepl(pattern = "\\.kin\\.marker)", parameter) ~ "kin_marker",
        grepl(pattern = "\\.kin\\.marker100)", parameter) ~ "kin_marker",
@@ -816,8 +800,8 @@ mod_out <- list() # Save list that will hold model outputs and such
       # If there is an interaction term
       if(grepl("int", mod)){
         
-      # If not random variable, paste on the suffix _dif  
-        xvar <- ifelse(grepl("random", var), var, paste0(var, "_dif")) # climate var
+      # Paste on the suffix _dif  
+        xvar <- paste0(var, "_dif") # climate var
        
          # Set BV var
         if(grepl("gam_kin_int", mod)){
