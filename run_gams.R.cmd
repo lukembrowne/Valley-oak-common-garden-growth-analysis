@@ -18,7 +18,7 @@
 #  program output  = Specified by user program
 #  Threaded:     8-way threaded
 #  Resources requested
-#$ -l h_data=2048M,h_rt=1:00:00
+#$ -l h_data=4096M,h_rt=2:30:00
 # #
 #  Name of application for log
 #$ -v QQAPP=job
@@ -38,7 +38,7 @@
 # Interval needs to match what is set in Job array indexes
 
 set interval=100
-set climate_var_dif='tmin_winter_dif'
+set climate_var_dif='tmax_sum_dif'
 
 
 # Initialization for serial execution
