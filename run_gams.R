@@ -1,7 +1,3 @@
-
-# Make good name for gam_list - unique to task
-# Rename hello R based on cliamte variable or something?
-
 # Read in command line arguments
 	args<-commandArgs(trailingOnly=TRUE)
 
@@ -16,7 +12,7 @@
 	library(tidyverse)
 
 # Load data
- load("../gam_cluster.Rdata")
+ load("../gam_cluster_2018-05-23.Rdata")
 
 
 # Initialize variables
@@ -29,14 +25,8 @@
        return(formula(formula(enquote(paste0(fixed, random)))))
      }
 
-# Formula for fixed effects
-     fixed_effects <- paste0(paste0("height_2017 ~ site + s(height_2014) + te(", 
-                              climate_var_dif,") + te(snp_dbl, k = 3) + ti(",
-                              climate_var_dif, ", snp_dbl, k = 3)"))
-
 # Formula for random effects
        random_effects <-  '+ s(accession, bs = "re") + s(section_block, bs = "re")'
-
 
 
 # Loop through snps by index based on task id
@@ -52,12 +42,17 @@ for(snp_index in task_id:(task_id + interval - 1)){
   start_time <- Sys.time()
 
 # Choose snp
- snp <- snp_col_names[snp_index]
+ snp <- paste0("snp_", snp_col_names[snp_index])
  
- cat("Working on: ", snp, "...\n" )
+ cat("Working on: ", snp, "... number: ", x, " ...\n" )
+
+
+# Formula for fixed effects
+    fixed_effects <- paste0(paste0("height_2017 ~ site + s(height_2014) + te(", 
+                                   climate_var_dif,") + te(",snp,",k = 3) + ti(",
+                                   climate_var_dif, ",", snp,", k = 3)"))
+
   
-   #dat_snp$snp_factor <- factor(pull(dat_snp, snp))
-   dat_snp$snp_dbl <- pull(dat_snp, snp)
   
    gam_snp = bam(formula = make_formula(fixed_effects, random_effects),
                  data = dat_snp, 
@@ -66,7 +61,7 @@ for(snp_index in task_id:(task_id + interval - 1)){
                  method = "fREML", family = "tw")
 
   # Attach data so that we can use visreg later if we need
-  gam_snp$data <- dat_snp
+   # gam_snp$data <- dat_snp
 
   # Save into list
    gam_list[[x]] <- gam_snp
@@ -115,7 +110,16 @@ for(snp_index in task_id:(task_id + interval - 1)){
             aic = unlist(lapply(gam_list, function(x) x$aic)),
             
             # P value of interaction term
-            p_val_int = unlist(lapply(gam_list_summary, function(x) x$s.table[paste0("ti(", climate_var_dif, ",snp_dbl)"), "p-value"]))
+            ## IF ORDER OF VARIABLES IN MODEL EVER CHANGES - THIS NEEDS TO CHANGE TOO!!
+             p_val_int = unlist(lapply(gam_list_summary, function(x) x$s.table[4, "p-value"]))
+
+            # Percent change in height with 3 degree increase
+            # height_change_3_deg = unlist(lapply(lapply(gam_list, function(x) predict(x, 
+            #                                      newdata = predictions_3deg  %>% 
+            #                                        dplyr::distinct(get(climate_var_dif), 
+            #                                                        .keep_all = TRUE), 
+            #                                      type = "response")),
+            #                   function(x) ((x[2] - x[1]) / x[1])*100))
             
             )
  
