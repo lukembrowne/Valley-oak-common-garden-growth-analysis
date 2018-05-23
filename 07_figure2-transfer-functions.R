@@ -133,13 +133,13 @@
     if(!is.null(var2)){
     
       par(mar=c(1,1,1,1)+0.1)
-     
+      
     # Make list of unique increasing x and y values for axes   
       pred_dat2 <- pred_dat %>%
-        select(climate_var_dif) %>%
+        dplyr::select(climate_var_dif) %>%
         unique() %>%
         bind_cols(., pred_dat %>%
-                    select(var2) %>%
+                    dplyr::select(var2) %>%
                     unique())
   
       # Munge into persp format - an x*y matrix with z values
@@ -174,18 +174,28 @@
         # Recode facet z-values into color indices
         facetcol <- cut(zfacet, nbcol)
       
-      persp(x = pull(pred_dat2, climate_var_dif),
+     persp(x = pull(pred_dat2, climate_var_dif),
             y = pull(pred_dat2, var2),
             z = persp_format,
             zlab = "\n\n5 year height (cm)", 
             xlab = paste0("\n", climate_var_dif),
             ylab = paste0("\n", var2),
-            theta = 50, phi = 15,
+            theta = 30, phi = 15,
             d = 2,  
             ticktype = "detailed",
             border = rgb(0,0,0, alpha = 50, maxColorValue = 255),
           #  col = rgb(35, 139, 35, alpha = 175,  maxColorValue = 255),
-          col = color[facetcol])
+          col = color[facetcol]) -> p
+     
+     base_data2 <- base_data %>%
+       mutate(!!climate_var_dif := back_transform(x = get(climate_var_dif),
+                                                var = climate_var_dif,
+                                                means = means,
+                                                sds = sds))
+
+     points(trans3d(x = pull(base_data2, climate_var_dif),
+                     y = pull(base_data2, var2),
+                     z = base_data$height_2017, pmat = p), pch = 19, cex = .25)
       
     } # End 3d plot IF
   
@@ -212,6 +222,12 @@
   plot_pred(climate_var_dif = "tmax_sum_dif", 
             var2 = "bv.tmax_sum.kin",
             mod = gam_mods$tmax_sum$gam_kin_int,
+            base_data = dat_bv,
+            means = scaled_var_means_gbs_only, sds = scaled_var_sds_gbs_only)
+  
+  plot_pred(climate_var_dif = "tmax_sum_dif", 
+            var2 = "bv.tmax_sum.kin.marker100",
+            mod = gam_mods$tmax_sum$gam_kin_marker100_int,
             base_data = dat_bv,
             means = scaled_var_means_gbs_only, sds = scaled_var_sds_gbs_only)
   
@@ -245,5 +261,181 @@
 
   dev.off()
   
- 
   
+ test =  bam(height_2017 ~ site + section_block + s(height_2014) + te(tmax_sum_dif) + 
+        te(bv.PC1.kin) + ti(tmax_sum_dif, bv.PC1.kin) + 
+        s(accession, bs = "re"), data = dat_bv, 
+        nthreads = 8,
+        method = "fREML", family = "tw")
+ 
+ summary(test)
+ 
+ visreg2d(test, xvar = "tmax_sum_dif", yvar = "bv.PC1.kin", scale = "response", plot.type = "persp")
+ 
+ AICc(gam_mods$tmax_sum$gam_clim_dif)
+ AICc(test)
+ 
+ 
+
+# Testing out individual SNP models ---------------------------------------------------------
+
+ 
+ dat_bv2 <- dat_bv
+ dat_bv2$accession <- as.numeric(as.character(dat_bv$accession))
+ 
+ dat_snp = left_join(dat_bv2, bind_cols(gen_dat_clim[, "accession"],
+                                        bglr_gen_scaled), 
+                     by = "accession")
+ 
+ dat_snp$accession <- factor(dat_snp$accession)
+ 
+
+ counts <- apply(dat_snp[, snp_col_names], 2, function(x) length(table(x)))
+ 
+ snp_col_names_sub <- snp_col_names[counts >= 3 ]
+ 
+ save(dat_snp, snp_col_names, file = "./output/gam_cluster.Rdata")
+ 
+ length(snp_col_names)
+ 
+ 
+ 
+ 
+ # Initialize variables
+ gam_list <- list()
+ x = 1
+ 
+ 
+ ## Set up formulas for gam models
+ climate_var_dif = "tmax_sum_dif"
+ 
+ 
+ ## Convert fixed and random parts of formula to actual formula objetc
+ # No idea why we need to call formula twice, but it works
+ make_formula <- function(fixed, random){
+   return(formula(formula(enquote(paste0(fixed, random)))))
+ }
+ 
+ # Formula for fixed effects
+ fixed_effects <- paste0(paste0("height_2017 ~ site + s(height_2014) + te(", 
+                                climate_var_dif,") + te(snp_dbl, k = 3) + ti(",
+                                climate_var_dif, ", snp_dbl, k = 3)"))
+ 
+ # Formula for random effects
+ random_effects <-  '+ s(accession, bs = "re") + s(section_block, bs = "re")'
+ 
+ task_id = 10; 
+ interval = 10
+ 
+ # Loop through snps by index based on task id
+ for(snp_index in task_id:(task_id + interval - 1)){
+   
+   # For timing loops
+   start_time <- Sys.time()
+   
+   # Choose snp
+   snp <- snp_col_names_sub[snp_index]
+   
+   cat("Working on: ", snp, "...\n" )
+   
+   #dat_snp$snp_factor <- factor(pull(dat_snp, snp))
+   dat_snp$snp_dbl <- pull(dat_snp, snp)
+   
+   gam_snp = bam(formula = make_formula(fixed_effects, random_effects),
+                 data = dat_snp, 
+                 discrete = TRUE,
+                 nthreads = 8,
+                 method = "fREML", family = "tw")
+   
+   # Save into list
+   gam_list[[x]] <- gam_snp
+   names(gam_list)[x] <- snp
+   
+   x = x + 1
+   
+   end_time <- Sys.time()
+   
+   cat("This loop took: ")
+   print(end_time - start_time)
+   
+   # Save individual .Rdata file for each model
+   cat("Saving gam model to file... \n")
+   
+   gam_name <- paste0("gam_", climate_var_dif, "_", "snp")
+   assign(x = gam_name, value = gam_snp) # Assign model the name
+   
+   save(list = gam_name, file = paste0("./", gam_name, ".Rdata"))
+   
+ }
+ 
+ # Model summaries
+ 
+ # SNP name
+ 
+ 
+ # Run summary for each model
+ gam_list_summary <- lapply(gam_list, summary)
+ 
+ gam_mod_summary_df <- data.frame(
+   
+            # climate var
+            climate_var = climate_var_dif,
+   
+            # Snp name
+            snp = names(gam_list),
+            # Deviance explained
+            dev_explained = unlist(lapply(gam_list_summary, function(x) x$dev.expl)),
+            
+            # Estimated degrees of freedom
+            edf = unlist(lapply(gam_list, function(x) sum(x$edf))),
+            
+            # AIC
+            aic = unlist(lapply(gam_list, function(x) x$aic)),
+            
+            # P value of interaction term
+            p_val_int = unlist(lapply(gam_list_summary, function(x) x$s.table[paste0("ti(", climate_var_dif, ",snp_dbl)"), "p-value"]))
+            
+            )
+ 
+ gam_mod_summary_df
+ 
+ write.csv(gam_mod_summary_df, file = "./")
+
+ 
+ 
+ 
+ 
+ 
+ snp_top <- "1_243802"
+ 
+ summary(sig_gams[[snp_top]])
+ 
+ plot(dat_snp$tmax_sum_dif, pull(dat_snp, snp_top))
+ 
+ visreg(sig_gams[[snp_top]], xvar = "tmax_sum_dif", by = "snp_dbl", scale = "response")
+ 
+
+ visreg2d(sig_gams[[snp_top]], xvar = "tmax_sum_dif", yvar = "snp_dbl", scale = "response", plot.type = "persp", theta = 45, phi = 15)
+ 
+ plot(dat_snp$tmax_sum_dif, pull(dat_snp, snp_top))
+ 
+ pairs.panels(dplyr::select(dat_snp, snp_top, climate_vars))
+ 
+ AIC(sig_gams[[snp_top]])
+ AIC(gam_base)
+ 
+
+ gam_base = bam(height_2017 ~ 
+                 site +
+                 + s(height_2014, k = 5) 
+               + s(tmax_sum_dif) 
+               + s(section_block, bs = "re")
+               + s(accession, bs = "re"), 
+               data = dat_snp, 
+               discrete = TRUE, nthreads = 8,
+               method = "fREML", family = "tw")
+ 
+ visreg(gam_base, scale = "response")
+ AIC(gam_base)
+ 
+ 
