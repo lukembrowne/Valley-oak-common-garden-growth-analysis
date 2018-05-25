@@ -5,28 +5,28 @@
 
 # Source files ------------------------------------------------------------
 
-source("./01_clean-process-explore-data.R")
-source("./03_adding-climate-data.R")
- 
-dim(dat_all_scaled)
-dim(dat_gbs_only_scaled)
+  source("./01_clean-process-explore-data.R")
+  source("./03_adding-climate-data.R")
+   
+  dim(dat_all_scaled)
+  dim(dat_gbs_only_scaled)
 
 
 # Load libraries ----------------------------------------------------------
 
-library(gamm4)
-library(lmerTest)
-library(caret)
-library(usdm) # to check for vif
-library(flashpcaR)
-library(parallel)
-library(cowsay)
-library(visreg)
-library(rtf)
-library(openxlsx)
-
-library(BGLR) # For genomic selection models - tutorials here: https://github.com/gdlc/BGLR-R
-library(rrBLUP) # Calculate kinship matrix
+  library(gamm4)
+  library(lmerTest)
+  library(caret)
+  library(usdm) # to check for vif
+  library(flashpcaR)
+  library(parallel)
+  library(cowsay)
+  library(visreg)
+  library(rtf)
+  library(openxlsx)
+  
+  library(BGLR) # For genomic selection models - tutorials here: https://github.com/gdlc/BGLR-R
+  library(rrBLUP) # Calculate kinship matrix
 
 
 # Genomic selection models to estimate breeding values  --------------------------------
@@ -40,7 +40,8 @@ library(rrBLUP) # Calculate kinship matrix
   
   # Joining climate and genetic data
   # Do an inner join to avoid having GBS moms with climate data but poor genotyping data
-    gen_dat_clim <- inner_join(climate_gbs_mom, dplyr::select(gen_dat, -accession), 
+    gen_dat_clim <- inner_join(climate_gbs_mom, 
+                               dplyr::select(gen_dat, -accession), 
                               by = c("id" = "gbs_name"))
     dim(gen_dat_clim)
 
@@ -111,8 +112,8 @@ mod_out <- list() # Save list that will hold model outputs and such
       folds <- createFolds(y = 1:length(y), k = k_folds)
       
       ## Iterations include burn in
-      n_iter <- 500
-      n_burn <- 250
+      n_iter <- 50000
+      n_burn <- 10000
       thin <- 5
       
     # Set output prefixes 
@@ -232,7 +233,7 @@ mod_out <- list() # Save list that will hold model outputs and such
 
 
 ## Save model output?
- # save(mod_out, file = paste0("./output/mod_out_", Sys.Date(), ".Rdata"))
+  save(mod_out, file = paste0("./output/mod_out_", Sys.Date(), ".Rdata"))
 
 # load("./output/mod_out_2018-04-19.Rdata") # 50,000 iter; includes precip variables
 # load("./output/mod_out_2018-05-01.Rdata") # 50,000 iter; includes temp + lat, long, elev, inner join
@@ -388,7 +389,7 @@ mod_out <- list() # Save list that will hold model outputs and such
   
   var = "latitude"
   resids <- mod_out[[var]]$mod_kin$y - (mod_out[[var]]$mod_kin$ETA[[1]]$u + mod_out[[var]]$mod_kin$mu)
-  View(bind_cols(dplyr::select(gen_dat_clim, id, var), data.frame(resids = resids)))
+  # View(bind_cols(dplyr::select(gen_dat_clim, id, var), data.frame(resids = resids)))
 
       
 # Calculate breeding values for kin-marker models
@@ -455,7 +456,7 @@ mod_out <- list() # Save list that will hold model outputs and such
   
 # Correlating BVs with growth data ----------------------------------------
   
-  dat_bv <- left_join(dat_all_scaled, bvs, by = "accession")
+  dat_bv <- left_join(dat_gbs_only_scaled, bvs, by = "accession")
   dim(dat_bv)
   
   # Check for missing data in breeding values - there shouldn't be any
@@ -465,13 +466,16 @@ mod_out <- list() # Save list that will hold model outputs and such
       group_by(accession) %>%
       count()
    
-   # Set up factors 
+   # Set up factors
+   
+    # Seedlings with GBS data
      dat_bv$section <- factor(dat_bv$section)
      dat_bv$section_block <- factor(dat_bv$section_block) 
      dat_bv$section_row <- factor(dat_bv$section_row)
      dat_bv$section_line <- factor(dat_bv$section_line)
      dat_bv$accession <- factor(dat_bv$accession)
      
+    # All seedlings 
      dat_all_scaled$section <- factor(dat_all_scaled$section)
      dat_all_scaled$section_block <- factor(dat_all_scaled$section_block) 
      dat_all_scaled$section_row <- factor(dat_all_scaled$section_row)
@@ -482,22 +486,14 @@ mod_out <- list() # Save list that will hold model outputs and such
      vif(as.data.frame(dat_bv[, c("height_2014", "rgr", 
                                   "tmax_sum_dif", "bv.tmax_sum.marker")]))
 
-# For each climate variable fit 5 game models
-   # 1) Null model with just Height 2014
-   # 2) Model with climate transfer
-   # 3) Model with climate transfer x kinship breeding value
-   # 4) Model with climate transfer x marker breeding value
-   # 5) Model with climate transfer x kin_marker breeding value
-   # 6) Model with climate transver x kinship interaction
-   # 7) Model with climate transfer x marker interaction   
-   # 8) Model with climate transfer x kin_marker interaction
      
- # Loop through climate variables
-     
+# Gam mods loop -----------------------------------------------------------
+
      gam_mods <- list()
      
      x = 1
      
+     # Loop through climate variables
      for(climate_var in climate_vars){
        
        say(paste0("Working on: ", climate_var, " ..."),  "trilobite")
@@ -524,7 +520,7 @@ mod_out <- list() # Save list that will hold model outputs and such
          bv_var_kin_marker100 <- paste0("bv.", climate_var, ".kin.marker100")
          
         # Add dif suffix  
-           climate_var_dif <- paste0(climate_var, "_dif")
+         climate_var_dif <- paste0(climate_var, "_dif")
        
        ## Set formulas for fixed effects / smoothed terms
          fixed_null <- paste0(response, " ~ site + section_block + s(height_2014)")
@@ -567,7 +563,6 @@ mod_out <- list() # Save list that will hold model outputs and such
        # Formula for random effects
        random <-  '+ s(accession, bs = "re")'
        
-
      ## Convert fixed and random parts of formula to actual formula objetc
      # No idea why we need to call formula twice, but it works
      make_formula <- function(fixed, random){
@@ -670,7 +665,7 @@ mod_out <- list() # Save list that will hold model outputs and such
  
       
  # Save gam mods
-  # save(gam_mods, file = paste0("./output/gam_mods_out_", Sys.Date(), ".Rdata"))
+   save(gam_mods, file = paste0("./output/gam_mods_out_", Sys.Date(), ".Rdata"))
  
   # load("./output/gam_mods_out_2018-04-19.Rdata")
   # load("./output/gam_mods_out_2018-05-16.Rdata")   
@@ -871,7 +866,7 @@ mod_out <- list() # Save list that will hold model outputs and such
       # Need to reclass as hyperlink for it to work
       class(mod_stats4$model_visualization) <- "hyperlink"
       
-  #### Out put as excel spreadsheet  
+  #### Output as excel spreadsheet  
   # Header style 
     hs1 <- createStyle(fgFill = "#DCE6F1", textDecoration = "bold",
                        border = "Bottom")
@@ -889,8 +884,6 @@ mod_out <- list() # Save list that will hold model outputs and such
               withFilter = TRUE,
               keepNA = TRUE)
     
-  
-  
     ## Genomic selection CV SCORES  
     addWorksheet(wb, "genomic selection model fits")
     writeData(wb, 2, 
@@ -959,9 +952,6 @@ mod_out <- list() # Save list that will hold model outputs and such
     
   ## Save workbook  
     saveWorkbook(wb, paste0("./output/model_summary_", Sys.Date(), ".xlsx"), overwrite = TRUE)
-   
- 
-    
     
     
 
@@ -1177,67 +1167,64 @@ mod_out <- list() # Save list that will hold model outputs and such
     
   # Simulating data ---------------------------------------------------------
   
-  # # To see if able to pick up interaction terms, etc with only 2 garden sites  
-  #   
-  # nSites <- 10  
-  #   
-  # sim <- expand.grid(accession = 1:350, site = 1:nSites)  
-  # 
-  # sim <- sim %>%
-  #   left_join(., data.frame(accession = 1:350, 
-  #                           tmax_sum = rnorm(n = 350, mean = 0, sd = 1)))
-  # 
-  # tmax_sites <- seq(-3, 3, length.out = nSites)
-  # 
-  # for(site in unique(sim$site)){
-  #   sim$tmax_sum_site[sim$site == site] <- tmax_sites[site]
-  # }
-  # 
-  # sim$tmax_sum_dif <- sim$tmax_sum_site - sim$tmax_sum
-  # 
-  # 
-  # plot(sim$tmax_sum_dif, sim$tmax_sum)
-  # 
-  # ## simulate growth rates
-  # 
-  # intercept = 0.5
-  # 
-  # sim$rgr <- intercept + 
-  #             #  .25  * sim$tmax_sum_dif + -.25 * sim$tmax_sum_dif^2 + # Polynomial transfer
-  #                   -.5 * sim$tmax_sum_dif +
-  #                   -.5 * sim$tmax_sum +  # Linear effect
-  #                   -.15 *sim$tmax_sum * sim$tmax_sum_dif + # Interaction effect
-  #                   rnorm(n = nrow(sim), mean = 0, sd = 1) # Residuals
-  # 
-  # # plot(sim$tmax_sum_dif, y = .25  * sim$tmax_sum_dif + -.25 * sim$tmax_sum_dif^2 +
-  # #        -.25 * sim$tmax_sum +  # Linear effect
-  # #        -.15 *sim$tmax_sum * sim$tmax_sum_dif)
-  # # 
-  # 
-  # pairs.panels(sim[, -c(1,2)])
-  # 
-  # 
-  # gam1 <- bam(rgr ~ s(tmax_sum_dif) + 
-  #                   s(tmax_sum),
-  #             
-  #             data = sim[sim$site %in% c(3,5),])
-  # 
-  # gam1 <- bam(rgr ~ ti(tmax_sum_dif) + 
-  #               ti(tmax_sum) +
-  #               te(tmax_sum_dif, tmax_sum),
-  #             
-  #             data = sim[sim$site %in% c(3,8),])
-  # 
-  # summary(gam1)
-  # gam.check(gam1)
-  # visreg(gam1)
-  # visreg(gam1, xvar = "tmax_sum", by = "tmax_sum_dif", overlay = FALSE)
-  # 
-  # 
-  # plot(sim[sim$site %in% c(3, 5),]$tmax_sum_dif, sim[sim$site %in% c(3, 5),]$tmax_sum)
-  # 
-    
+  # To see if able to pick up interaction terms, etc with only 2 garden sites
+
+  nSites <- 10
+
+  sim <- expand.grid(accession = 1:350, site = 1:nSites)
+
+  sim <- sim %>%
+    left_join(., data.frame(accession = 1:350,
+                            tmax_sum = rnorm(n = 350, mean = 0, sd = 1)))
+
+  tmax_sites <- seq(-3, 3, length.out = nSites)
+
+  for(site in unique(sim$site)){
+    sim$tmax_sum_site[sim$site == site] <- tmax_sites[site]
+  }
+
+  sim$tmax_sum_dif <- sim$tmax_sum_site - sim$tmax_sum
+
+
+  plot(sim$tmax_sum_dif, sim$tmax_sum)
+
+  ## simulate growth rates
+
+  intercept = 0.5
+
+  sim$rgr <- intercept +
+              #  .25  * sim$tmax_sum_dif + -.25 * sim$tmax_sum_dif^2 + # Polynomial transfer
+                    -.5 * sim$tmax_sum_dif +
+                    -.5 * sim$tmax_sum +  # Linear effect
+                    -.15 *sim$tmax_sum * sim$tmax_sum_dif + # Interaction effect
+                    rnorm(n = nrow(sim), mean = 0, sd = 1) # Residuals
+
+  plot(sim$tmax_sum_dif, y = .25  * sim$tmax_sum_dif + -.25 * sim$tmax_sum_dif^2 +
+         -.25 * sim$tmax_sum +  # Linear effect
+         -.15 *sim$tmax_sum * sim$tmax_sum_dif)
   
+  gam1 <- bam(rgr ~ ti(tmax_sum_dif) +
+                ti(tmax_sum) +
+                te(tmax_sum_dif, tmax_sum),
+
+              data = sim[sim$site %in% c(3,8),])
+
+  summary(gam1)
+#  gam.check(gam1)
+  visreg(gam1)
+  visreg(gam1, xvar = "tmax_sum", by = "tmax_sum_dif", overlay = FALSE)
+
+
+  plot(sim[sim$site %in% c(3, 5),]$tmax_sum_dif, sim[sim$site %in% c(3, 5),]$tmax_sum)
+
+  visreg::visreg2d(fit = gam1, 
+                   xvar = tmax_sum_dif, 
+                   yvar = tmax_sum, 
+                   plot.type = "persp",
+                   scale = "response",
+                   theta = 30)
+  
+  visreg2d(gam1)
  
   
 

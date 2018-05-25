@@ -150,7 +150,8 @@
 # Filter down to seedlings with and without GBS data ----------------------
       
       ## Filtering down individuals who's moms don't have climate data and has GBS data
-      dat_gbs_only_clim <- dplyr::filter(dat_all_clim, accession %in% climate_gbs_mom$accession)
+      dat_gbs_only_clim <- dplyr::filter(dat_all_clim,
+                                         accession %in% climate_gbs_mom$accession)
       dim(dat_gbs_only_clim)
     
 # Calculating difference in climate variables -----------------------------

@@ -1,5 +1,6 @@
 
 # Load libraries ----------------------------------------------------------
+  library(plyr)
   library(tidyverse)
   library(googlesheets)
   library(maptools)
@@ -250,6 +251,8 @@ response_variable = "height"
   ## Subset gen_dat to just individuals we have GBS data for
     gen_dat <- gen_dat %>%
       filter(gbs_name %in% indv$ID)
+    
+    dim(gen_dat)
   
       
     
