@@ -30,7 +30,7 @@
 #$ -r n
 #
 #  Job array indexes
-#$ -t 1-14177:100
+#$ -t 1-5000:100
 #
 # 14177 SNPS
 
@@ -79,7 +79,6 @@ set climate_var_dif='tmax_sum_dif'
 # Make directories and copy over R file
 mkdir run_${JOB_ID}_${climate_var_dif}
 cp ./run_gams.R ./run_${JOB_ID}_${climate_var_dif}
-cp ./gam_cluster.Rdata ./run_${JOB_ID}_${climate_var_dif}
 cd ./run_${JOB_ID}_${climate_var_dif}
 mkdir R_output
 mkdir output
