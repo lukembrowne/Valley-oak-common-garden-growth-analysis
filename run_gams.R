@@ -12,14 +12,14 @@
 	library(tidyverse)
 
 # Load data
- load("../gam_cluster_2018-05-23.Rdata")
+ load("../gam_cluster_2018-05-25.Rdata")
 
 
 # Initialize variables
   gam_list <- list()
   x = 1
 
-## Convert fixed and random parts of formula to actual formula objetc
+## Convert fixed and random parts of formula to actual formula object
      # No idea why we need to call formula twice, but it works
      make_formula <- function(fixed, random){
        return(formula(formula(enquote(paste0(fixed, random)))))
@@ -46,11 +46,19 @@ for(snp_index in task_id:(task_id + interval - 1)){
  
  cat("Working on: ", snp, "... number: ", x, " ...\n" )
 
+  # Make sure there's at least 3 levels
+    if(length(table(dat_snp[, snp])) < 3){
+      cat("Skipping because not at least 3 levels... \n")
+      next
+    }
+
 
 # Formula for fixed effects
-    fixed_effects <- paste0(paste0("height_2017 ~ site + s(height_2014) + te(", 
+    fixed_effects <- paste0(paste0("height_2017 ~ site + 
+                                    s(height_2014) + te(", 
                                    climate_var_dif,") + te(",snp,",k = 3) + ti(",
-                                   climate_var_dif, ",", snp,", k = 3)"))
+                                   climate_var_dif, ",", snp,", k = 3) +
+                                   s(PC1_gen) + s(PC2_gen) + s(PC3_gen)"))
 
   
   
@@ -100,14 +108,18 @@ for(snp_index in task_id:(task_id + interval - 1)){
    
             # Snp name
             snp = names(gam_list),
+
             # Deviance explained
             dev_explained = unlist(lapply(gam_list_summary, function(x) x$dev.expl)),
+
+            # Rsquared adjusted
+            r_sq_adj = unlist(lapply(gam_list_summary, function(x) x$r.sq)),
             
             # Estimated degrees of freedom
             edf = unlist(lapply(gam_list, function(x) sum(x$edf))),
             
             # AIC
-            aic = unlist(lapply(gam_list, function(x) x$aic)),
+            aic = unlist(lapply(gam_list, function(x) AIC(x))),
             
             # P value of interaction term
             ## IF ORDER OF VARIABLES IN MODEL EVER CHANGES - THIS NEEDS TO CHANGE TOO!!
@@ -130,17 +142,6 @@ for(snp_index in task_id:(task_id + interval - 1)){
 
 
 ###### LAGNIAPPE
-
-## Creating dat_snp dataframe
-
- # dat_bv2 <- dat_bv
- # dat_bv2$accession <- as.numeric(as.character(dat_bv$accession))
- # 
- # dat_snp = left_join(dat_bv2, bind_cols(gen_dat_clim[, "accession"],
- #                                        bglr_gen_scaled), 
- #                     by = "accession")
- # 
- # dat_snp$accession <- factor(dat_snp$accession)
 
 
 
