@@ -48,11 +48,20 @@ library(vegan)
 
   
   # Combine with genetic data 
-    dat_snp = left_join(dat_gbs_only_scaled, 
-                        bind_cols(gen_dat_clim[, "accession"],
-                                           bglr_gen_scaled), 
-                        by = "accession")
-    
+    # dat_snp = left_join(dat_gbs_only_scaled, 
+    #                     bind_cols(gen_dat_clim[, "accession"],
+    #                                        bglr_gen_scaled), 
+    #                     by = "accession")
+  
+  # For using snps as factors
+  dat_snp = left_join(dat_gbs_only_scaled, 
+                    bind_cols(gen_dat_clim[, c("accession", snp_col_names)],
+                                       pcs),
+                    by = "accession")
+  
+    # dat_snp <- dat_snp %>%
+    #   dplyr::mutate_at(snp_col_names, funs(factor(.)))
+    #   
     dat_snp$accession <- factor(dat_snp$accession)
     dat_snp$section_block <- factor(dat_snp$section_block)
     dat_snp$section <- factor(dat_snp$section)
@@ -107,7 +116,7 @@ save(dat_snp, snp_col_names,
  
     # Formula for fixed effects
     fixed_effects <- paste0(paste0("height_2017 ~ site + s(height_2014) + s(", 
-                                   climate_var_dif,")"))
+                                   climate_var_dif,") + s(PC1_gen) + s(PC2_gen) + s(PC3_gen)"))
     
     # Formula for random effects
     random_effects <-  '+ s(accession, bs = "re") + s(section_block, bs = "re")'
@@ -143,8 +152,11 @@ save(dat_snp, snp_col_names,
     # Estimated degrees of freedom
     edf = unlist(lapply(base_gams, function(x) sum(x$edf))),
     
+    # Rsquared adjusted
+    r_sq_adj = unlist(lapply(gam_list_summary, function(x) x$r.sq)),
+    
     # AIC
-    aic = unlist(lapply(base_gams, function(x) x$aic)),
+    aic = unlist(lapply(base_gams, function(x) AIC(x))),
     
     # P value of interaction term
     p_val_int = NA
@@ -205,25 +217,41 @@ save(dat_snp, snp_col_names,
       next
     }
     
+    dat_snp[, snp] <- as.factor(pull(dat_snp, snp))
+    
   
     # Formula for fixed effects
-    fixed_effects <- fixed_effects <- paste0(paste0("height_2017 ~ site + 
-                                    s(height_2014) + te(", 
-                                  climate_var_dif,") + te(",snp,",k = 3) + ti(",
-                                  climate_var_dif, ",", snp,", k = 3) +
-                                  s(PC1_gen) + s(PC2_gen) + s(PC3_gen)"))
+    fixed_effects_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014) + s(", climate_var_dif,") + s(", climate_var_dif,", by =",snp,") + s(PC1_gen) + s(PC2_gen) + s(PC3_gen)"))
+    
+    fixed_effects_no_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014) + s(", climate_var_dif,")  + s(PC1_gen) + s(PC2_gen) + s(PC3_gen)"))
   
     
     cat("Working on: ", snp, "... number: ", x, " ...\n" )
     
-    gam_snp = bam(formula = make_formula(fixed_effects, random_effects),
+    gam_snp_int = bam(formula = make_formula(fixed_effects_int, random_effects),
                   data = dat_snp, 
                   discrete = TRUE,
                   nthreads = 8,
                   method = "fREML", family = "tw")
     
-    summary(gam_snp)
-    visreg(gam_snp, scale = "response")
+    gam_snp_no_int =  bam(formula = make_formula(fixed_effects_no_int,
+                                                 random_effects),
+                          data = dat_snp, 
+                          discrete = TRUE,
+                          nthreads = 8,
+                          method = "fREML", family = "tw")
+    
+    # Compare AICs
+    gam_snp_int$aic - gam_snp_no_int$aic
+    
+    
+    #summary(gam_snp)
+    #visreg(gam_snp, scale = "response")
+    visreg(gam_snp_int, xvar = "tmax_sum_dif", by = snp, scale = "response")
+    # visreg2d(gam_snp, xvar = "tmax_sum_dif", 
+    #          yvar = snp, 
+    #          scale = "response", 
+    #          plot.type = "persp", theta = 45, phi = 15)
 
     # Attach data so that we can use visreg later if we need
     # gam_snp$data <- dat_snp
@@ -313,6 +341,9 @@ save(dat_snp, snp_col_names,
   sum_df <- sum_df %>%
     dplyr::group_by(climate_var) %>%
     dplyr::mutate(aic_weight = Weights(aic))
+  
+  sum_df <- sum_df %>%
+    dplyr::mutate(aic_delta = aic - 28941.18) # AIC calculated from base model
 
   
 # Look at top SNPs
@@ -322,7 +353,12 @@ save(dat_snp, snp_col_names,
       dplyr::group_by(climate_var) %>%
       dplyr::arrange(aic)
     
-  # Sort by lowest p value  
+  # Sort by delta AIC  
+    sum_df %>%
+      dplyr::group_by(climate_var) %>%
+      dplyr::arrange(aic_delta)
+    
+  # Sort by lowest p value - have the strongest interaction effect, but maybe not best AIC
     sum_df %>%
       dplyr::group_by(climate_var) %>%
       dplyr::arrange(p_val_int)
@@ -334,6 +370,11 @@ save(dat_snp, snp_col_names,
     
     summary(sum_df$dev_explained)
     
+  # Sort by Rsquared  - base model is 0.5620117
+    sum_df %>%
+      dplyr::arrange(desc(r_sq_adj))
+    
+    
   
 ## Calculating q value  
   # Vignette - https://bioconductor.org/packages/release/bioc/vignettes/qvalue/inst/doc/qvalue.pdf
@@ -342,7 +383,11 @@ save(dat_snp, snp_col_names,
   
   qvals <- qvalue(p = sum_df %>%
                     dplyr::filter(climate_var == "tmax_sum_dif") %>%
-                    dplyr::pull(p_val_int))
+                    dplyr::pull(p_val_int),
+                  fdr.level = 0.05)
+  
+  
+  qvals$qvalues == sum_df$p_val_int
   
   sum_df <- sum_df %>%
     dplyr::filter(climate_var == "tmax_sum_dif") %>%
@@ -365,6 +410,11 @@ save(dat_snp, snp_col_names,
   qobj_fdrlevel$significant
   table(qobj_fdrlevel$significant)
   
+ plot(qobj_fdrlevel$qvalues ~ factor(as.numeric(qobj_fdrlevel$significant)))
+ summary(qobj_fdrlevel$qvalues[qobj_fdrlevel$significant])
+ summary(qobj_fdrlevel)
+ 
+ 
   summary(qobj_fdrlevel)
   
   # Sort by lowest q value  
@@ -380,19 +430,200 @@ save(dat_snp, snp_col_names,
 sum_df_sub <-  sum_df %>%
   dplyr::filter(climate_var == "tmax_sum_dif")    
     
-  plot(-log10(sum_df_sub$p_val_int), pch = 20,
+  plot(-log10(sum_df_sub$q_val), pch = 20,
        xlab = "SNP", ylab = "-log10(P)", 
        main = "tmax_sum_dif", las = 1,
        col = factor(snp_pos$chrom %% 2), # To alternate colors for pseudo-chromosomes
-       ylim = c(0, 9))
+       ylim = c(0, 2))
   abline(h = -log10(5e-8), lty = 2, col = "red") # Genome-wide significance line
   abline(h = -log10(1e-5)) # Suggestive significance line  
+  abline(h = -log10(.05))
   
   
+  
+
+# RDA on top snps ---------------------------------------------------------
+
+number = 100
+  
+top_snps <- sum_df %>%  
+    dplyr::filter(climate_var == "tmax_sum_dif")  %>%
+    dplyr::top_n(., -number, q_val) %>%
+    dplyr::select(snp) %>%
+    dplyr::mutate(snp = gsub("snp_", "", snp)) %>%
+    dplyr::filter(snp %in% colnames(gen_dat_clim)) # TEMP FILTERING
+
+# Based on delta AIC
+top_snps <- sum_df %>%  
+  dplyr::filter(climate_var == "tmax_sum_dif")  %>%
+  dplyr::filter(aic_delta < -2) %>%
+  dplyr::select(snp) %>%
+  dplyr::mutate(snp = gsub("snp_", "", snp)) %>%
+  dplyr::filter(snp %in% colnames(gen_dat_clim)) # TEMP FILTERING
+
+
+
+bglr_gen_scaled[, top_snps$snp]
+
+
+rda_full <- vegan::rda(bglr_gen_scaled[, top_snps$snp] ~ latitude + 
+                         longitude + tmax_sum + tmin_winter + cwd + bioclim_04 + bioclim_15 + bioclim_18 + bioclim_19,
+                       data = gen_dat_clim)
+
+
+
+rda_full <- vegan::rda(bglr_gen_scaled[, top_snps$snp] ~ tmax_sum + Condition(latitude + longitude),
+                       data = gen_dat_clim)
+
+rda_full
+summary(rda_full)
+
+anova(rda_full)
+
+anova(rda_full, by="axis", permutations = 100)
+
+anova(rda_full, 
+      by = "margin",
+      permutations = 100)
+
+round(summary(rda_full)$biplot[, c(1,2)], 2)
+
+plot(rda_full)
+
+
+plot(gen_dat_clim$tmax_sum, bglr_gen_scaled[, snp])
+    cor.test(gen_dat_clim$tmax_sum, bglr_gen_scaled[, snp])
+
+    summary(gam(bglr_gen_scaled[, snp] ~  s(tmax_sum), data = gen_dat_clim ))  
+  
+    
+
+# Gradient forest test ----------------------------------------------------
+    
+    
+    # Based on delta AIC
+    top_snps <- sum_df %>%  
+      dplyr::filter(climate_var == "tmax_sum_dif")  %>%
+      dplyr::filter(aic_delta < -2) %>%
+      dplyr::select(snp) %>%
+      dplyr::mutate(snp = gsub("snp_", "", snp)) %>%
+      dplyr::filter(snp %in% colnames(gen_dat_clim)) # TEMP FILTERING
+   
+  # Based on q value   
+    top_snps <- sum_df %>%  
+      dplyr::filter(climate_var == "tmax_sum_dif")  %>%
+      dplyr::top_n(., -number, q_val) %>%
+      dplyr::select(snp) %>%
+      dplyr::mutate(snp = gsub("snp_", "", snp)) %>%
+      dplyr::filter(snp %in% colnames(gen_dat_clim)) # TEMP FILTERING
+    
+    
+    
+    
+    bglr_gen_scaled[, top_snps$snp]
+    
+    library(gradientForest)
+    
+    climate_vars_gf <- c(climate_vars, "latitude", "longitude")
+    
+    length(top_snps$snp)
+    top_snps$snp
+    
+    gf <- gradientForest(cbind(bglr_gen_scaled, gen_dat_clim),
+                         predictor.vars = climate_vars_gf, 
+                        response.vars = top_snps$snp,
+                      # response.vars = colnames(bglr_gen_scaled)[1:1000],
+                         ntree = 500, transform = NULL, compact = T,
+                         nbin = 201)
+    
+    gf$result # Rsquared of positive loci
+    gf$species.pos.rsq
+    
+    mean(gf$result)
+    
+    plot(gf, plot.type = "O")
+    
+    most_important <- names(importance(gf))
+    
+    pred <- expand.grid(latitude = seq(35, 41, by = .1))
+    pred$pred <- predict(gf, newdata = pred)
+    
+    pred
+    
+    plot(pred$latitude, pred$pred$latitude)
+    
+    library(randomForest)
+    library(forestFloor)
+    
+    snp = "4_93755225"
+    
+    gen_dat_clim_sub <- gen_dat_clim %>%
+                      dplyr::filter(!is.na(pull(., snp)))
+    
+    rfo <- randomForest(y = as.factor(pull(gen_dat_clim_sub, snp)),
+                       x = gen_dat_clim_sub[, climate_vars_gf], 
+                       keep.inbag = TRUE,  # mandatory,
+                       importance = TRUE)  # recommended, else ordering by giniImpurity (unstable))
+    rfo
+    plot(rfo)
+    
+    rfo$importance
+    
+    ff = forestFloor(
+      rf.fit = rfo,       # mandatory
+      X = gen_dat_clim_sub[, climate_vars_gf],              # mandatory
+      calc_np = FALSE,    # TRUE or FALSE both works, makes no difference
+      binary_reg = FALSE  # takes no effect here when rfo$type="regression"
+    )
+    
+    plot(ff)
+    
+    plot(ff,                       # forestFloor object
+         plot_seq = 1:6,           # optional sequence of features to plot
+         orderByImportance=TRUE    # if TRUE index sequence by importance, else by X column  
+    )
+    
+    rf$importance
+    
+    pred <- expand.grid(latitude = seq(33, 42, by = .1),
+                        tmax_sum = 0, tmin_winter = 0, random = 0, bioclim_04 = 0, PC1 = 0, PC2 = 0, PC3 = 0, longitude = seq(-123.5, -118.5, by = .1))
+    pred$pred <- predict(rfo, newdata = pred)
+    
+    pred
+    
+    table(pred$pred)
+    
+    
+    plot(pred$latitude, pred$pred)
+    
+    
+    
+    
+    plot(gf, plot.type = "S", imp.vars = most_important,
+          leg.posn = "topright", cex.legend = 0.4, cex.axis = 0.6,
+          cex.lab = 0.7, line.ylab = 0.9, par.args = list(mgp = c(1.5,
+          0.5, 0), mar = c(3.1, 1.5, 0.1, 1)))
+    
+    plot(gf, plot.type = "C", imp.vars = most_important,
+     show.overall = F, legend = T, leg.posn = "topleft",
+     leg.nspecies = 5, cex.lab = 0.7, cex.legend = 0.4,
+     cex.axis = 0.6, line.ylab = 0.9, par.args = list(mgp = c(1.5,
+     0.5, 0), mar = c(2.5, 1, 0.1, 0.5), omi = c(0, + 0.3, 0, 0)))
+    
+    plot(gf, plot.type = "C", imp.vars = most_important,
+         show.species = F, common.scale = T, cex.axis = 0.6,
+        cex.lab = 0.7, line.ylab = 0.9, par.args = list(mgp = c(1.5,
+       + 0.5, 0), mar = c(2.5, 1, 0.1, 0.5), omi = c(0,  0.3, 0, 0)))
+    
+    plot(gf, plot.type = "P", show.names = T, horizontal = F,
+         cex.axis = 1, cex.labels = 0.7, line = 2.5)
+    
+    
+    
 
 # Look at top models ------------------------------------------------------
 
-  top_snp = "snp_7_39668055"
+  top_snp = "snp_4_93755225"
   
   plot(pull(dat_snp, top_snp), dat_snp$height_2017)
   plot(pull(dat_snp, tmax_sum_dif),pull(dat_snp, top_snp))
