@@ -18,7 +18,7 @@
 #  program output  = Specified by user program
 #  Threaded:     8-way threaded
 #  Resources requested
-#$ -l h_data=4096M,h_rt=2:30:00
+#$ -l h_data=4096M,h_rt=3:30:00
 # #
 #  Name of application for log
 #$ -v QQAPP=job
@@ -30,14 +30,14 @@
 #$ -r n
 #
 #  Job array indexes
-#$ -t 1-5000:100
+#$ -t 1-500:25
 #
 # 14177 SNPS
 
 # Set variable that will be passed to R script
 # Interval needs to match what is set in Job array indexes
 
-set interval=100
+set interval=25
 set climate_var_dif='tmax_sum_dif'
 
 
@@ -84,6 +84,7 @@ mkdir R_output
 mkdir output
 mkdir gam_mods_data
 mkdir model_summaries
+mkdir model_plots
 
 #
   # if more than 10 jobtasks, send only "a" mail.  until...
