@@ -73,30 +73,29 @@ library(vegan)
 # Set a prediction data frame
   
   # function to transform from raw to scaled variables
- #  forward_transform <- function(x, var, means, sds){
- #   ( x - means[var]) / sds[var]
- #  }
- # 
- # # Prediction frame with a 3 degree increase 
- #  # Set up each climate variable individually
- #  predictions_3deg <-  expand.grid(height_2014 = 0,
- #                  site = "Chico",
- #                  accession = "1",
- #                  section_block = "Block1_1",
- #                  tmax_sum_dif = forward_transform(c(0, 3), 
- #                                                   var = "tmax_sum_dif", 
- #                                                   means = scaled_var_means_gbs_only,
- #                                                   sds = scaled_var_sds_gbs_only),
- #                  tmin_winter_dif = forward_transform(c(0, 3), 
- #                                                      var = "tmin_winter_dif", 
- #                                                      means = scaled_var_means_gbs_only,
  #                                                      sds = scaled_var_sds_gbs_only))
- #  
- #  predictions_3deg
+  forward_transform <- function(x, var, means, sds){
+   ( x - means[var]) / sds[var]
+  }
+
+ # Prediction frame with a 3 degree increase
+  # Set up each climate variable individually
+  predictions_3deg <-  expand.grid(height_2014 = 0,
+                  site = "Chico",
+                  accession = "1",
+                  section_block = "Block1_1",
+                  PC1_gen = 0, PC2_gen = 0, PC3_gen = 0,
+                  genotype = c(0, 1, 2),
+                  tmax_sum_dif = forward_transform(c(0, 3),
+                                                   var = "tmax_sum_dif",
+                                                   means = scaled_var_means_gbs_only,
+                                                   sds = scaled_var_sds_gbs_only))
+
+  predictions_3deg
 
   
 # Save data to file that will be uploaded to cluster  
-save(dat_snp, snp_col_names,
+save(dat_snp, snp_col_names, predictions_3deg,
   file = paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
 
   
@@ -194,8 +193,6 @@ save(dat_snp, snp_col_names,
    # Formula for random effects
   random_effects <-  '+ s(accession, bs = "re") + s(section_block, bs = "re")'
   
-  
-  
   # Loop through snps by index based on task id
   for(snp_index in task_id:(task_id + interval - 1)){
     
@@ -212,18 +209,19 @@ save(dat_snp, snp_col_names,
     snp <- paste0("snp_", snp_col_names[snp_index])
     
     # Make sure there's at least 3 levels
-    if(length(table(dat_snp[, snp])) < 3){
-      cat("Skipping because not at least 3 levels")
-      next
-    }
+    # if(length(table(dat_snp[, snp])) < 3){
+    #   cat("Skipping because not at least 3 levels")
+    #   next
+    # }
     
+    # Convert to factor
     dat_snp[, snp] <- as.factor(pull(dat_snp, snp))
     
   
     # Formula for fixed effects
-    fixed_effects_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014) + s(", climate_var_dif,") + s(", climate_var_dif,", by =",snp,") + s(PC1_gen) + s(PC2_gen) + s(PC3_gen)"))
+    fixed_effects_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\") + s(", climate_var_dif,", by =",snp,", bs=\"cr\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
     
-    fixed_effects_no_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014) + s(", climate_var_dif,")  + s(PC1_gen) + s(PC2_gen) + s(PC3_gen)"))
+    fixed_effects_no_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\")  + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
   
     
     cat("Working on: ", snp, "... number: ", x, " ...\n" )
@@ -232,7 +230,8 @@ save(dat_snp, snp_col_names,
                   data = dat_snp, 
                   discrete = TRUE,
                   nthreads = 8,
-                  method = "fREML", family = "tw")
+                  method = "fREML", family = "tw", 
+                  control = list(trace = FALSE))
     
     gam_snp_no_int =  bam(formula = make_formula(fixed_effects_no_int,
                                                  random_effects),
@@ -242,12 +241,34 @@ save(dat_snp, snp_col_names,
                           method = "fREML", family = "tw")
     
     # Compare AICs
-    gam_snp_int$aic - gam_snp_no_int$aic
+    gam_snp_int$delta_aic <- gam_snp_int$aic - gam_snp_no_int$aic
+    
+    # Make predictions
+    predictions_3deg <-  predictions_3deg  %>%
+      dplyr::mutate(!!snp := genotype)
+    
+    predictions_3deg$pred <- predict(gam_snp_int, newdata = predictions_3deg,
+                                     type = "response")
     
     
-    #summary(gam_snp)
-    #visreg(gam_snp, scale = "response")
-    visreg(gam_snp_int, xvar = "tmax_sum_dif", by = snp, scale = "response")
+    climate_min <- min(predictions_3deg$tmax_sum_dif)
+    climate_max <- max(predictions_3deg$tmax_sum_dif)
+    
+    for(genotype in c(0,1,2)){
+      
+      pred_sub <- predictions_3deg[predictions_3deg$genotype == genotype, ]
+      
+      height_change <- (pred_sub$pred[pred_sub$tmax_sum_dif == climate_max] - 
+        pred_sub$pred[pred_sub$tmax_sum_dif == climate_min]) / pred_sub$pred[pred_sub$tmax_sum_dif == climate_max] * 100 
+      
+      gam_snp_int[paste0("height_change_gen_", genotype)] <- height_change
+      
+      }
+
+   
+    # summary(gam_snp_int)
+    # visreg(gam_snp_int, scale = "response")
+    # visreg(gam_snp_int, xvar = "tmax_sum_dif", by = snp, scale = "response")
     # visreg2d(gam_snp, xvar = "tmax_sum_dif", 
     #          yvar = snp, 
     #          scale = "response", 
@@ -257,29 +278,26 @@ save(dat_snp, snp_col_names,
     # gam_snp$data <- dat_snp
     
     # Save into list
-    gam_list[[x]] <- gam_snp
+    gam_list[[x]] <- gam_snp_int
     names(gam_list)[x] <- snp
     
     x = x + 1
     
     
     # Save individual .Rdata file for each model
-    cat("Saving gam model to file... \n")
-    
-    gam_name <- paste0("gam_", climate_var_dif, "_", snp)
-    assign(gam_name, gam_snp) # Assign model the name
-    
-    save(list = gam_name, file = paste0("./gam_mods_data/", gam_name, ".Rdata"))
+    # cat("Saving gam model to file... \n")
+    # 
+    # gam_name <- paste0("gam_", climate_var_dif, "_", snp)
+    # assign(gam_name, gam_snp_int) # Assign model the name
+    # 
+    # save(list = gam_name, file = paste0("./gam_mods_data/", gam_name, ".Rdata"))
     
     # Timing of loop
     end_time <- Sys.time()
-    
     cat("This loop took: ")
     print(end_time - start_time)   
     
   }
-  
-  
   
   
   # Run summary for each model
@@ -287,11 +305,18 @@ save(dat_snp, snp_col_names,
   
   # Save into dataframe 
   gam_mod_summary_df <- data.frame(
+    
     # climate var
     climate_var = climate_var_dif,
     
     # Snp name
     snp = names(gam_list),
+    
+    # Sample size
+    n = unlist(lapply(gam_list_summary, function(x) x$n)),
+    
+    # Converged?
+    converged = unlist(lapply(gam_list, function(x) x$mgcv.conv)),
     
     # Deviance explained
     dev_explained = unlist(lapply(gam_list_summary, function(x) x$dev.expl)),
@@ -305,23 +330,20 @@ save(dat_snp, snp_col_names,
     # AIC
     aic = unlist(lapply(gam_list, function(x) x$aic)),
     
-    # P value of interaction term
+    # Delta AIC with model without interaction
+    delta_aic = unlist(lapply(gam_list, function(x) x$delta_aic)),
     
-    ## IF ORDER OF VARIABLES IN MODEL EVER CHANGES - THIS NEEDS TO CHANGE TOO!!
-    
-    p_val_int = unlist(lapply(gam_list_summary, function(x) x$s.table[4, "p-value"]))
-    
-    # Percent change in height with 3 degree increase
-    # height_change_3_deg = unlist(lapply(lapply(gam_list, function(x) predict(x, 
-    #                                                                          newdata = predictions_3deg  %>% 
-    #                                                                            dplyr::distinct(get(climate_var_dif), 
-    #                                                                                            .keep_all = TRUE), 
-    #                                                                          type = "response")),
-    #                                     function(x) ((x[2] - x[1]) / x[1])*100))
-    
+    # Predictions of height
+    height_change_gen_0 = unlist(lapply(gam_list, function(x) x$height_change_gen_0)),
+    height_change_gen_1 = unlist(lapply(gam_list, function(x) x$height_change_gen_1)),
+    height_change_gen_2 = unlist(lapply(gam_list, function(x) x$height_change_gen_2))
   )
   
   head(gam_mod_summary_df)
+  
+  
+  
+  
 
 # Read in cluster run output ----------------------------------------------
 
@@ -336,16 +358,47 @@ save(dat_snp, snp_col_names,
 
 # Sort and arrange data ---------------------------------------------------
 
+  # How many converged?
+  table(sum_df$converged)
+  
+  # Sort by delta AIC  
+  test = sum_df %>%
+    dplyr::group_by(climate_var) %>%
+    dplyr::filter(converged == TRUE) %>%
+    dplyr::filter(delta_aic > -1000) %>% 
+    dplyr::filter(delta_aic < 500) %>%
+    dplyr::arrange(delta_aic)
+  
+  
+  hist(test$delta_aic, breaks = 30)
+  
+  
+  
+  
+  
+  # Take snps with lowest delta aic 
+  # Filter out ones that did not converge
+  # - run in same model to generate super model?
+  # - filter down to snps that aren't super correlated with each other?
+  # - try to figure out more about those SNPs with gradient forest / RDA, etc?
+  
+  
+  
+  
+  
+  
+  
+  
 
 # Calculate AIC weights
   sum_df <- sum_df %>%
     dplyr::group_by(climate_var) %>%
     dplyr::mutate(aic_weight = Weights(aic))
   
-  sum_df <- sum_df %>%
-    dplyr::mutate(aic_delta = aic - 28941.18) # AIC calculated from base model
-
-  
+  # sum_df <- sum_df %>%
+  #   dplyr::mutate(aic_delta = aic - 28941.18) # AIC calculated from base model
+  # 
+  # 
 # Look at top SNPs
     
   # Sort by lowest AIC  
@@ -356,8 +409,8 @@ save(dat_snp, snp_col_names,
   # Sort by delta AIC  
     sum_df %>%
       dplyr::group_by(climate_var) %>%
-      dplyr::arrange(aic_delta)
-    
+      dplyr::arrange(delta_aic)
+ 
   # Sort by lowest p value - have the strongest interaction effect, but maybe not best AIC
     sum_df %>%
       dplyr::group_by(climate_var) %>%
@@ -500,14 +553,19 @@ plot(gen_dat_clim$tmax_sum, bglr_gen_scaled[, snp])
 
 # Gradient forest test ----------------------------------------------------
     
+    number = 50
     
     # Based on delta AIC
-    top_snps <- sum_df %>%  
+    top_snps = sum_df %>%
       dplyr::filter(climate_var == "tmax_sum_dif")  %>%
-      dplyr::filter(aic_delta < -2) %>%
+      dplyr::filter(converged == TRUE) %>%
+      dplyr::filter(delta_aic > -1000) %>% 
+      dplyr::filter(delta_aic < 500) %>%
+      dplyr::top_n(., -number, delta_aic) %>%
+      dplyr::arrange(delta_aic) %>%
       dplyr::select(snp) %>%
-      dplyr::mutate(snp = gsub("snp_", "", snp)) %>%
-      dplyr::filter(snp %in% colnames(gen_dat_clim)) # TEMP FILTERING
+      dplyr::mutate(snp = gsub("snp_", "", snp))
+    
    
   # Based on q value   
     top_snps <- sum_df %>%  
@@ -555,7 +613,7 @@ plot(gen_dat_clim$tmax_sum, bglr_gen_scaled[, snp])
     library(randomForest)
     library(forestFloor)
     
-    snp = "4_93755225"
+    snp = "1_62307519"
     
     gen_dat_clim_sub <- gen_dat_clim %>%
                       dplyr::filter(!is.na(pull(., snp)))
