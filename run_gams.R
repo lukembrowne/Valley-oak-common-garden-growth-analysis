@@ -31,8 +31,7 @@
   
   # Loop through snps by index based on task id
   for(snp_index in task_id:(task_id + interval - 1)){
-    
-    
+        
     # To avoid going past number of snps
     if(snp_index > length(snp_col_names)){
       next
@@ -54,11 +53,12 @@
     dat_snp[, snp] <- as.factor(pull(dat_snp, snp))
     
   
-    # Formula for fixed effects
-    fixed_effects_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\") + s(", climate_var_dif,", by =",snp,", bs=\"cr\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
+      
+    # Stack overflow on adding m = 1 to by= smooths - https://stats.stackexchange.com/questions/32730/how-to-include-an-interaction-term-in-gam
+    
+    fixed_effects_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\") + s(", climate_var_dif,", by =",snp,", bs=\"cr\", m = 1) + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
     
     fixed_effects_no_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\")  + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
-    
     cat("Working on: ", snp, "... number: ", x, " ...\n" )
     
     gam_snp_int = bam(formula = make_formula(fixed_effects_int, random_effects),
@@ -78,7 +78,7 @@
     gam_snp_int$delta_aic <- gam_snp_int$aic - gam_snp_no_int$aic
 
     # Make plots of interaction
-    pdf(paste0("./model_plots/", snp,".pdf"))
+    pdf(paste0("./model_plots/", snp,".pdf"), width = 8, height = 5)
     visreg(gam_snp_int, xvar = climate_var_dif, 
       by = snp, scale = "response")
     dev.off()
@@ -88,10 +88,16 @@
     predictions_3deg_sub <-  predictions_3deg  %>%
       dplyr::filter(genotype %in% pull(dat_snp, snp)) %>% # Make sure genotypes are represented
       dplyr::mutate(!!snp := genotype)
-      
-    
+
+
+   # Change accession number if genetic data is missing so we don't get errors in prediction
+     while(any(is.na(dat_snp[as.character(dat_snp$accession) %in% 
+                          as.character(predictions_3deg_sub$accession), snp]))){
+    predictions_3deg_sub$accession = as.numeric(predictions_3deg_sub$accession) + 1
+  }
+     
+        
     # Subset predictions based on 
-    
     predictions_3deg_sub$pred <- predict(gam_snp_int, newdata = predictions_3deg_sub,
                                      type = "response")
     
@@ -148,7 +154,9 @@
     cat("This loop took: ")
     print(end_time - start_time)   
     
-  }
+  } # End SNP loop
+
+
   
   
   # Run summary for each model
@@ -187,7 +195,35 @@
     # Predictions of height
     height_change_gen_0 = unlist(lapply(gam_list, function(x) x$height_change_gen_0)),
     height_change_gen_1 = unlist(lapply(gam_list, function(x) x$height_change_gen_1)),
-    height_change_gen_2 = unlist(lapply(gam_list, function(x) x$height_change_gen_2))
+    height_change_gen_2 = unlist(lapply(gam_list, function(x) x$height_change_gen_2)),
+
+    # P values for interaction terms
+    # Use grep to look at the last number of the smooth summary table - 
+    # Should correspond to the genotype
+    # Returns NA if no match
+    p_val_gen_0 = ifelse(unlist(lapply(gam_list_summary, function(x)
+                                length(x$s.table[grep(pattern = "0$",
+                                               rownames(x$s.table)), "p-value"]) == 0)), 
+                         yes = NA, 
+                         no = unlist(lapply(gam_list_summary, function(x)
+                                                    x$s.table[grep(pattern = "0$",
+                                                   rownames(x$s.table)), "p-value"]))),
+    
+    p_val_gen_1 = ifelse(unlist(lapply(gam_list_summary, function(x)
+                          length(x$s.table[grep(pattern = "1$",
+                            rownames(x$s.table)), "p-value"]) == 0)), 
+                              yes = NA, 
+                           no = unlist(lapply(gam_list_summary, function(x)
+                                  x$s.table[grep(pattern = "1$",
+                                  rownames(x$s.table)), "p-value"]))),
+    
+    p_val_gen_2 = ifelse(unlist(lapply(gam_list_summary, function(x)
+                           length(x$s.table[grep(pattern = "2$",
+                            rownames(x$s.table)), "p-value"]) == 0)), 
+                          yes = NA, 
+                          no = unlist(lapply(gam_list_summary, function(x)
+                          x$s.table[grep(pattern = "2$",
+                                         rownames(x$s.table)), "p-value"])))
 
   )
   
