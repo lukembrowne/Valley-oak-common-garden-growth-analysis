@@ -6,6 +6,7 @@
 library(qvalue)
 library(MuMIn)
 library(vegan)
+library(beepr)
 
 
 # Goal is to run an individual gam for each SNP, like a fancy GWAS, and then correct for multiple testing after
@@ -73,7 +74,6 @@ library(vegan)
 # Set a prediction data frame
   
   # function to transform from raw to scaled variables
- #                                                      sds = scaled_var_sds_gbs_only))
   forward_transform <- function(x, var, means, sds){
    ( x - means[var]) / sds[var]
   }
@@ -219,7 +219,10 @@ save(dat_snp, snp_col_names, predictions_3deg,
     
   
     # Formula for fixed effects
-    fixed_effects_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\") + s(", climate_var_dif,", by =",snp,", bs=\"cr\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
+    
+    # Stack overflow on adding m = 1 to by= smooths - https://stats.stackexchange.com/questions/32730/how-to-include-an-interaction-term-in-gam
+    
+    fixed_effects_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\") + s(", climate_var_dif,", by =",snp,", bs=\"cr\", m = 1) + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
     
     fixed_effects_no_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\")  + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
   
@@ -243,20 +246,40 @@ save(dat_snp, snp_col_names, predictions_3deg,
     # Compare AICs
     gam_snp_int$delta_aic <- gam_snp_int$aic - gam_snp_no_int$aic
     
+    pdf(paste0("./output/model_visualizations/", snp,".pdf"), width = 8, height = 5)
+    visreg(gam_snp_int, xvar = climate_var_dif, 
+           by = snp, scale = "response")
+    dev.off()
+    
     # Make predictions
-    predictions_3deg <-  predictions_3deg  %>%
+    predictions_3deg_sub <-  predictions_3deg  %>%
+      dplyr::filter(genotype %in% pull(dat_snp, snp)) %>% # Make sure genotypes are represented
       dplyr::mutate(!!snp := genotype)
     
-    predictions_3deg$pred <- predict(gam_snp_int, newdata = predictions_3deg,
+    # Change accession number if genetic data is missing so we don't get errors in prediction
+    while(any(is.na(dat_snp[as.character(dat_snp$accession) %in% 
+                            as.character(predictions_3deg_sub$accession), snp]))){
+      predictions_3deg_sub$accession = as.numeric(predictions_3deg_sub$accession) + 1
+    }
+    
+      
+    # Subset predictions based on 
+    predictions_3deg_sub$pred <- predict(gam_snp_int, 
+                                         newdata = predictions_3deg_sub,
                                      type = "response")
     
     
-    climate_min <- min(predictions_3deg$tmax_sum_dif)
-    climate_max <- max(predictions_3deg$tmax_sum_dif)
+    climate_min <- min(predictions_3deg_sub$tmax_sum_dif)
+    climate_max <- max(predictions_3deg_sub$tmax_sum_dif)
     
     for(genotype in c(0,1,2)){
       
-      pred_sub <- predictions_3deg[predictions_3deg$genotype == genotype, ]
+      if(!genotype %in% predictions_3deg_sub$genotype){
+        gam_snp_int[paste0("height_change_gen_", genotype)] <- NA
+        next
+      }
+      
+      pred_sub <- predictions_3deg_sub[predictions_3deg_sub$genotype == genotype, ]
       
       height_change <- (pred_sub$pred[pred_sub$tmax_sum_dif == climate_max] - 
         pred_sub$pred[pred_sub$tmax_sum_dif == climate_min]) / pred_sub$pred[pred_sub$tmax_sum_dif == climate_max] * 100 
@@ -299,6 +322,9 @@ save(dat_snp, snp_col_names, predictions_3deg,
     
   }
   
+  beep(4)
+  
+  
   
   # Run summary for each model
   gam_list_summary <- lapply(gam_list, summary)
@@ -336,7 +362,35 @@ save(dat_snp, snp_col_names, predictions_3deg,
     # Predictions of height
     height_change_gen_0 = unlist(lapply(gam_list, function(x) x$height_change_gen_0)),
     height_change_gen_1 = unlist(lapply(gam_list, function(x) x$height_change_gen_1)),
-    height_change_gen_2 = unlist(lapply(gam_list, function(x) x$height_change_gen_2))
+    height_change_gen_2 = unlist(lapply(gam_list, function(x) x$height_change_gen_2)),
+    
+    # P values for interaction terms
+    # Use grep to look at the last number of the smooth summary table - 
+    # Should correspond to the genotype
+    # Returns NA if no match
+    p_val_gen_0 = ifelse(unlist(lapply(gam_list_summary, function(x)
+                                length(x$s.table[grep(pattern = "0$",
+                                               rownames(x$s.table)), "p-value"]) == 0)), 
+                         yes = NA, 
+                         no = unlist(lapply(gam_list_summary, function(x)
+                                                    x$s.table[grep(pattern = "0$",
+                                                   rownames(x$s.table)), "p-value"]))),
+    p_val_gen_1 = ifelse(unlist(lapply(gam_list_summary, function(x)
+                          length(x$s.table[grep(pattern = "1$",
+                            rownames(x$s.table)), "p-value"]) == 0)), 
+                              yes = NA, 
+                           no = unlist(lapply(gam_list_summary, function(x)
+                                  x$s.table[grep(pattern = "1$",
+                                  rownames(x$s.table)), "p-value"]))),
+    
+    p_val_gen_2 = ifelse(unlist(lapply(gam_list_summary, function(x)
+                           length(x$s.table[grep(pattern = "2$",
+                            rownames(x$s.table)), "p-value"]) == 0)), 
+                          yes = NA, 
+                          no = unlist(lapply(gam_list_summary, function(x)
+                          x$s.table[grep(pattern = "2$",
+                                         rownames(x$s.table)), "p-value"])))
+    
   )
   
   head(gam_mod_summary_df)
@@ -355,6 +409,10 @@ save(dat_snp, snp_col_names, predictions_3deg,
   sum_df
   
   summary(sum_df)
+  
+  
+  
+  
 
 # Sort and arrange data ---------------------------------------------------
 
@@ -370,9 +428,17 @@ save(dat_snp, snp_col_names, predictions_3deg,
     dplyr::arrange(delta_aic)
   
   
+  summary(test)
+  
   hist(test$delta_aic, breaks = 30)
   
+  hist(test$p_val_gen_0, breaks = 30)
+  hist(test$p_val_gen_1, breaks = 30)
+  hist(test$p_val_gen_2, breaks = 30)
   
+  plot(test$delta_aic, test$p_val_gen_0, pch = 19, cex = .5)
+  plot(test$delta_aic, test$p_val_gen_1, pch = 19, cex = .5)
+  plot(test$delta_aic, test$p_val_gen_2, pch = 19, cex = .5)
   
   
   
@@ -436,11 +502,8 @@ save(dat_snp, snp_col_names, predictions_3deg,
   
   qvals <- qvalue(p = sum_df %>%
                     dplyr::filter(climate_var == "tmax_sum_dif") %>%
-                    dplyr::pull(p_val_int),
-                  fdr.level = 0.05)
-  
-  
-  qvals$qvalues == sum_df$p_val_int
+                    dplyr::pull(p_val_gen_0),
+                  fdr.level = 0.001)
   
   sum_df <- sum_df %>%
     dplyr::filter(climate_var == "tmax_sum_dif") %>%
@@ -523,11 +586,6 @@ rda_full <- vegan::rda(bglr_gen_scaled[, top_snps$snp] ~ latitude +
                          longitude + tmax_sum + tmin_winter + cwd + bioclim_04 + bioclim_15 + bioclim_18 + bioclim_19,
                        data = gen_dat_clim)
 
-
-
-rda_full <- vegan::rda(bglr_gen_scaled[, top_snps$snp] ~ tmax_sum + Condition(latitude + longitude),
-                       data = gen_dat_clim)
-
 rda_full
 summary(rda_full)
 
@@ -553,7 +611,9 @@ plot(gen_dat_clim$tmax_sum, bglr_gen_scaled[, snp])
 
 # Gradient forest test ----------------------------------------------------
     
-    number = 50
+    number = 500
+    
+    growth_thresh = -10
     
     # Based on delta AIC
     top_snps = sum_df %>%
@@ -561,39 +621,72 @@ plot(gen_dat_clim$tmax_sum, bglr_gen_scaled[, snp])
       dplyr::filter(converged == TRUE) %>%
       dplyr::filter(delta_aic > -1000) %>% 
       dplyr::filter(delta_aic < 500) %>%
-      dplyr::top_n(., -number, delta_aic) %>%
+    #  dplyr::top_n(., -number, delta_aic) %>%
+   #   dplyr::filter(delta_aic < -3) %>%
       dplyr::arrange(delta_aic) %>%
+      dplyr::filter(height_change_gen_0 < growth_thresh | 
+                      height_change_gen_1 < growth_thresh | 
+                      height_change_gen_2 < growth_thresh) %>%
       dplyr::select(snp) %>%
       dplyr::mutate(snp = gsub("snp_", "", snp))
     
-   
-  # Based on q value   
-    top_snps <- sum_df %>%  
-      dplyr::filter(climate_var == "tmax_sum_dif")  %>%
-      dplyr::top_n(., -number, q_val) %>%
-      dplyr::select(snp) %>%
-      dplyr::mutate(snp = gsub("snp_", "", snp)) %>%
-      dplyr::filter(snp %in% colnames(gen_dat_clim)) # TEMP FILTERING
     
+    # Based on delta AIC
+    
+    growth_thresh = -4
+    
+    top_snps = sum_df %>%
+      dplyr::filter(climate_var == "tmax_sum_dif")  %>%
+      dplyr::filter(converged == TRUE) %>%
+      dplyr::filter(delta_aic > -1000) %>% 
+      dplyr::filter(delta_aic < 500) %>%
+      dplyr::filter(delta_aic < -5) %>%
+      dplyr::filter(p_val_gen_2 < 0.001) %>%
+      dplyr::arrange(delta_aic) %>%
+      dplyr::filter(height_change_gen_2 > -3) %>%
+      dplyr::select(snp) %>%
+      dplyr::mutate(snp = gsub("snp_", "", snp))
+
+    top_snps
     
     
     
     bglr_gen_scaled[, top_snps$snp]
     
+   gen_dat[, top_snps$snp]
+
+   gen_dat_factor =  gen_dat_clim %>%
+     dplyr::select(top_snps$snp) %>%
+     mutate_all(funs(factor))
+   
+   # gen_dat_factor =  gen_dat_clim %>%
+   #   dplyr::select(top_snps$snp)
+   
+   
+   
+   # Mode impute
+   for(snp in 1:ncol(gen_dat_factor)){
+     mode <- as.numeric(names(sort(-table(gen_dat_factor[, snp])))[1])
+     gen_dat_factor[is.na(gen_dat_factor[, snp]), snp] <- mode
+   }
+   
+   summary(gen_dat_factor)
+    
     library(gradientForest)
     
-    climate_vars_gf <- c(climate_vars, "latitude", "longitude")
+    climate_vars_gf <- c("tmax_sum", "tmin_winter", "bioclim_04", 
+                         "tmax", "tmin", "random", "ppt", "cwd",
+                         "latitude", "longitude")
     
     length(top_snps$snp)
     top_snps$snp
     
-    gf <- gradientForest(cbind(bglr_gen_scaled, gen_dat_clim),
+    gf <- gradientForest(cbind(gen_dat_factor, 
+                                      gen_dat_clim),
                          predictor.vars = climate_vars_gf, 
                         response.vars = top_snps$snp,
-                      # response.vars = colnames(bglr_gen_scaled)[1:1000],
-                         ntree = 500, transform = NULL, compact = T,
-                         nbin = 201)
-    
+                        trace = TRUE)
+
     gf$result # Rsquared of positive loci
     gf$species.pos.rsq
     
@@ -613,7 +706,7 @@ plot(gen_dat_clim$tmax_sum, bglr_gen_scaled[, snp])
     library(randomForest)
     library(forestFloor)
     
-    snp = "1_62307519"
+    snp = top_snps$snp[1]
     
     gen_dat_clim_sub <- gen_dat_clim %>%
                       dplyr::filter(!is.na(pull(., snp)))
@@ -693,4 +786,47 @@ plot(gen_dat_clim$tmax_sum, bglr_gen_scaled[, snp])
            scale = "response", plot.type = "persp", theta = 45, phi = 15)
   
   pairs.panels(dplyr::select(dat_snp, top_snp, latitude, longitude, climate_vars ))
+
+  
+
+# Simulate data to test out interaction effects in gams -------------------
+
+  dat <- expand.grid(cat = c(1,2,3),
+                     x = seq(-3, 3, by = .1))
+  dat$cat <- factor(dat$cat)
+    
+    
+  dat$y <- -.5 + -.25*dat$x + -.25*dat$x^2 + rnorm(nrow(dat), sd = .5)
+  
+  # dat$y[dat$cat == 2] <- -.5 + -.25*dat$x[dat$cat == 2] + .25*dat$x[dat$cat == 2]^2 + rnorm(nrow(dat[dat$cat == 2,]), sd = .5)
+  
+  dat$y[dat$cat == 1] <- -.5 + -.25*dat$x[dat$cat == 1] + .25*dat$x[dat$cat == 1]^2 + rnorm(nrow(dat[dat$cat == 1,]), sd = .5)
+  
+  ggplot(dat, aes(x, y, col = cat, fill = cat)) + geom_point() + 
+    theme_bw() + geom_smooth()
+  
+  
+  gam1 <- gam(y ~ s(x) + cat + s(x, by = cat, m = 1), data = dat)
+  summary(gam1) 
+  visreg(gam1, xvar = "x", by = "cat")
+  
+
+# Copying files from cluster ----------------------------------------------
+
+library(ssh.utils)  
+  
+  cp.remote(remote.src = "lukembro@dtn2.hoffman2.idre.ucla.edu",
+            path.src = "/u/flashscratch/l/lukembro/qlobata_growth/run_log.txt",
+            remote.dest = "",
+            path.dest = getwd(), verbose = TRUE)
+  
+  system2("scp lukembro@dtn2.hoffman2.idre.ucla.edu:/u/flashscratch/l/lukembro/qlobata_growth/run_log.txt ./")
+  
+  install.packages("RCurl")
+  library(RCurl)
+  
+  curlVersion()
+  
+  scp(host = "dtn2.hoffman2.idre.ucla.edu",
+      path = "/u/flashscratch/l/lukembro/qlobata_growth/run_log.txt"")
   
