@@ -13,7 +13,7 @@
   library(visreg) # Installed on home directory
 
 # Load data
- load("../gam_cluster_2018-05-28.Rdata")
+ load("../gam_cluster_2018-05-31.Rdata")
 
 
  # Initialize variables
@@ -29,6 +29,9 @@
    # Formula for random effects
   random_effects <-  '+ s(accession, bs = "re") + s(section_block, bs = "re")'
   
+
+
+
   # Loop through snps by index based on task id
   for(snp_index in task_id:(task_id + interval - 1)){
         
@@ -44,23 +47,37 @@
     snp <- paste0("snp_", snp_col_names[snp_index])
     
     # Make sure there's at least 3 levels
-    # if(length(table(dat_snp[, snp])) < 3){
-    #   cat("Skipping because not at least 3 levels")
-    #   next
-    # }
+      if(length(table(dat_snp[, snp])) < 3){
+        cat("Skipping because not at least 3 levels")
+        next
+      }
+
+    # Choose numbers of knots
+    k = length(table(pull(dat_snp, snp)))
     
     # Convert to factor
-    dat_snp[, snp] <- as.factor(pull(dat_snp, snp))
+    # dat_snp[, snp] <- as.factor(pull(dat_snp, snp))
     
   
       
+    
+  # For SNPS as factors    
+     
     # Stack overflow on adding m = 1 to by= smooths - https://stats.stackexchange.com/questions/32730/how-to-include-an-interaction-term-in-gam
+     
+    # fixed_effects_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\") + s(", climate_var_dif,", by =",snp,", bs=\"cr\", m = 1) + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
     
-    fixed_effects_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\") + s(", climate_var_dif,", by =",snp,", bs=\"cr\", m = 1) + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
+    # fixed_effects_no_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\")  + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
     
-    fixed_effects_no_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\")  + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
-    cat("Working on: ", snp, "... number: ", x, " ...\n" )
+  # For SNPS as continuous  
+    fixed_effects_int <- paste0(paste0("height_2017 ~ site + s(height_2014, bs=\"cr\") + te(", snp, ", bs=\"cr\", k = ", k, ") +  te(", climate_var_dif,", bs=\"cr\") + ti(", climate_var_dif,", ",snp,", bs=\"cr\", k =", k," ) + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
     
+    fixed_effects_no_int <- paste0(paste0("height_2017 ~ site + s(height_2014, bs=\"cr\") + te(", snp, ", bs=\"cr\", k = ", k, ") +  te(", climate_var_dif,", bs=\"cr\")  + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
+    
+  # Run gams
+  
+   cat("Working on: ", snp, "... number: ", x, " ...\n" )
+
     gam_snp_int = bam(formula = make_formula(fixed_effects_int, random_effects),
                   data = dat_snp, 
                   discrete = TRUE,
@@ -77,28 +94,54 @@
     # Compare AICs
     gam_snp_int$delta_aic <- gam_snp_int$aic - gam_snp_no_int$aic
 
-    # Make plots of interaction
-    pdf(paste0("./model_plots/", snp,".pdf"), width = 8, height = 5)
-    visreg(gam_snp_int, xvar = climate_var_dif, 
-      by = snp, scale = "response")
-    dev.off()
+
+
+   # Visualization plots
+    
+    # For snps as factors
+      # pdf(paste0("./model_plots/", snp,".pdf"), width = 8, height = 5)
+      # visreg(gam_snp_int, xvar = climate_var_dif, 
+      #        by = snp, scale = "response")
+      # dev.off()
+    
+    # For SNPS as continuous
+        pdf(paste0("./model_plots/", snp,".pdf"), width = 5, height = 5)
+        visreg2d(gam_snp_int, 
+                 xvar = climate_var_dif, yvar = snp, 
+                 scale = "response", 
+                 plot.type = "persp", theta = 35)
+        dev.off()
 
 
   # Make predictions
-    predictions_3deg_sub <-  predictions_3deg  %>%
-      dplyr::filter(genotype %in% pull(dat_snp, snp)) %>% # Make sure genotypes are represented
-      dplyr::mutate(!!snp := genotype)
 
-
-   # Change accession number if genetic data is missing so we don't get errors in prediction
-     while(any(is.na(dat_snp[as.character(dat_snp$accession) %in% 
-                          as.character(predictions_3deg_sub$accession), snp]))){
-    predictions_3deg_sub$accession = as.numeric(predictions_3deg_sub$accession) + 1
-  }
-     
+   # When SNPs are continuous, make own genotypes
+      gen_temp <- data.frame(accession = "1", 
+                 genotype = c(0, 1, 2),             
+               genotype_scaled = c((0 - scaled_snps_means[snp]) / scaled_snps_sds[snp],
+                              (1 - scaled_snps_means[snp]) / scaled_snps_sds[snp],
+                              (2 - scaled_snps_means[snp]) / scaled_snps_sds[snp]))
+                 
+      
+      predictions_3deg_sub <- left_join(predictions_3deg, gen_temp)
         
+        
+    # Make sure genotypes are represented and rename column      
+    predictions_3deg_sub <-  predictions_3deg_sub  %>%
+      dplyr::filter(genotype_scaled %in% pull(dat_snp, snp)) %>% 
+      dplyr::mutate(!!snp := genotype_scaled)
+    
+  # For SNPs as factors  
+    # Change accession number if genetic data is missing so we don't get errors in prediction
+    # while(any(is.na(dat_snp[as.character(dat_snp$accession) %in% 
+    #                         as.character(predictions_3deg_sub$accession), snp]))){
+    #   predictions_3deg_sub$accession = as.numeric(predictions_3deg_sub$accession) + 1
+    # }
+    
+      
     # Subset predictions based on 
-    predictions_3deg_sub$pred <- predict(gam_snp_int, newdata = predictions_3deg_sub,
+    predictions_3deg_sub$pred <- predict(gam_snp_int, 
+                                         newdata = predictions_3deg_sub,
                                      type = "response")
     
     
@@ -121,19 +164,10 @@
       
       }
 
-
-    
-    #summary(gam_snp)
-    #visreg(gam_snp, scale = "response")
-    #visreg(gam_snp_int, xvar = "tmax_sum_dif", by = snp, scale = "response")
-    # visreg2d(gam_snp, xvar = "tmax_sum_dif", 
-    #          yvar = snp, 
-    #          scale = "response", 
-    #          plot.type = "persp", theta = 45, phi = 15)
-
     # Attach data so that we can use visreg later if we need
     # gam_snp$data <- dat_snp
     
+
     # Save into list
     gam_list[[x]] <- gam_snp_int
     names(gam_list)[x] <- snp
@@ -147,7 +181,7 @@
     gam_name <- paste0("gam_", climate_var_dif, "_", snp)
     assign(gam_name, gam_snp_int) # Assign model the name
 
-    save(list = gam_name, file = paste0("./gam_mods_data/", gam_name, ".Rdata"))
+    # save(list = gam_name, file = paste0("./gam_mods_data/", gam_name, ".Rdata"))
     
     # Timing of loop
     end_time <- Sys.time()
@@ -198,6 +232,14 @@
     height_change_gen_2 = unlist(lapply(gam_list, function(x) x$height_change_gen_2)),
 
     # P values for interaction terms
+    p_val_int = ifelse(unlist(lapply(gam_list_summary, function(x)
+      length(x$s.table[grep(pattern = "^ti", 
+                            rownames(x$s.table)), "p-value"]) == 0)), 
+      yes = NA, 
+      no = unlist(lapply(gam_list_summary, function(x)
+        x$s.table[grep(pattern = "^ti",
+                       rownames(x$s.table)), "p-value"]))),
+    
     # Use grep to look at the last number of the smooth summary table - 
     # Should correspond to the genotype
     # Returns NA if no match
@@ -208,7 +250,6 @@
                          no = unlist(lapply(gam_list_summary, function(x)
                                                     x$s.table[grep(pattern = "0$",
                                                    rownames(x$s.table)), "p-value"]))),
-    
     p_val_gen_1 = ifelse(unlist(lapply(gam_list_summary, function(x)
                           length(x$s.table[grep(pattern = "1$",
                             rownames(x$s.table)), "p-value"]) == 0)), 
@@ -224,8 +265,8 @@
                           no = unlist(lapply(gam_list_summary, function(x)
                           x$s.table[grep(pattern = "2$",
                                          rownames(x$s.table)), "p-value"])))
-
-  )
+    
+      )
   
   head(gam_mod_summary_df)
   

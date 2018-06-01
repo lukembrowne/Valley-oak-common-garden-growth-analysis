@@ -20,6 +20,8 @@ library(beepr)
                              by = c("id" = "gbs_name"))
   dim(gen_dat_clim)
   
+  climate_gbs_mom$id[!is.na(climate_gbs_mom$accession)]
+  
   # Getting genetic data
   snp_col_names <- colnames(gen_dat[, -c(1, 2)])
   
@@ -38,31 +40,31 @@ library(beepr)
   
   
   ## Calculate PCA on genetic data
-  pca_gen = prcomp(bglr_gen_scaled, center = FALSE, scale = FALSE)
-  summary(pca_gen)
-  screeplot(pca_gen, bstick = TRUE)
-  
-  pcs <- as.data.frame(pca_gen$x[, 1:10])
-  colnames(pcs) <- paste0(colnames(pcs), "_gen")
-  
-  bglr_gen_scaled <- bind_cols(bglr_gen_scaled, pcs)
+    pca_gen = prcomp(bglr_gen_scaled, center = FALSE, scale = FALSE)
+    summary(pca_gen)
+    screeplot(pca_gen, bstick = TRUE)
+    
+    pcs <- as.data.frame(pca_gen$x[, 1:10])
+    colnames(pcs) <- paste0(colnames(pcs), "_gen")
+    
+    bglr_gen_scaled <- bind_cols(bglr_gen_scaled, pcs)
 
   
-  # Combine with genetic data 
-    # dat_snp = left_join(dat_gbs_only_scaled, 
-    #                     bind_cols(gen_dat_clim[, "accession"],
-    #                                        bglr_gen_scaled), 
-    #                     by = "accession")
+  # Genetic data as numeric - with mean imputed genotypes
+    dat_snp = left_join(dat_gbs_only_scaled,
+                        bind_cols(gen_dat_clim[, "accession"],
+                                           bglr_gen_scaled),
+                        by = "accession")
+    dim(dat_snp)
   
   # For using snps as factors
-  dat_snp = left_join(dat_gbs_only_scaled, 
+  dat_snp = left_join(dat_gbs_only_scaled,
                     bind_cols(gen_dat_clim[, c("accession", snp_col_names)],
                                        pcs),
                     by = "accession")
   
-    # dat_snp <- dat_snp %>%
-    #   dplyr::mutate_at(snp_col_names, funs(factor(.)))
-    #   
+   
+  # Set up factors  
     dat_snp$accession <- factor(dat_snp$accession)
     dat_snp$section_block <- factor(dat_snp$section_block)
     dat_snp$section <- factor(dat_snp$section)
@@ -70,7 +72,39 @@ library(beepr)
     
     # Adding snp_ to column names - useful for gams
     colnames(dat_snp)[which(colnames(dat_snp) %in% snp_col_names)] <- paste0("snp_", colnames(dat_snp[, snp_col_names]))
+    
+  # Scale PCA axes
+    dat_snp$PC1_gen <- (dat_snp$PC1_gen - mean(dat_snp$PC1_gen)) / sd(dat_snp$PC1_gen)
+    dat_snp$PC2_gen <- (dat_snp$PC1_gen - mean(dat_snp$PC2_gen)) / sd(dat_snp$PC2_gen)
+    dat_snp$PC3_gen <- (dat_snp$PC1_gen - mean(dat_snp$PC3_gen)) / sd(dat_snp$PC3_gen)
+    dat_snp$PC4_gen <- (dat_snp$PC1_gen - mean(dat_snp$PC4_gen)) / sd(dat_snp$PC4_gen)
+    dat_snp$PC5_gen <- (dat_snp$PC1_gen - mean(dat_snp$PC5_gen)) / sd(dat_snp$PC5_gen)
  
+    
+  # Scale genotypes  
+    scaled_snps_means <- apply(dat_snp[, paste0("snp_", snp_col_names)], MARGIN = 2,
+          function(x) mean(x, na.rm = TRUE))
+    
+    scaled_snps_sds <- apply(dat_snp[, paste0("snp_", snp_col_names)], MARGIN = 2,
+                               function(x) sd(x, na.rm = TRUE))
+    
+    dat_snp[, paste0("snp_", snp_col_names)] <-   apply(dat_snp[, paste0("snp_",
+                                             snp_col_names)], MARGIN = 2,
+                    function(x) (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE))
+    
+    dat_snp[1:10, 150:160]
+    
+    # Mean impute
+    dat_snp[, paste0("snp_", snp_col_names)] <- apply(dat_snp[, paste0("snp_",
+                                                    snp_col_names)], MARGIN = 2,
+               function(x) ifelse(is.na(x), yes = 0, no = x))
+    
+    dat_snp[1:10, 150:160]
+    
+    summary(dat_snp[, 150:160])
+    
+    
+    
 # Set a prediction data frame
   
   # function to transform from raw to scaled variables
@@ -85,7 +119,7 @@ library(beepr)
                   accession = "1",
                   section_block = "Block1_1",
                   PC1_gen = 0, PC2_gen = 0, PC3_gen = 0,
-                  genotype = c(0, 1, 2),
+                #  genotype = c(0, 1, 2),
                   tmax_sum_dif = forward_transform(c(0, 3),
                                                    var = "tmax_sum_dif",
                                                    means = scaled_var_means_gbs_only,
@@ -95,14 +129,14 @@ library(beepr)
 
   
 # Save data to file that will be uploaded to cluster  
-save(dat_snp, snp_col_names, predictions_3deg,
+save(dat_snp, snp_col_names, predictions_3deg, scaled_snps_means, scaled_snps_sds,
   file = paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
   
 
-# Code from cluster for testing -------------------------------------------
+# Gam code from cluster for testing -------------------------------------------
 
   
-  # Initialize variables
+# Initialize variables
   gam_list <- list()
   x = 1
   
@@ -115,9 +149,10 @@ save(dat_snp, snp_col_names, predictions_3deg,
    # Formula for random effects
   random_effects <-  '+ s(accession, bs = "re") + s(section_block, bs = "re")'
   
-  # Loop through snps by index based on task id
+  
+  
+# Loop through snps by index based on task id
   for(snp_index in task_id:(task_id + interval - 1)){
-    
     
     # To avoid going past number of snps
     if(snp_index > length(snp_col_names)){
@@ -130,27 +165,40 @@ save(dat_snp, snp_col_names, predictions_3deg,
     # Choose snp
     snp <- paste0("snp_", snp_col_names[snp_index])
     
+    # Choose numbers of knots
+    k = length(table(pull(dat_snp, snp)))
+    
     # Make sure there's at least 3 levels
-    # if(length(table(dat_snp[, snp])) < 3){
-    #   cat("Skipping because not at least 3 levels")
-    #   next
-    # }
+    if(length(table(dat_snp[, snp])) < 3){
+      cat("Skipping because not at least 3 levels")
+      next
+    }
+
     
     # Convert to factor
-    dat_snp[, snp] <- as.factor(pull(dat_snp, snp))
+    # dat_snp[, snp] <- as.factor(pull(dat_snp, snp))
     
   
     # Formula for fixed effects
     
     # Stack overflow on adding m = 1 to by= smooths - https://stats.stackexchange.com/questions/32730/how-to-include-an-interaction-term-in-gam
     
-    fixed_effects_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\") + s(", climate_var_dif,", by =",snp,", bs=\"cr\", m = 1) + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
+  # For SNPS as factors    
     
-    fixed_effects_no_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\")  + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
+  # For factor interaction  
+    # fixed_effects_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\") + s(", climate_var_dif,", by =",snp,", bs=\"cr\", m = 1) + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
+    
+    # fixed_effects_no_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\")  + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
+    
+  # For SNPS as continuous  
+    fixed_effects_int <- paste0(paste0("height_2017 ~ site + s(height_2014, bs=\"cr\") + te(", snp, ", bs=\"cr\", k = ", k, ") +  te(", climate_var_dif,", bs=\"cr\") + ti(", climate_var_dif,", ",snp,", bs=\"cr\", k =", k," ) + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
+    
+    fixed_effects_no_int <- paste0(paste0("height_2017 ~ site + s(height_2014, bs=\"cr\") + te(", snp, ", bs=\"cr\", k = ", k, ") +  te(", climate_var_dif,", bs=\"cr\")  + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
+    
   
-    
+  # Run gams  
     cat("Working on: ", snp, "... number: ", x, " ...\n" )
-    
+
     gam_snp_int = bam(formula = make_formula(fixed_effects_int, random_effects),
                   data = dat_snp, 
                   discrete = TRUE,
@@ -168,21 +216,47 @@ save(dat_snp, snp_col_names, predictions_3deg,
     # Compare AICs
     gam_snp_int$delta_aic <- gam_snp_int$aic - gam_snp_no_int$aic
     
-    pdf(paste0("./output/model_visualizations/", snp,".pdf"), width = 8, height = 5)
-    visreg(gam_snp_int, xvar = climate_var_dif, 
-           by = snp, scale = "response")
-    dev.off()
+  
+    # Visualization plots
+    
+    # For snps as factors
+      # pdf(paste0("./output/model_visualizations/", snp,".pdf"), width = 8, height = 5)
+      # visreg(gam_snp_int, xvar = climate_var_dif, 
+      #        by = snp, scale = "response")
+      # dev.off()
+    
+    # For SNPS as continuous
+        pdf(paste0("./output/model_visualizations/", snp,".pdf"), width = 8, height = 5)
+        visreg2d(gam_snp_int, 
+                 xvar = climate_var_dif, yvar = snp, 
+                 scale = "response", 
+                 plot.type = "persp", theta = 35)
+        dev.off()
     
     # Make predictions
-    predictions_3deg_sub <-  predictions_3deg  %>%
-      dplyr::filter(genotype %in% pull(dat_snp, snp)) %>% # Make sure genotypes are represented
-      dplyr::mutate(!!snp := genotype)
+        
+    # When SNPs are continuous, make own genotypes
+      gen_temp <- data.frame(accession = "1", 
+                 genotype = c(0, 1, 2),             
+               genotype_scaled = c((0 - scaled_snps_means[snp]) / scaled_snps_sds[snp],
+                              (1 - scaled_snps_means[snp]) / scaled_snps_sds[snp],
+                              (2 - scaled_snps_means[snp]) / scaled_snps_sds[snp]))
+                 
+      
+      predictions_3deg_sub <- left_join(predictions_3deg, gen_temp)
+        
+        
+    # Make sure genotypes are represented and rename column      
+    predictions_3deg_sub <-  predictions_3deg_sub  %>%
+      dplyr::filter(genotype_scaled %in% pull(dat_snp, snp)) %>% 
+      dplyr::mutate(!!snp := genotype_scaled)
     
+  # For SNPs as factors  
     # Change accession number if genetic data is missing so we don't get errors in prediction
-    while(any(is.na(dat_snp[as.character(dat_snp$accession) %in% 
-                            as.character(predictions_3deg_sub$accession), snp]))){
-      predictions_3deg_sub$accession = as.numeric(predictions_3deg_sub$accession) + 1
-    }
+    # while(any(is.na(dat_snp[as.character(dat_snp$accession) %in% 
+    #                         as.character(predictions_3deg_sub$accession), snp]))){
+    #   predictions_3deg_sub$accession = as.numeric(predictions_3deg_sub$accession) + 1
+    # }
     
       
     # Subset predictions based on 
@@ -287,6 +361,14 @@ save(dat_snp, snp_col_names, predictions_3deg,
     height_change_gen_2 = unlist(lapply(gam_list, function(x) x$height_change_gen_2)),
     
     # P values for interaction terms
+    p_val_int = ifelse(unlist(lapply(gam_list_summary, function(x)
+      length(x$s.table[grep(pattern = "^ti", 
+                            rownames(x$s.table)), "p-value"]) == 0)), 
+      yes = NA, 
+      no = unlist(lapply(gam_list_summary, function(x)
+        x$s.table[grep(pattern = "^ti",
+                       rownames(x$s.table)), "p-value"]))),
+    
     # Use grep to look at the last number of the smooth summary table - 
     # Should correspond to the genotype
     # Returns NA if no match
@@ -354,10 +436,13 @@ save(dat_snp, snp_col_names, predictions_3deg,
   
   hist(test$delta_aic, breaks = 30)
   
-  hist(test$p_val_gen_0, breaks = 30)
-  hist(test$p_val_gen_1, breaks = 30)
-  hist(test$p_val_gen_2, breaks = 30)
+  hist(test$p_val_int, breaks = 20)
   
+  hist(test$p_val_gen_0, breaks = 20)
+  hist(test$p_val_gen_1, breaks = 20)
+  hist(test$p_val_gen_2, breaks = 20)
+  
+  plot(test$delta_aic, test$p_val_int, pch = 19, cex = .5)
   plot(test$delta_aic, test$p_val_gen_0, pch = 19, cex = .5)
   plot(test$delta_aic, test$p_val_gen_1, pch = 19, cex = .5)
   plot(test$delta_aic, test$p_val_gen_2, pch = 19, cex = .5)
@@ -424,8 +509,8 @@ save(dat_snp, snp_col_names, predictions_3deg,
   
   qvals <- qvalue(p = sum_df %>%
                     dplyr::filter(climate_var == "tmax_sum_dif") %>%
-                    dplyr::pull(p_val_gen_0),
-                  fdr.level = 0.001)
+                    dplyr::pull(p_val_int),
+                  fdr.level = 0.05)
   
   sum_df <- sum_df %>%
     dplyr::filter(climate_var == "tmax_sum_dif") %>%
