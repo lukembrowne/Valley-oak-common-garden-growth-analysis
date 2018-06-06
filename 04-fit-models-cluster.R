@@ -129,10 +129,143 @@ library(beepr)
 
   
 # Save data to file that will be uploaded to cluster  
-save(dat_snp, snp_col_names, predictions_3deg, scaled_snps_means, scaled_snps_sds,
-  file = paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
-  
+  # save(dat_snp, snp_col_names, predictions_3deg, scaled_snps_means, scaled_snps_sds,
+  #   file = paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
 
+
+# Run FULL models with all seedlings (no genomic data) --------------------
+
+  # Convert factors
+    dat_all_scaled$section <- factor(dat_all_scaled$section)
+    dat_all_scaled$section_block <- factor(dat_all_scaled$section_block) 
+    dat_all_scaled$accession <- factor(dat_all_scaled$accession)
+    dat_all_scaled$site <- factor(dat_all_scaled$site)
+  
+  # With all 5,000+ seedlings
+  gam_tmax_sum_dif_all <- bam(height_2017 ~ section_block + 
+                          + s(height_2014, bs= "cr")  
+                          + s(tmax_sum_dif, bs="cr")
+                          + s(accession, bs = "re"),
+                          data = dat_all_scaled,
+                          discrete = TRUE, 
+                          nthreads = 8,
+                          method = "fREML", family = "tw", 
+                          control = list(trace = FALSE))
+  
+  summary(gam_tmax_sum_dif_all)
+
+
+# Function for plotting predictions ---------------------------------------
+
+  plot_pred <- function(xvar,
+                        add_points = TRUE,
+                        save = FALSE,
+                        path = "./",
+                        filename = ""){
+  
+      # Function to back transform variables
+      back_transform <- function(x, var, means, sds){
+        (x * sds[var]) + means[var]
+      }
+
+      # Test to see what type of variable it is - factor or numeric
+      type <- ifelse(is.factor(pull(dat_all_scaled, xvar)), "factor", "numeric")
+      
+      
+      # Make predictions
+        v <- visreg(gam_tmax_sum_dif_all, xvar = xvar, 
+             scale = "response", rug = FALSE, ylab = "5 yr height (cm)", plot = FALSE)
+        
+        dat_all_scaled_trans <- dat_all_scaled
+ 
+    # If xvariable is not a factor, backtranform to original scale for plotting
+      if(type == "numeric"){
+          # Transform x axis + assign variables for lo and hi CI
+          v$fit <- v$fit %>%
+            # Back transform X axis
+            mutate(!!xvar := back_transform(x = get(xvar),
+                                                       var = xvar,
+                                                       means = scaled_var_means_all,
+                                                       sds = scaled_var_sds_all))
+          
+          dat_all_scaled_trans <- dat_all_scaled %>%
+            # Back transform X axis
+            mutate(!!xvar := back_transform(x = get(xvar),
+                                            var = xvar,
+                                            means = scaled_var_means_all,
+                                            sds = scaled_var_sds_all))
+      } # End factor if
+      
+      ## Main GGPLOT
+        gg <- 
+          ggplot(dat_all_scaled_trans, aes(x = get(xvar), y = height_2017)) + 
+          xlab(xvar) + ylab("5 yr height (cm)") +
+          theme_bw()
+        
+      # Add raw points to graph?
+        if(add_points == TRUE){
+          gg <- gg + 
+            geom_jitter(data = dat_all_scaled_trans, aes(x = get(xvar), y = height_2017),
+                        size = 0.5, alpha = 0.5)
+        }
+      
+     
+      
+      # If numeric, add points and lines
+        if(type == "numeric"){
+         gg <- gg + 
+            geom_ribbon(data = v$fit, aes(ymin = visregLwr, ymax = visregUpr), fill = "forestgreen", alpha = 0.75) +
+            geom_line(data = v$fit, aes(x = get(xvar), y = visregFit), lwd = 2) 
+        }
+      
+      # If factor, make point_range
+        if(type == "factor"){
+          gg <- gg + 
+            geom_pointrange(data = v$fit, aes(x = get(xvar), y = visregFit, 
+                                              ymin = visregLwr, ymax = visregUpr,
+                                                        fill = get(xvar)),
+                                      size = 1.5, shape = 21) +
+            guides(fill=FALSE) # Remove legend
+        }
+      
+      
+      
+      # Add verticle line at 0 if a climate transfer function
+        if(grepl(pattern = "_dif", x = xvar)){
+          gg <- gg + geom_vline(aes(xintercept = 0), lty = 2) 
+        }
+      
+      # General theme and margins
+        gg <- gg + theme(plot.margin = (margin(1.5,1.5,1.5,1.5, "cm")),
+                         text = element_text(size = 20))
+      
+      # Printing to file
+      if(save){
+        ggsave(paste0(path, filename))
+      }
+        
+      print(gg)
+      
+  } # End plot_pred function
+
+    
+# Numerical    
+  
+  save_flag = TRUE
+  path <- "./figs_tables/2018_06_08 Jamie meeting/"
+  
+  plot_pred(xvar = "height_2014", add_points = FALSE, save = save_flag, path = path, filename = "height_2014_no_points.pdf")
+  plot_pred(xvar = "height_2014", add_points = TRUE, save = save_flag, path = path, filename = "height_2014_points.pdf")
+  
+  plot_pred(xvar = "tmax_sum_dif", add_points = FALSE, save = save_flag, path = path, filename = "tmax_sum_dif_no_points.pdf")
+  plot_pred(xvar = "tmax_sum_dif", add_points = TRUE, save = save_flag, path = path, filename = "tmax_sum_dif_points.pdf")
+  
+# Factors
+  plot_pred(xvar = "section_block", save = save_flag, path = path, filename = "section_block.pdf")  
+  plot_pred(xvar = "site", save = save_flag, path = path, filename = "site.pdf")  
+  plot_pred(xvar = "accession", add_points = FALSE, save = save_flag, path = path, filename = "accession.pdf")
+      
+      
 # Gam code from cluster for testing -------------------------------------------
 
   

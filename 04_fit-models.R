@@ -1,8 +1,3 @@
-# TODO
-
-# - On combining MAS and GS models: From Lasky 2015
-# each environmental variable tested, we calculated z scores of marker predictions and z scores of kinship predictions and then took the aver- age of the two predictions for each genotype. Accession
-
 # Source files ------------------------------------------------------------
 
   source("./01_clean-process-explore-data.R")
@@ -665,7 +660,7 @@ mod_out <- list() # Save list that will hold model outputs and such
  
       
  # Save gam mods
-   save(gam_mods, file = paste0("./output/gam_mods_out_", Sys.Date(), ".Rdata"))
+  # save(gam_mods, file = paste0("./output/gam_mods_out_", Sys.Date(), ".Rdata"))
  
   # load("./output/gam_mods_out_2018-04-19.Rdata")
   # load("./output/gam_mods_out_2018-05-16.Rdata")   
