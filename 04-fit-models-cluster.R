@@ -423,7 +423,35 @@ save(dat_snp, snp_col_names, predictions_3deg, scaled_snps_means, scaled_snps_sd
   # How many converged?
   table(sum_df$converged)
   
-  # Sort by delta AIC  
+  # Filter to just those that converged
+  sum_df <- sum_df %>%
+    dplyr::filter(converged)
+  dim(sum_df)
+  
+  
+  ## Sort by p value of interaction
+  pval_sub <- sum_df %>%
+    dplyr::top_n(., -5, p_val_int)
+  
+  pval_sub
+  
+  ## TAKE top 1% of SNPS
+  
+  
+  ## SCP code to copy over model plots
+    for(snp in pval_sub$snp){
+      system(paste0("scp lukembro@dtn2.hoffman2.idre.ucla.edu:/u/flashscratch/l/lukembro/qlobata_growth/run_2815486_tmax_sum_dif/model_plots/", snp, ".pdf ./output/model_visualizations/"))
+      
+      ggplot(dat_snp, aes(tmax_sum_dif, pull(dat_snp, snp))) +
+        geom_jitter() +
+        ylab(snp) +
+        theme_bw()  
+      
+      ggsave(paste0("./output/model_visualizations/",snp, "_scatter.pdf"))
+      
+    }
+  
+   # Sort by delta AIC  
   test = sum_df %>%
     dplyr::group_by(climate_var) %>%
     dplyr::filter(converged == TRUE) %>%
@@ -448,25 +476,11 @@ save(dat_snp, snp_col_names, predictions_3deg, scaled_snps_means, scaled_snps_sd
   plot(test$delta_aic, test$p_val_gen_2, pch = 19, cex = .5)
   
   
-  
-  # Take snps with lowest delta aic 
-  # Filter out ones that did not converge
-  # - run in same model to generate super model?
-  # - filter down to snps that aren't super correlated with each other?
-  # - try to figure out more about those SNPs with gradient forest / RDA, etc?
-  
-  
-  
-  
-  
-  
-  
-  
 
 # Calculate AIC weights
-  sum_df <- sum_df %>%
-    dplyr::group_by(climate_var) %>%
-    dplyr::mutate(aic_weight = Weights(aic))
+  # sum_df <- sum_df %>%
+  #   dplyr::group_by(climate_var) %>%
+  #   dplyr::mutate(aic_weight = Weights(aic))
   
   # sum_df <- sum_df %>%
   #   dplyr::mutate(aic_delta = aic - 28941.18) # AIC calculated from base model
@@ -486,7 +500,6 @@ save(dat_snp, snp_col_names, predictions_3deg, scaled_snps_means, scaled_snps_sd
  
   # Sort by lowest p value - have the strongest interaction effect, but maybe not best AIC
     sum_df %>%
-      dplyr::group_by(climate_var) %>%
       dplyr::arrange(p_val_int)
     
   # Sort by highest deviance explained
@@ -508,12 +521,10 @@ save(dat_snp, snp_col_names, predictions_3deg, scaled_snps_means, scaled_snps_sd
   hist(sum_df$p_val_int, nclass = 20)
   
   qvals <- qvalue(p = sum_df %>%
-                    dplyr::filter(climate_var == "tmax_sum_dif") %>%
                     dplyr::pull(p_val_int),
                   fdr.level = 0.05)
   
   sum_df <- sum_df %>%
-    dplyr::filter(climate_var == "tmax_sum_dif") %>%
     mutate(q_val = qvals$qvalues)
   
   qvals$qvalues
@@ -527,40 +538,57 @@ save(dat_snp, snp_col_names, predictions_3deg, scaled_snps_means, scaled_snps_sd
   hist(qvals)
   
   plot(qvals)
-  
-  # Setting an alpha threshold 
-  qobj_fdrlevel <- qvalue(p = sum_df$p_val_int, fdr.level = 0.05)
-  qobj_fdrlevel$significant
-  table(qobj_fdrlevel$significant)
-  
- plot(qobj_fdrlevel$qvalues ~ factor(as.numeric(qobj_fdrlevel$significant)))
- summary(qobj_fdrlevel$qvalues[qobj_fdrlevel$significant])
- summary(qobj_fdrlevel)
- 
- 
-  summary(qobj_fdrlevel)
-  
+
   # Sort by lowest q value  
   sum_df %>%
-    dplyr::group_by(climate_var) %>%
     dplyr::arrange(q_val)
   
   
 
 # Manhattan plots ---------------------------------------------------------
 
-
-sum_df_sub <-  sum_df %>%
+  sum_df_sub <-  sum_df %>%
   dplyr::filter(climate_var == "tmax_sum_dif")    
     
-  plot(-log10(sum_df_sub$q_val), pch = 20,
+  plot(-log10(sum_df_sub$p_val_int), pch = 20,
        xlab = "SNP", ylab = "-log10(P)", 
        main = "tmax_sum_dif", las = 1,
-       col = factor(snp_pos$chrom %% 2), # To alternate colors for pseudo-chromosomes
-       ylim = c(0, 2))
+       
+       # Will need to correct colors for missing SNPs
+      # col = factor(snp_pos$chrom %% 2), # To alternate colors for pseudo-chromosomes
+       ylim = c(0, 4))
   abline(h = -log10(5e-8), lty = 2, col = "red") # Genome-wide significance line
   abline(h = -log10(1e-5)) # Suggestive significance line  
   abline(h = -log10(.05))
+  
+  library(CMplot)
+  
+  man_df <- data.frame(SNP = paste0("snp_", snp_col_names), 
+                       snp_pos)
+  
+   man_df <- left_join(man_df, sum_df[, c("snp", "p_val_int")], by = c("SNP" = "snp"))
+ # man_df <- left_join(man_df, sum_df[, c("snp", "q_val")], by = c("SNP" = "snp"))
+  
+  head(man_df)
+  
+  # SNP density plot
+  CMplot(man_df, plot.type = "d",
+         col=c("darkgreen", "yellow", "red"),
+         file.output = FALSE)
+  
+## Manhattan plot with SNP density  
+  dev.off()
+  CMplot(man_df, plot.type=c("m"), LOG10=TRUE, threshold=1e-4,
+         bin.size=1e6,
+         chr.den.col=c("darkgreen", "yellow", "red"), file.output = TRUE)
+  
+  
+## QQplot  
+  dev.off()
+  CMplot(man_df, plot.type="q", box=TRUE,file.output = TRUE)
+  
+  
+  
   
   
   
@@ -618,25 +646,10 @@ plot(gen_dat_clim$tmax_sum, bglr_gen_scaled[, snp])
 
 # Gradient forest test ----------------------------------------------------
     
-    number = 500
+  # Take 1%  
+    number = round(0.01 * nrow(sum_df))
     
     growth_thresh = -10
-    
-    # Based on delta AIC
-    top_snps = sum_df %>%
-      dplyr::filter(climate_var == "tmax_sum_dif")  %>%
-      dplyr::filter(converged == TRUE) %>%
-      dplyr::filter(delta_aic > -1000) %>% 
-      dplyr::filter(delta_aic < 500) %>%
-    #  dplyr::top_n(., -number, delta_aic) %>%
-   #   dplyr::filter(delta_aic < -3) %>%
-      dplyr::arrange(delta_aic) %>%
-      dplyr::filter(height_change_gen_0 < growth_thresh | 
-                      height_change_gen_1 < growth_thresh | 
-                      height_change_gen_2 < growth_thresh) %>%
-      dplyr::select(snp) %>%
-      dplyr::mutate(snp = gsub("snp_", "", snp))
-    
     
     # Based on delta AIC
     
@@ -656,40 +669,49 @@ plot(gen_dat_clim$tmax_sum, bglr_gen_scaled[, snp])
 
     top_snps
     
+    # Based on q value
+    top_snps = sum_df %>%
+    #  dplyr::filter(q_val < 0.05) %>%
+      dplyr::top_n(., -number, q_val) %>%
+      dplyr::select(snp) %>%
+      dplyr::mutate(snp = gsub("snp_", "", snp))
     
-    
+    top_snps
+
     bglr_gen_scaled[, top_snps$snp]
     
-   gen_dat[, top_snps$snp]
+   gen_dat_clim[, top_snps$snp]
 
-   gen_dat_factor =  gen_dat_clim %>%
-     dplyr::select(top_snps$snp) %>%
-     mutate_all(funs(factor))
-   
    # gen_dat_factor =  gen_dat_clim %>%
-   #   dplyr::select(top_snps$snp)
+   #   dplyr::select(top_snps$snp) %>%
+   #   mutate_all(funs(factor))
+   
+   gen_dat_factor =  gen_dat_clim %>%
+     dplyr::select(top_snps$snp)
    
    
    
    # Mode impute
-   for(snp in 1:ncol(gen_dat_factor)){
-     mode <- as.numeric(names(sort(-table(gen_dat_factor[, snp])))[1])
-     gen_dat_factor[is.na(gen_dat_factor[, snp]), snp] <- mode
-   }
+   # for(snp in 1:ncol(gen_dat_factor)){
+   #   mode <- as.numeric(names(sort(-table(gen_dat_factor[, snp])))[1])
+   #   gen_dat_factor[is.na(gen_dat_factor[, snp]), snp] <- mode
+   # }
    
    summary(gen_dat_factor)
     
     library(gradientForest)
     
     climate_vars_gf <- c("tmax_sum", "tmin_winter", "bioclim_04", 
-                         "tmax", "tmin", "random", "ppt", "cwd",
-                         "latitude", "longitude")
+                         "random", "cwd",
+                         "latitude")
+    
+    pairs.panels(gen_dat_clim[, climate_vars_gf])
     
     length(top_snps$snp)
     top_snps$snp
     
-    gf <- gradientForest(cbind(gen_dat_factor, 
-                                      gen_dat_clim),
+    gf <- gradientForest(cbind(gen_dat_clim[, climate_vars_gf],
+                                     bglr_gen_scaled ),
                          predictor.vars = climate_vars_gf, 
                         response.vars = top_snps$snp,
                         trace = TRUE)
@@ -818,22 +840,3 @@ plot(gen_dat_clim$tmax_sum, bglr_gen_scaled[, snp])
   visreg(gam1, xvar = "x", by = "cat")
   
 
-# Copying files from cluster ----------------------------------------------
-
-library(ssh.utils)  
-  
-  cp.remote(remote.src = "lukembro@dtn2.hoffman2.idre.ucla.edu",
-            path.src = "/u/flashscratch/l/lukembro/qlobata_growth/run_log.txt",
-            remote.dest = "",
-            path.dest = getwd(), verbose = TRUE)
-  
-  system2("scp lukembro@dtn2.hoffman2.idre.ucla.edu:/u/flashscratch/l/lukembro/qlobata_growth/run_log.txt ./")
-  
-  install.packages("RCurl")
-  library(RCurl)
-  
-  curlVersion()
-  
-  scp(host = "dtn2.hoffman2.idre.ucla.edu",
-      path = "/u/flashscratch/l/lukembro/qlobata_growth/run_log.txt"")
-  
