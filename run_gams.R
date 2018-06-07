@@ -11,9 +11,23 @@
 	library(mgcv)
 	library(tidyverse)
   library(visreg) # Installed on home directory
+  library(patchwork) # Installed on home directory
 
 # Load data
- load("../gam_cluster_2018-05-31.Rdata")
+ load("../gam_cluster_2018-06-07.Rdata")
+
+
+# Save functions
+# function to transform from raw to scaled variables
+  forward_transform <- function(x, var, means, sds){
+    ( x - means[var]) / sds[var]
+  }
+  
+  # Function to back transform variables
+  back_transform <- function(x, var, means, sds){
+    (x * sds[var]) + means[var]
+  }
+
 
 
  # Initialize variables
@@ -27,10 +41,8 @@
   }
   
    # Formula for random effects
-  random_effects <-  '+ s(accession, bs = "re") + s(section_block, bs = "re")'
+  random_effects <-  '+ s(accession, bs = "re")'
   
-
-
 
   # Loop through snps by index based on task id
   for(snp_index in task_id:(task_id + interval - 1)){
@@ -59,7 +71,7 @@
     # dat_snp[, snp] <- as.factor(pull(dat_snp, snp))
     
   
-      
+
     
   # For SNPS as factors    
      
@@ -69,100 +81,144 @@
     
     # fixed_effects_no_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\")  + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
     
-  # For SNPS as continuous  
-    fixed_effects_int <- paste0(paste0("height_2017 ~ site + s(height_2014, bs=\"cr\") + te(", snp, ", bs=\"cr\", k = ", k, ") +  te(", climate_var_dif,", bs=\"cr\") + ti(", climate_var_dif,", ",snp,", bs=\"cr\", k =", k," ) + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
-    
-    fixed_effects_no_int <- paste0(paste0("height_2017 ~ site + s(height_2014, bs=\"cr\") + te(", snp, ", bs=\"cr\", k = ", k, ") +  te(", climate_var_dif,", bs=\"cr\")  + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
-    
-  # Run gams
-  
-   cat("Working on: ", snp, "... number: ", x, " ...\n" )
 
+
+# Run gams
+   	cat("Working on: ", snp, "... number: ", x, " ...\n" )
+
+  # For SNPS as continuous  
+    fixed_effects_int <- paste0(paste0("height_2017 ~ section_block + s(height_2014, bs=\"cr\") + te(", snp, ", bs=\"cr\", k = ", k, ") +  te(", climate_var_dif,", bs=\"cr\") + ti(", climate_var_dif,", ",snp,", bs=\"cr\", k =", k," ) + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
+    
+    fixed_effects_no_int <- paste0(paste0("height_2017 ~ section_block + s(height_2014, bs=\"cr\") + te(", snp, ", bs=\"cr\", k = ", k, ") +  te(", climate_var_dif,", bs=\"cr\")  + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
+    
+  
+  # Gam with interaction effect
     gam_snp_int = bam(formula = make_formula(fixed_effects_int, random_effects),
                   data = dat_snp, 
                   discrete = TRUE,
                   nthreads = 8,
                   method = "fREML", family = "tw")
+
+   # Check for convergence
+    if(!gam_snp_int$mgcv.conv){
+    #  cat("Model not converged... trying again \n")
+    #  gam_snp_int = bam(formula = make_formula(fixed_effects_int, random_effects),
+    #                    data = dat_snp, 
+    #                    discrete = TRUE,
+    #                    nthreads = 8,
+    #                    method = "fREML", family = "tw", 
+    #                    control = list(trace = FALSE,
+    #                                   maxit = 500))
+    #  
+    #  if(!gam_snp_int$mgcv.conv){
+    #    cat("Model STILL not converged...\n")
+    #  }
+    }
     
-    gam_snp_no_int =  bam(formula = make_formula(fixed_effects_no_int,
-                                                 random_effects),
-                          data = dat_snp, 
-                          discrete = TRUE,
-                          nthreads = 8,
-                          method = "fREML", family = "tw")
+   
+
+   # gam_snp_no_int =  bam(formula = make_formula(fixed_effects_no_int,
+   #                                              random_effects),
+   #                       data = dat_snp, 
+   #                       discrete = TRUE,
+   #                       nthreads = 8,
+   #                       method = "fREML", family = "tw")
     
     # Compare AICs
-    gam_snp_int$delta_aic <- gam_snp_int$aic - gam_snp_no_int$aic
+   # gam_snp_int$delta_aic <- gam_snp_int$aic - gam_snp_no_int$aic
+     gam_snp_int$delta_aic <- NA
 
 
 
-   # Visualization plots
-    
-    # For snps as factors
-      # pdf(paste0("./model_plots/", snp,".pdf"), width = 8, height = 5)
-      # visreg(gam_snp_int, xvar = climate_var_dif, 
-      #        by = snp, scale = "response")
-      # dev.off()
-    
-    # For SNPS as continuous
-        pdf(paste0("./model_plots/", snp,".pdf"), width = 5, height = 5)
-        visreg2d(gam_snp_int, 
-                 xvar = climate_var_dif, yvar = snp, 
-                 scale = "response", 
-                 plot.type = "persp", theta = 35)
-        dev.off()
-
-
-  # Make predictions
+    # Make predictions
 
    # When SNPs are continuous, make own genotypes
       gen_temp <- data.frame(accession = "1", 
                  genotype = c(0, 1, 2),             
-               genotype_scaled = c((0 - scaled_snps_means[snp]) / scaled_snps_sds[snp],
+               	 genotype_scaled = c((0 - scaled_snps_means[snp]) / scaled_snps_sds[snp],
                               (1 - scaled_snps_means[snp]) / scaled_snps_sds[snp],
                               (2 - scaled_snps_means[snp]) / scaled_snps_sds[snp]))
                  
       
-      predictions_3deg_sub <- left_join(predictions_3deg, gen_temp)
+      pred_sub <- left_join(pred, gen_temp)
         
         
     # Make sure genotypes are represented and rename column      
-    predictions_3deg_sub <-  predictions_3deg_sub  %>%
+    pred_sub <-  pred_sub  %>%
       dplyr::filter(genotype_scaled %in% pull(dat_snp, snp)) %>% 
       dplyr::mutate(!!snp := genotype_scaled)
     
-  # For SNPs as factors  
-    # Change accession number if genetic data is missing so we don't get errors in prediction
-    # while(any(is.na(dat_snp[as.character(dat_snp$accession) %in% 
-    #                         as.character(predictions_3deg_sub$accession), snp]))){
-    #   predictions_3deg_sub$accession = as.numeric(predictions_3deg_sub$accession) + 1
-    # }
+    # Make PREDICTION
+    gam_preds <-  predict(gam_snp_int, 
+                          newdata = pred_sub,
+                          type = "response",
+                          se = TRUE)
+    pred_sub$pred <- gam_preds$fit
+    pred_sub$se <- gam_preds$se.fit
     
-      
-    # Subset predictions based on 
-    predictions_3deg_sub$pred <- predict(gam_snp_int, 
-                                         newdata = predictions_3deg_sub,
-                                     type = "response")
+    pred_sub$genotype <- factor(pred_sub$genotype)
     
+   # Backtransform climate variable
+     dat_snp_trans <- dat_snp %>%
+                  dplyr::select(climate_var_dif, snp, height_2017) %>%
+                     # Back transform X axis
+                     mutate(!!climate_var_dif := back_transform(x = get(climate_var_dif),
+                                                     var = climate_var_dif,
+                                                     means = scaled_var_means_gbs_only,
+                                                     sds = scaled_var_sds_gbs_only)) %>%
+                     # Back transform SNP
+                     mutate(!!snp := back_transform(x = get(snp),
+                                                                var = snp,
+                                                                means = scaled_snps_means,
+                                                                sds = scaled_snps_sds)) %>%
+                    # Filter down to just 0,1,2 genotypes
+                    dplyr::filter(get(snp) %in% c(0, 1, 2))
+
+  
+  # Climate transfer functions by genotype     
+    p1 <-  ggplot(pred_sub) + 
+      geom_ribbon(aes(tmax_sum_dif_unscaled, ymin = pred - 2 * se, ymax = pred + 2*se, fill = factor(genotype)), 
+                  alpha = 0.25, show.legend = FALSE)  +
+      geom_line(data = pred_sub, aes(x = tmax_sum_dif_unscaled, y = pred, col = factor(genotype)), lwd = 1.5) + 
+      geom_vline(aes(xintercept = 0), lty = 2) +
+      labs(col = "Genotype") +
+      ylab("5 yr height (cm)") +
+      xlab(climate_var_dif) +
+      theme_bw(15)
+  
+  # Density plots of genotypes       
+    p2 <- ggplot(dat_snp_trans, 
+                 aes(x = get(climate_var_dif), fill = factor(get(snp)))) + 
+      geom_histogram(binwidth = .5, col = "grey10") + 
+      geom_vline(aes(xintercept = 0), lty = 2) +
+      labs(fill = "Genotype") +
+      xlab(climate_var_dif) +
+      theme_bw(15)
     
-    climate_min <- min(predictions_3deg_sub$tmax_sum_dif)
-    climate_max <- max(predictions_3deg_sub$tmax_sum_dif)
-    
+  # Plot to PDF  
+    pdf(paste0("./model_plots/", snp,".pdf"), width = 15, height = 5)  
+     print(p1 + p2)
+    dev.off()
+   
+
+
+   # Make prediction for 3 degree increase in temperature
     for(genotype in c(0,1,2)){
       
-      if(!genotype %in% predictions_3deg_sub$genotype){
+      if(!genotype %in% as.numeric(as.character(pred_sub$genotype))){
         gam_snp_int[paste0("height_change_gen_", genotype)] <- NA
         next
       }
       
-      pred_sub <- predictions_3deg_sub[predictions_3deg_sub$genotype == genotype, ]
+      pred_sub_temp <- pred_sub[pred_sub$genotype == genotype, ]
       
-      height_change <- (pred_sub$pred[pred_sub$tmax_sum_dif == climate_max] - 
-        pred_sub$pred[pred_sub$tmax_sum_dif == climate_min]) / pred_sub$pred[pred_sub$tmax_sum_dif == climate_max] * 100 
+      height_change <- (pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 3][1] - 
+                          pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 0][1]) / pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 3][1] * 100 
       
       gam_snp_int[paste0("height_change_gen_", genotype)] <- height_change
       
       }
+
 
     # Attach data so that we can use visreg later if we need
     # gam_snp$data <- dat_snp
@@ -186,7 +242,8 @@
     # Timing of loop
     end_time <- Sys.time()
     cat("This loop took: ")
-    print(end_time - start_time)   
+    print(end_time - start_time)
+    cat("\n")   
     
   } # End SNP loop
 
@@ -238,7 +295,7 @@
       yes = NA, 
       no = unlist(lapply(gam_list_summary, function(x)
         x$s.table[grep(pattern = "^ti",
-                       rownames(x$s.table)), "p-value"]))),
+                       rownames(x$s.table)), "p-value"]))), 
     
     # Use grep to look at the last number of the smooth summary table - 
     # Should correspond to the genotype

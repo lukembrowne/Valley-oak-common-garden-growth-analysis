@@ -30,14 +30,14 @@
 #$ -r n
 #
 #  Job array indexes
-#$ -t 1-11717:50
+#$ -t 1-11717:100
 #
 # 11717 SNPS
 
 # Set variable that will be passed to R script
 # Interval needs to match what is set in Job array indexes
 
-set interval=50
+set interval=100
 set climate_var_dif='tmax_sum_dif'
 
 
