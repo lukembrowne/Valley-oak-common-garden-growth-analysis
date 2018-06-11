@@ -4,7 +4,7 @@
   library(tidyverse)
   library(googlesheets)
   library(maptools)
-  library(qtlcharts)
+ # library(qtlcharts)
 
 # Choose model type -------------------------------------------------------
 
@@ -296,12 +296,12 @@ response_variable = "height"
       # View(dplyr::select(pos_rgr, accession_progeny, rgr, height_2015, height_2017) )
       
       # Change to NA outlier values in relative growth rate
-      dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.025, na.rm = TRUE) |
-                    dat_all$rgr >= quantile(dat_all$rgr, 0.975, na.rm = TRUE)] <- NA
+      # dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.025, na.rm = TRUE) |
+      #               dat_all$rgr >= quantile(dat_all$rgr, 0.975, na.rm = TRUE)] <- NA
   
   
       ## Filter out individuals without an estimated RGR
-       dat_all <- dplyr::filter(dat_all, !is.na(rgr))
+      # dat_all <- dplyr::filter(dat_all, !is.na(rgr))
       }
 
     ## Filtering based on survival  

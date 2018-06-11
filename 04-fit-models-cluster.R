@@ -52,6 +52,7 @@ library(patchwork)
   
   ## Calculate PCA on genetic data
     pca_gen = prcomp(bglr_gen_scaled, center = FALSE, scale = FALSE)
+    biplot(pca_gen)
     summary(pca_gen)
     screeplot(pca_gen, bstick = TRUE)
     
@@ -142,10 +143,10 @@ library(patchwork)
   pred
 
 # Save data to file that will be uploaded to cluster  
-  save(dat_snp, snp_col_names, pred, 
-       scaled_snps_means, scaled_snps_sds,
-       scaled_var_means_gbs_only, scaled_var_sds_gbs_only,
-    file = paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
+  # save(dat_snp, snp_col_names, pred, 
+  #      scaled_snps_means, scaled_snps_sds,
+  #      scaled_var_means_gbs_only, scaled_var_sds_gbs_only,
+  #   file = paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
 
   
   
@@ -162,7 +163,7 @@ library(patchwork)
   # With all 5,000+ seedlings
   gam_all <- bam(height_2017 ~ section_block + 
                           + s(height_2014, bs= "cr")  
-                          + s(tmin_winter_dif, bs="cr")
+                          + s(tmax_sum_dif, bs="cr")
                           + s(accession, bs = "re"),
                           data = dat_all_scaled,
                           discrete = TRUE, 
@@ -283,6 +284,12 @@ library(patchwork)
   plot_pred(xvar = "accession", add_points = FALSE, save = save_flag, path = path, filename = "accession.pdf")
       
       
+  
+  
+  
+  
+  
+  
 # Gam code from cluster for testing -------------------------------------------
 
   
@@ -468,6 +475,7 @@ library(patchwork)
       labs(col = "Genotype") +
       ylab("5 yr height (cm)") +
       xlab(climate_var_dif) +
+      ggtitle(snp) +
       theme_bw(15)
   
   # Density plots of genotypes    
@@ -477,6 +485,7 @@ library(patchwork)
       geom_vline(aes(xintercept = 0), lty = 2) +
       labs(fill = "Genotype") +
       xlab(climate_var_dif) +
+      ggtitle(snp) +
       theme_bw(15)
     
   # Plot to PDF  
@@ -633,9 +642,9 @@ library(patchwork)
   table(sum_df$converged)
   
   # Filter to just those that converged
-  # sum_df <- sum_df %>%
-  #   dplyr::filter(converged)
-  # dim(sum_df)
+  sum_df <- sum_df %>%
+    dplyr::filter(converged)
+  dim(sum_df)
   
   
   
@@ -663,34 +672,53 @@ library(patchwork)
         dplyr::arrange(q_val)
       
   
+ 
+      
+  # Calculate average height prediction
+    avg_height_pred <- mean(c(pull(sum_df, height_change_gen_0), 
+                            pull(sum_df, height_change_gen_1),
+                            pull(sum_df, height_change_gen_2)), na.rm = TRUE)
+    
+    avg_height_pred
+    
+    avg_height_pred <- 0
+  
+  # Figuring out which allele is beneficial
+    sum_df <- sum_df %>%
+        mutate(beneficial_gen_0 = ifelse(height_change_gen_0 > avg_height_pred, 1, 0),
+               beneficial_gen_1 = ifelse(height_change_gen_1 > avg_height_pred, 1, 0),
+               beneficial_gen_2 = ifelse(height_change_gen_2 > avg_height_pred, 1, 0))
+    
+    table(sum_df$beneficial_gen_0)
+    table(sum_df$beneficial_gen_1)
+    table(sum_df$beneficial_gen_2)
+    
+   # View(sum_df[which(sum_df$beneficial_gen_0 == 1 & sum_df$beneficial_gen_1 == 1 & sum_df$beneficial_gen_2 == 1),])
+    
+    
   ## Select top snps
-  
-  # Based on q value
-      top_snps = sum_df %>%
-        dplyr::filter(q_val < 0.05) %>%
+    
+    # Based on q value
+    top_snps = sum_df %>%
+      dplyr::filter(q_val < 0.05) %>%
+    #  dplyr::filter(beneficial_gen_0 == 1 | beneficial_gen_1 == 1 | beneficial_gen_2 == 1) %>%
       #  dplyr::select(snp) %>%
-        dplyr::mutate(snp = gsub("snp_", "", snp)) %>%
-        dplyr::arrange(q_val)
-      
-      top_snps
-  
-      
-      
-      
-      
-  
+      dplyr::mutate(snp = gsub("snp_", "", snp)) %>%
+      dplyr::arrange(q_val)
+    
+    top_snps
   
   ## SCP code to copy over model plots
-    for(snp in top_snps$snp[1:10]){
-    #  system(paste0("scp lukembro@dtn2.hoffman2.idre.ucla.edu:/u/flashscratch/l/lukembro/qlobata_growth/run_2815486_tmax_sum_dif/model_plots/", snp, ".pdf ./output/model_visualizations/"))
+    for(snp in paste0("snp_", top_snps$snp)){
+      system(paste0("scp lukembro@dtn2.hoffman2.idre.ucla.edu:/u/flashscratch/l/lukembro/qlobata_growth/run_2876655_tmax_sum_dif/model_plots/", snp, ".pdf ./output/model_visualizations/"))
       
-     gg <-  ggplot(dat_snp, aes(tmax_sum_dif, pull(dat_snp, snp))) +
-        geom_jitter() +
-        ylab(snp) +
-        theme_bw() 
-     
-     print(gg)
-      
+     # gg <-  ggplot(dat_snp, aes(tmax_sum_dif, pull(dat_snp, snp))) +
+     #    geom_jitter() +
+     #    ylab(snp) +
+     #    theme_bw() 
+     # 
+     # print(gg)
+     #  
     #  ggsave(paste0("./output/model_visualizations/",snp, "_scatter.pdf"))
       
     }
@@ -699,10 +727,10 @@ library(patchwork)
 
   library(CMplot)
   
-  man_df <- data.frame(SNP = paste0("snp_", snp_col_names), 
+  man_df1 <- data.frame(SNP = paste0("snp_", snp_col_names), 
                        snp_pos)
   
-   man_df <- left_join(man_df, sum_df[, c("snp", "p_val_int")], by = c("SNP" = "snp"))
+   man_df <- left_join(man_df1, sum_df[, c("snp", "p_val_int")], by = c("SNP" = "snp"))
  
   
   head(man_df)
@@ -714,103 +742,122 @@ library(patchwork)
   # 
 ## Manhattan plot with SNP density  
   dev.off()
-  CMplot(man_df, plot.type=c("m"), LOG10=TRUE, threshold=1e-4,
+  CMplot(man_df, plot.type=c("m"), LOG10=TRUE, threshold=1e-3,
          bin.size=1e6,
-         chr.den.col=c("darkgreen", "yellow", "red"), file.output = FALSE)
+         chr.den.col=c("darkgreen", "yellow", "red"), file.output = TRUE)
   
 ## QQplot  
   dev.off()
   CMplot(man_df, plot.type="q", box=TRUE,file.output = TRUE)
   
 # With Q values  
-   man_df <- left_join(man_df, sum_df[, c("snp", "q_val")], by = c("SNP" = "snp"))
+   man_df <- left_join(man_df1, sum_df[, c("snp", "q_val")], by = c("SNP" = "snp"))
    dev.off()
    CMplot(man_df, plot.type=c("m"), LOG10=TRUE, threshold= 0.05,
           bin.size=1e6, ylim = c(0, 2),
-          chr.den.col=c("darkgreen", "yellow", "red"), file.output = FALSE)
+          chr.den.col=c("darkgreen", "yellow", "red"), file.output = TRUE)
   
-  
+
   
   
 
 # RDA on top snps ---------------------------------------------------------
 
-number = 100
+  rda_scaled <- flashpcaR::scale2(gen_dat_clim[, top_snps$snp], impute = 2)
   
-top_snps <- sum_df %>%  
-    dplyr::filter(climate_var == "tmax_sum_dif")  %>%
-    dplyr::top_n(., -number, q_val) %>%
-    dplyr::select(snp) %>%
-    dplyr::mutate(snp = gsub("snp_", "", snp)) %>%
-    dplyr::filter(snp %in% colnames(gen_dat_clim)) # TEMP FILTERING
 
-# Based on delta AIC
-top_snps <- sum_df %>%  
-  dplyr::filter(climate_var == "tmax_sum_dif")  %>%
-  dplyr::filter(aic_delta < -2) %>%
-  dplyr::select(snp) %>%
-  dplyr::mutate(snp = gsub("snp_", "", snp)) %>%
-  dplyr::filter(snp %in% colnames(gen_dat_clim)) # TEMP FILTERING
+  
+  rda_full <- vegan::rda(rda_scaled ~ latitude + 
+                           longitude + elevation + tmax_sum + tmin_winter,
+                         data = gen_dat_clim)
+  
+  rda_full
+  summary(rda_full)
+  
+  anova(rda_full)
+  
+  anova(rda_full, by="axis", permutations = 100)
+  
+  anova(rda_full, 
+        by = "margin",
+        permutations = 100)
+  
+  round(summary(rda_full)$biplot[, c(1,2)], 2)
+  
+  plot(rda_full)
+  
+  
+  loadings <- summary(rda_full)$species # Extracts loadings for each SNP (named species here)
+  head(loadings)
+  
+  # Plot histogram of the loadings
+  hist(loadings[, 1], xlab = "RDA1", breaks = 30, col = "skyblue2", main = "RDA1")
 
-
-
-bglr_gen_scaled[, top_snps$snp]
-
-
-rda_full <- vegan::rda(bglr_gen_scaled[, top_snps$snp] ~ latitude + 
-                         longitude + tmax_sum + tmin_winter + cwd + bioclim_04 + bioclim_15 + bioclim_18 + bioclim_19,
-                       data = gen_dat_clim)
-
-rda_full
-summary(rda_full)
-
-anova(rda_full)
-
-anova(rda_full, by="axis", permutations = 100)
-
-anova(rda_full, 
-      by = "margin",
-      permutations = 100)
-
-round(summary(rda_full)$biplot[, c(1,2)], 2)
-
-plot(rda_full)
-
-    
+  # Outliers function from Forester et al.
+  outliers <- function(loadings, sd_cutoff){
+    # find loadings +/-z sd from mean loading
+    lims <- mean(loadings) + c(-1, 1) * sd_cutoff * sd(loadings)
+    loadings[loadings < lims[1] | loadings > lims[2]] # locus names in these tails
+  }
+  
+  cand_rda1 <- outliers(loadings[, 1], sd_cutoff = 2) 
+  cand_rda1
+  
+  cand_rda2 <- outliers(loadings[, 2], sd_cutoff = 2)
+  cand_rda2
+  
+  outlier_snps_names <- c(names(cand_rda1), names(cand_rda2))
+  
+  # Extract row indices of outlier snps
+  sig_snps <- which(rownames(loadings) %in% outlier_snps_names) 
+  
+  # Color of outlier SNPs
+  snp_cols <- rep("grey90",  times = nrow(loadings)) # Set default color
+  snp_cols[sig_snps] <- "red"
+  
+  # Labels of outlier SNPs
+  snp_labels <- rep("", times = nrow(loadings))
+  snp_labels[sig_snps] <- outlier_snps_names
+  
+  # Make biplot
+  plot(rda_full, type = "n", scaling = 3) # Create empty plot 
+  points(rda_full, display = "species", pch = 21,
+         col = "black", bg = snp_cols, scaling = 3)
+  text(rda_full, display = "species", labels = snp_labels, cex = .75, scaling = 3)
+  text(rda_full, scaling = 3, display = "bp", col="black") # Environmental vectors  
+  
+  
+  # Get map of California - already loaded in ggplot2 package
+  ca_map <- dplyr::filter(ggplot2::map_data("state"), region == "california")
+  
+  
+  # Get loadings for each individual
+  ind_loadings <- summary(rda_full)$sites
+  head(ind_loadings)
+  
+  
+  # Plot values for first RDA axis
+  ggplot(ca_map, aes(x = long, y = lat)) +
+    geom_polygon(color = "black", fill = "grey80") +
+    geom_point(data = gen_dat_clim, aes(x = longitude, y = latitude, 
+                                        fill = ind_loadings[, 1]), # Color by first RDA axis
+               color = "black", pch = 21, size = 5) +
+    scale_fill_gradientn(colours = terrain.colors(10), 
+                         name = "RDA1") +
+    theme_bw() + coord_equal(ratio = 1)
+  
+  
+  
 
 # Gradient forest test ----------------------------------------------------
-    
-  # Take 1%  
-    number = round(0.01 * nrow(sum_df))
-    
-    growth_thresh = -10
-    
-    # Based on delta AIC
   
-    
-   gen_dat_clim[, top_snps$snp]
-
-   # gen_dat_factor =  gen_dat_clim %>%
-   #   dplyr::select(top_snps$snp) %>%
-   #   mutate_all(funs(factor))
+  gf_scaled <- flashpcaR::scale2(gen_dat_clim[, top_snps$snp], impute = 2)
    
-   gen_dat_factor =  gen_dat_clim %>%
-     dplyr::select(top_snps$snp)
-   
-   
-   
-   # Mode impute
-   # for(snp in 1:ncol(gen_dat_factor)){
-   #   mode <- as.numeric(names(sort(-table(gen_dat_factor[, snp])))[1])
-   #   gen_dat_factor[is.na(gen_dat_factor[, snp]), snp] <- mode
-   # }
-   
-   summary(gen_dat_factor)
     
     library(gradientForest)
     
     climate_vars_gf <- c("tmax_sum", "tmin_winter", "bioclim_04", 
-                         "random", "cwd",
+                         "random", "cwd", "ppt", "longitude", "elevation",
                          "latitude")
     
     pairs.panels(gen_dat_clim[, climate_vars_gf])
@@ -821,7 +868,8 @@ plot(rda_full)
     gf <- gradientForest(cbind(gen_dat_clim[, climate_vars_gf],
                                      bglr_gen_scaled ),
                          predictor.vars = climate_vars_gf, 
-                        response.vars = top_snps$snp,
+                       # response.vars = top_snps$snp,
+                       response.vars = gsub("snp_", "", sum_df$snp),
                         trace = TRUE)
 
     gf$result # Rsquared of positive loci
@@ -839,52 +887,7 @@ plot(rda_full)
     pred
     
     plot(pred$latitude, pred$pred$latitude)
-    
-    library(randomForest)
-    
-    snp = top_snps$snp[1]
-    
-    gen_dat_clim_sub <- gen_dat_clim %>%
-                      dplyr::filter(!is.na(pull(., snp)))
-    
-    rfo <- randomForest(y = as.factor(pull(gen_dat_clim_sub, snp)),
-                       x = gen_dat_clim_sub[, climate_vars_gf], 
-                       keep.inbag = TRUE,  # mandatory,
-                       importance = TRUE)  # recommended, else ordering by giniImpurity (unstable))
-    rfo
-    plot(rfo)
-    
-    rfo$importance
-    
-    ff = forestFloor(
-      rf.fit = rfo,       # mandatory
-      X = gen_dat_clim_sub[, climate_vars_gf],              # mandatory
-      calc_np = FALSE,    # TRUE or FALSE both works, makes no difference
-      binary_reg = FALSE  # takes no effect here when rfo$type="regression"
-    )
-    
-    plot(ff)
-    
-    plot(ff,                       # forestFloor object
-         plot_seq = 1:6,           # optional sequence of features to plot
-         orderByImportance=TRUE    # if TRUE index sequence by importance, else by X column  
-    )
-    
-    rf$importance
-    
-    pred <- expand.grid(latitude = seq(33, 42, by = .1),
-                        tmax_sum = 0, tmin_winter = 0, random = 0, bioclim_04 = 0, PC1 = 0, PC2 = 0, PC3 = 0, longitude = seq(-123.5, -118.5, by = .1))
-    pred$pred <- predict(rfo, newdata = pred)
-    
-    pred
-    
-    table(pred$pred)
-    
-    
-    plot(pred$latitude, pred$pred)
-    
-    
-    
+  
     
     plot(gf, plot.type = "S", imp.vars = most_important,
           leg.posn = "topright", cex.legend = 0.4, cex.axis = 0.6,
@@ -905,25 +908,16 @@ plot(rda_full)
     plot(gf, plot.type = "P", show.names = T, horizontal = F,
          cex.axis = 1, cex.labels = 0.7, line = 2.5)
     
+    plot(gen_dat_clim$latitude, pull(gen_dat_clim, snp))
     
     
-
-# Look at top models ------------------------------------------------------
-
-  top_snp = "snp_4_93755225"
-  
-  plot(pull(dat_snp, top_snp), dat_snp$height_2017)
-  plot(pull(dat_snp, tmax_sum_dif),pull(dat_snp, top_snp))
-  
-  summary(gam_tmax_sum_dif_snp_7_39668055)
-  visreg(gam_tmax_sum_dif_snp_7_39668055, scale = "response")
-  visreg2d(gam_tmax_sum_dif_snp_7_39668055, xvar = "tmax_sum_dif", 
-           yvar = "snp_7_39668055", 
-           scale = "response", plot.type = "persp", theta = 45, phi = 15)
-  
-  pairs.panels(dplyr::select(dat_snp, top_snp, latitude, longitude, climate_vars ))
-
-  
+    
+    
+    
+    
+    
+    
+    
 
 # Simulate data to test out interaction effects in gams -------------------
 
