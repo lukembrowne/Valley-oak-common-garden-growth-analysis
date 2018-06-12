@@ -4,13 +4,13 @@
   library(tidyverse)
   library(googlesheets)
   library(maptools)
- # library(qtlcharts)
 
 # Choose model type -------------------------------------------------------
 
-response_variable = "height"
-# response_variable = "rgr"
-# response_variable = "survival"
+  response_variable = "height"
+  # response_variable = "rgr"
+  # response_variable = "survival"
+
 
 # Load and quality check data ---------------------------------------------------------------
     
@@ -155,7 +155,8 @@ response_variable = "height"
       
       
     ## Calculate relative growth rates: over 2 years
-      dat_all$rgr <- (log(dat_all$height_2017) - log(dat_all$height_2015))/ 2
+      # dat_all$rgr <- (log(dat_all$height_2017) - log(dat_all$height_2015))/ 2
+      dat_all$rgr <- (log(dat_all$height_2017) - log(dat_all$height_2014))/ 3
       
       summary(dat_all$rgr)
       
@@ -166,7 +167,7 @@ response_variable = "height"
       abline(a = 0, b = 1, lwd = 2, col = "steelblue")
       
       ## Plot of RGR
-      plot(dat_all$height_2015, dat_all$rgr, pch = 19, cex = 0.5, las = 1)
+      plot(dat_all$height_2014, dat_all$rgr, pch = 19, cex = 0.5, las = 1)
       cor.test(dat_all$height_2015, dat_all$rgr)
       
       ## Histogram of RGR
@@ -270,15 +271,18 @@ response_variable = "height"
     ## Filtering based on height
       
       if(response_variable == "height"){
-      
+        
+        # Exclude based on percentle
+        dat_all$height_2017[dat_all$height_2017 <= quantile(dat_all$height_2017, 0.01,
+                                                            na.rm = TRUE) |
+                              dat_all$height_2017 >= quantile(dat_all$height_2017, 0.99,
+                                                              na.rm = TRUE)] <- NA
+
         ## Filter out NA heights
         dat_all <- dplyr::filter(dat_all, !is.na(height_2017))
         dat_all <- dplyr::filter(dat_all, !is.na(height_2014))  
   
-        # dat_all$height_2017[dat_all$height_2017 <= quantile(dat_all$height_2017, 0.01,
-        #                                                     na.rm = TRUE) |
-        #               dat_all$height_2017 >= quantile(dat_all$height_2017, 0.99,
-        #                                               na.rm = TRUE)] <- NA
+        
       
       }
 
@@ -296,15 +300,14 @@ response_variable = "height"
       # View(dplyr::select(pos_rgr, accession_progeny, rgr, height_2015, height_2017) )
       
       # Change to NA outlier values in relative growth rate
-      # dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.025, na.rm = TRUE) |
-      #               dat_all$rgr >= quantile(dat_all$rgr, 0.975, na.rm = TRUE)] <- NA
+      dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.025, na.rm = TRUE) |
+                    dat_all$rgr >= quantile(dat_all$rgr, 0.975, na.rm = TRUE)] <- NA
   
   
       ## Filter out individuals without an estimated RGR
-      # dat_all <- dplyr::filter(dat_all, !is.na(rgr))
+       dat_all <- dplyr::filter(dat_all, !is.na(rgr))
       }
 
     ## Filtering based on survival  
       dim(dat_all)
-  
 

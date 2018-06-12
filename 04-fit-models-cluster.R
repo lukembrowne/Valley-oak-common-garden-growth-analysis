@@ -1,4 +1,7 @@
+## Notes..
 
+# Switch to gaussian to better display partial residual plots - can then show that log transforming doesn't change anything
+# Re-run models with LGM climate difference and see if significant SNPs overlap
 
 # Load libraries ----------------------------------------------------------
 
@@ -126,24 +129,43 @@ library(patchwork)
                   site = "Chico",
                   accession = "1",
                   section_block = "Block1_1",
-                  PC1_gen = 0, PC2_gen = 0, PC3_gen = 0,
-                  tmax_sum_dif = c(seq(min(dat_all_scaled$tmax_sum_dif),
-                                     max(dat_all_scaled$tmax_sum_dif),
-                                     by = 0.1), 
-                                   forward_transform(c(0, 3),
-                                                     var = "tmax_sum_dif",
-                                                     means = scaled_var_means_gbs_only,
-                                                     sds = scaled_var_sds_gbs_only)))
+                  PC1_gen = 0, PC2_gen = 0, PC3_gen = 0)
   
-  pred$tmax_sum_dif_unscaled <- back_transform(pred$tmax_sum_dif,
-                                                  var = "tmax_sum_dif",
-                                                  means = scaled_var_means_gbs_only,
-                                                  sds = scaled_var_sds_gbs_only)
+  for(var in climate_vars_dif){
+    
+    var_unscaled <- paste0(var, "_unscaled")
+    
+    # Set scaled climate var dif, with a 0 and 3 degree increase as well
+    var_df <- expand.grid(accession = "1",
+                          var_temp = c(seq(min(dat_all_scaled[ ,var]),
+                                               max(dat_all_scaled[ ,var]),
+                                               length.out = 50), 
+                                           forward_transform(c(0, 3),
+                                                             var = var,
+                                                             means = scaled_var_means_gbs_only,
+                                                             sds = scaled_var_sds_gbs_only)))
+    # Rename columns and set unscaled climate_var dif
+    var_df <- var_df %>%
+          rename(!!var := var_temp) %>%
+          mutate(!!var_unscaled := back_transform(x = get(var),
+                                         var = var,
+                                         means = scaled_var_means_gbs_only,
+                                         sds = scaled_var_sds_gbs_only))
+    
+   # Do a left join if the first variable, or else just bind cols, removing accession column  
+    if(nrow(pred) == 1){
+    pred <- left_join(pred, var_df)
+    } else {
+      pred <- bind_cols(pred, var_df[, -1])
+    }
+  }
+  
+  head(pred)
 
   pred
 
 # Save data to file that will be uploaded to cluster  
-  # save(dat_snp, snp_col_names, pred, 
+  # save(dat_snp, snp_col_names, pred,
   #      scaled_snps_means, scaled_snps_sds,
   #      scaled_var_means_gbs_only, scaled_var_sds_gbs_only,
   #   file = paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
@@ -168,30 +190,44 @@ library(patchwork)
                           data = dat_all_scaled,
                           discrete = TRUE, 
                           nthreads = 8,
-                          method = "fREML", family = "tw", 
-                          control = list(trace = FALSE))
+                          method = "fREML", family = "gaussian", 
+                          control = list(trace = TRUE))
   
   summary(gam_all)
 
+# Plot overall model fit
+  test_fit <- dat_all_scaled
+  test_fit$pred <- gam_all$fitted.values
+  
+  ggplot(test_fit, aes(x = pred, y = height_2017, bg = section_block)) + geom_point(alpha = 0.75, pch = 21) + theme_bw(15) + 
+    geom_abline(slope = 1, intercept = 0, lwd = 1.5, col = "forestgreen") 
+  
+  visreg(gam_all, partial = TRUE)
+  visreg(gam_all, partial = FALSE)
+  
+  gam.check(gam_all)
 
+  
 # Function for plotting predictions ---------------------------------------
 
   plot_pred <- function(xvar,
                         add_points = TRUE,
+                        add_residuals = FALSE,
                         save = FALSE,
                         path = "./",
-                        filename = ""){
+                        filename = "",
+                        main = ""){
   
       # Test to see what type of variable it is - factor or numeric
       type <- ifelse(is.factor(pull(dat_all_scaled, xvar)), "factor", "numeric")
-      
       
       # Make predictions
         v <- visreg(gam_all, xvar = xvar, 
              scale = "response", rug = FALSE, ylab = "5 yr height (cm)", plot = FALSE)
         
         dat_all_scaled_trans <- dat_all_scaled
- 
+        
+     
     # If xvariable is not a factor, backtranform to original scale for plotting
       if(type == "numeric"){
           # Transform x axis + assign variables for lo and hi CI
@@ -209,11 +245,16 @@ library(patchwork)
                                             means = scaled_var_means_all,
                                             sds = scaled_var_sds_all))
       } # End factor if
+        
+        
+        # Add partial residuals
+        dat_all_scaled_trans$resid <- v$res$visregRes
       
       ## Main GGPLOT
         gg <- 
           ggplot(dat_all_scaled_trans, aes(x = get(xvar), y = height_2017)) + 
           xlab(xvar) + ylab("5 yr height (cm)") +
+          ggtitle(main) +
           theme_bw()
         
       # Add raw points to graph?
@@ -223,6 +264,12 @@ library(patchwork)
                         size = 0.5, alpha = 0.5)
         }
       
+      ## Add partial residuals to graph?
+        if(add_residuals == TRUE){
+          gg <- gg + 
+            geom_point(data = dat_all_scaled_trans, aes(x = get(xvar), y = resid),
+          size = 0.5, alpha = 0.5)
+        }
      
       
       # If numeric, add points and lines
@@ -265,18 +312,61 @@ library(patchwork)
     
 # Numerical    
   
-  save_flag = FALSE
+  save_flag = TRUE
   path <- "./figs_tables/2018_06_08 Jamie meeting/"
   
   plot_pred(xvar = "height_2014", add_points = FALSE, save = save_flag, path = path, filename = "height_2014_no_points.pdf")
   plot_pred(xvar = "height_2014", add_points = TRUE, save = save_flag, path = path, filename = "height_2014_points.pdf")
   
-  plot_pred(xvar = "tmax_sum_dif", add_points = FALSE, save = save_flag, path = path, filename = "tmax_sum_dif_no_points.pdf")
-  plot_pred(xvar = "tmax_sum_dif", add_points = TRUE, save = save_flag, path = path, filename = "tmax_sum_dif_points.pdf")
+  plot_pred(xvar = "tmax_sum_dif", add_points = FALSE, add_residuals = TRUE, main = "Tmax _summer 1950-1980", 
+            save = save_flag, path = path, filename = "tmax_sum_dif_no_points.pdf")
+  plot_pred(xvar = "tmax_sum_dif", add_points = FALSE, main = "Tmax _summer 1950-1980", 
+            save = save_flag, path = path, filename = "tmax_sum_dif_points.pdf")
   
+# Historic  
+  plot_pred(xvar = "tmax_sum_last1000_dif", add_points = FALSE, add_residuals = TRUE,
+            main = "Tmax_summer Last Millennium (1,000 yrs ago)",
+            save = save_flag, path = path, filename = "tmax_sum_last1000_dif_no_points.pdf")
+  plot_pred(xvar = "tmax_sum_last1000_dif", add_points = FALSE, main = "Tmax_summer Last Millennium (1,000 yrs ago)",
+            save = save_flag, path = path, filename = "tmax_sum_last1000_dif_points.pdf")
+  
+  plot_pred(xvar = "tmax_sum_holo_dif", add_points = FALSE, add_residuals = TRUE, main = "Tmax_summer Mid-Holocene (6,000 yrs ago)",
+            save = save_flag, path = path, filename = "tmax_sum_holo_dif_no_points.pdf")
+  plot_pred(xvar = "tmax_sum_holo_dif", add_points = TRUE, main = "Tmax_summer Mid-Holocene (6,000 yrs ago)",
+            save = save_flag, path = path, filename = "tmax_sum_holo_dif_points.pdf")
+  
+  plot_pred(xvar = "tmax_sum_lgm_dif", add_points = FALSE, add_residuals = TRUE, 
+            main = "Tmax_summer Last Glacial Maximum (21,000 yrs ago)",
+            save = save_flag, path = path, filename = "tmax_sum_lgm_dif_no_points.pdf")
+  
+  plot_pred(xvar = "tmax_sum_lgm_dif", add_points = FALSE, add_residuals = FALSE, 
+            main = "Tmax_summer Last Glacial Maximum (21,000 yrs ago)",
+            save = save_flag, path = path, filename = "tmax_sum_lgm_dif_points.pdf")
+  
+  
+ # Tmin winter 
   plot_pred(xvar = "tmin_winter_dif", add_points = FALSE, save = save_flag, path = path, filename = "tmin_winter_dif_no_points.pdf")
   plot_pred(xvar = "tmin_winter_dif", add_points = TRUE, save = save_flag, path = path, filename = "tmin_winter_dif_points.pdf")
   
+  
+  plot_pred(xvar = "tmin_winter_last1000_dif",  add_points = FALSE, add_residuals = TRUE, 
+            main = "Tmin_winter Last Millenium (1,000 yrs ago)",
+            save = save_flag, path = path, filename = "tmin_winter_last1000_dif_no_points.pdf")
+  plot_pred(xvar = "tmin_winter_last1000_dif", add_points = FALSE,  add_residuals = FALSE, 
+            main = "Tmin_winter Last Millenium (1,000 yrs ago)",
+            save = save_flag, path = path, filename = "tmin_winter_last1000_dif_points.pdf")
+  
+  plot_pred(xvar = "tmin_winter_holo_dif", add_points = FALSE, 
+            save = save_flag, path = path, filename = "tmin_winter_holo_dif_no_points.pdf")
+  plot_pred(xvar = "tmin_winter_holo_dif", add_points = TRUE, 
+            save = save_flag, path = path, filename = "tmin_winter_holo_dif_points.pdf")
+  
+  plot_pred(xvar = "tmin_winter_lgm_dif", add_points = FALSE, add_residuals = TRUE, 
+            main = "Tmin_winter Last Glacial Maximum (21,000 yrs ago)",
+            save = save_flag, path = path, filename = "tmin_winter_lgm_dif_no_points.pdf")
+  plot_pred(xvar = "tmin_winter_lgm_dif", add_points = FALSE,  add_residuals = FALSE, 
+            main = "Tmin_winter Last Glacial Maximum (21,000 yrs ago)",
+            save = save_flag, path = path, filename = "tmin_winter_lgm_dif_points.pdf")
   
 # Factors
   plot_pred(xvar = "section_block", save = save_flag, path = path, filename = "section_block.pdf")  
@@ -284,11 +374,6 @@ library(patchwork)
   plot_pred(xvar = "accession", add_points = FALSE, save = save_flag, path = path, filename = "accession.pdf")
       
       
-  
-  
-  
-  
-  
   
 # Gam code from cluster for testing -------------------------------------------
 
@@ -362,7 +447,7 @@ library(patchwork)
                   data = dat_snp, 
                   discrete = TRUE,
                   nthreads = 8,
-                  method = "fREML", family = "tw", 
+                  method = "fREML", family = "gaussian", 
                   control = list(trace = FALSE))
     
     # Check for convergence
@@ -437,62 +522,96 @@ library(patchwork)
     #   pred_sub$accession = as.numeric(pred_sub$accession) + 1
     # }
     
+    
+    ## Visreg plots
+    pdf(paste0("./output/model_visualizations/", snp,".pdf"), width = 8, height = 5)
+
+   # With partial residuals
+    visreg(gam_snp_int, xvar = climate_var_dif, by = snp,
+           overlay = TRUE, partial = TRUE, 
+           breaks = c(unique(pred_sub$genotype_scaled)),
+           xtrans = function(x) {(x *  scaled_var_sds_gbs_only[climate_var_dif]) + scaled_var_means_gbs_only[climate_var_dif]},
+           ylab = "5 year height (cm)")
+    
+    # Without partial residuals
+    visreg(gam_snp_int, xvar = climate_var_dif, by = snp,
+           overlay = TRUE, partial = FALSE, rug = FALSE,
+           breaks = c(unique(pred_sub$genotype_scaled)),
+           xtrans = function(x) {(x *  scaled_var_sds_gbs_only[climate_var_dif]) + scaled_var_means_gbs_only[climate_var_dif]},
+           ylab = "5 year height (cm)")
+    
+    dev.off()
+
+    
+    
       
   # Make PREDICTION
-    gam_preds <-  predict(gam_snp_int, 
-                          newdata = pred_sub,
-                          type = "response",
-                          se = TRUE)
-    
-    pred_sub$pred <- gam_preds$fit
-    pred_sub$se <- gam_preds$se.fit
-    
-    pred_sub$genotype <- factor(pred_sub$genotype)
-    
-   # Backtransform climate variable
-     dat_snp_trans <- dat_snp %>%
-                  dplyr::select(climate_var_dif, snp, height_2017) %>%
-                     # Back transform X axis
-                     mutate(!!climate_var_dif := back_transform(x = get(climate_var_dif),
-                                                     var = climate_var_dif,
-                                                     means = scaled_var_means_gbs_only,
-                                                     sds = scaled_var_sds_gbs_only)) %>%
-                     # Back transform SNP
-                     mutate(!!snp := back_transform(x = get(snp),
-                                                                var = snp,
-                                                                means = scaled_snps_means,
-                                                                sds = scaled_snps_sds)) %>%
-                    # Filter down to just 0,1,2 genotypes
-                    dplyr::filter(get(snp) %in% c(0, 1, 2))
-
-  
-  # Climate transfer functions by genotype     
-    p1 <-  ggplot(pred_sub) + 
-      geom_ribbon(aes(tmax_sum_dif_unscaled, ymin = pred - 2 * se, ymax = pred + 2*se, fill = factor(genotype)), 
-                  alpha = 0.25, show.legend = FALSE)  +
-      geom_line(data = pred_sub, aes(x = tmax_sum_dif_unscaled, y = pred, col = factor(genotype)), lwd = 1.5) + 
-      geom_vline(aes(xintercept = 0), lty = 2) +
-      labs(col = "Genotype") +
-      ylab("5 yr height (cm)") +
-      xlab(climate_var_dif) +
-      ggtitle(snp) +
-      theme_bw(15)
-  
-  # Density plots of genotypes    
-    p2 <- ggplot(dat_snp_trans, 
-                 aes(x = get(climate_var_dif), fill = factor(get(snp)))) + 
-      geom_histogram(binwidth = .5, col = "grey10") + 
-      geom_vline(aes(xintercept = 0), lty = 2) +
-      labs(fill = "Genotype") +
-      xlab(climate_var_dif) +
-      ggtitle(snp) +
-      theme_bw(15)
-    
-  # Plot to PDF  
-    pdf(paste0("./output/model_visualizations/", snp,".pdf"), width = 15, height = 5)  
-    print(p1 + p2)
-    dev.off()
-  
+  #   gam_preds <-  predict(gam_snp_int, 
+  #                         newdata = pred_sub,
+  #                         type = "response",
+  #                         se = TRUE)
+  #   
+  #   pred_sub$pred <- gam_preds$fit
+  #   pred_sub$se <- gam_preds$se.fit
+  #   
+  #   pred_sub$genotype <- factor(pred_sub$genotype)
+  #   
+  #  # Backtransform climate variable
+  #    dat_snp_trans <- dat_snp %>%
+  #                 dplyr::select(climate_var_dif, snp, height_2017) %>%
+  #                    # Back transform X axis
+  #                    mutate(!!climate_var_dif := back_transform(x = get(climate_var_dif),
+  #                                                    var = climate_var_dif,
+  #                                                    means = scaled_var_means_gbs_only,
+  #                                                    sds = scaled_var_sds_gbs_only)) %>%
+  #                    # Back transform SNP
+  #                    mutate(!!snp := back_transform(x = get(snp),
+  #                                                               var = snp,
+  #                                                               means = scaled_snps_means,
+  #                                                               sds = scaled_snps_sds)) %>%
+  #                   # Filter down to just 0,1,2 genotypes
+  #                   dplyr::filter(get(snp) %in% c(0, 1, 2))
+  #    
+  #    # Partial residuals
+  #    resids <- visreg(gam_snp_int, xvar = climate_var_dif, plot = FALSE)$res
+  #    # Back transform X axis
+  #    resids <- resids %>%
+  #                 mutate(!!climate_var_dif := back_transform(x = get(climate_var_dif),
+  #                                               var = climate_var_dif,
+  #                                               means = scaled_var_means_gbs_only,
+  #                                               sds = scaled_var_sds_gbs_only))
+  # 
+  # 
+  # # Climate transfer functions by genotype   
+  #    climate_var_dif_unscaled <- paste0(climate_var_dif, "_unscaled")
+  #    
+  #   p1 <-  ggplot(pred_sub) + 
+  #     geom_ribbon(aes(get(climate_var_dif_unscaled), ymin = pred - 2 * se, ymax = pred + 2 * se, fill = factor(genotype)), 
+  #                 alpha = 0.25, show.legend = FALSE)  +
+  #     geom_line(data = pred_sub, aes(x = get(climate_var_dif_unscaled), y = pred, col = factor(genotype)), lwd = 1.5) + 
+  #     geom_vline(aes(xintercept = 0), lty = 2) +
+  #     labs(col = "Genotype") +
+  #     ylab("5 yr height (cm)") +
+  #     xlab(climate_var_dif) +
+  #     geom_point(data = resids, aes(x = get(climate_var_dif), y = visregRes)) +
+  #     ggtitle(snp) +
+  #     theme_bw(15)
+  # 
+  # # Density plots of genotypes    
+  #   p2 <- ggplot(dat_snp_trans, 
+  #                aes(x = get(climate_var_dif), fill = factor(get(snp)))) + 
+  #     geom_histogram(binwidth = .5, col = "grey10") + 
+  #     geom_vline(aes(xintercept = 0), lty = 2) +
+  #     labs(fill = "Genotype") +
+  #     xlab(climate_var_dif) +
+  #     ggtitle(snp) +
+  #     theme_bw(15)
+  #   
+  # # Plot to PDF  
+  #   pdf(paste0("./output/model_visualizations/", snp,".pdf"), width = 15, height = 5)  
+  #   print(p1 + p2)
+  #   dev.off()
+  # 
     
   # Make prediction for 3 degree increase in temperature
     for(genotype in c(0,1,2)){
@@ -504,8 +623,8 @@ library(patchwork)
       
       pred_sub_temp <- pred_sub[pred_sub$genotype == genotype, ]
       
-      height_change <- (pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 3][1] - 
-                          pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 0][1]) / pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 3][1] * 100 
+      height_change <- (pred_sub_temp$pred[pred_sub_temp[, climate_var_dif_unscaled] == 3][1] - 
+                          pred_sub_temp$pred[pred_sub_temp[, climate_var_dif_unscaled] == 0][1]) / pred_sub_temp$pred[pred_sub_temp[, climate_var_dif_unscaled] == 3][1] * 100 
       
       gam_snp_int[paste0("height_change_gen_", genotype)] <- height_change
       

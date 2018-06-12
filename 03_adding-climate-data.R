@@ -9,7 +9,7 @@
 
 # Load in climate data ----------------------------------------------------
 
-  ## Read in climate data of of maternal trees in the common garden
+  ## Read in BCM climate data of of maternal trees in the common garden
   ## Should be 659 trees
     climate_garden_mom <- read_csv("./data/cleaned_data/maternal tree climate data BCM 1950-1981 2018_03_08.csv")
   
@@ -20,7 +20,49 @@
       select_all(., tolower)
     
     climate_garden_mom
-  
+    
+    
+  ## Read in historical / paleo climate data from WNA to compare with BCM
+    
+    # Last 1000 years
+      last1000 <-   read_csv("./data/cleaned_data/maternal tree climate data ClimateWna Last1000 2018_06_11_4GCM-Ensemble.csv") %>%
+                    rename(accession = ID2 , 
+                           tmax_sum_last1000 = Tmax_sm,
+                           tmin_winter_last1000 = Tmin_wt) %>%
+                    dplyr::select(accession, tmax_sum_last1000, tmin_winter_last1000)
+    # Last glacial maximum
+      lgm <- read_csv("./data/cleaned_data/maternal tree climate data ClimateWna LGM 2018_06_11_4GCM-Ensemble.csv") %>%
+        rename(accession = ID2 , 
+               tmax_sum_lgm = Tmax_sm,
+               tmin_winter_lgm = Tmin_wt) %>%
+        dplyr::select(accession, tmax_sum_lgm, tmin_winter_lgm)
+    
+    # Mid-holocene  
+      holo <- read_csv("./data/cleaned_data/maternal tree climate data ClimateWna MidHolocene 2018_06_11_4GCM-Ensemble.csv") %>%
+        rename(accession = ID2 , 
+               tmax_sum_holo = Tmax_sm,
+               tmin_winter_holo = Tmin_wt) %>%
+        dplyr::select(accession, tmax_sum_holo, tmin_winter_holo)
+      
+    # Join together in main climate dataset
+      climate_garden_mom <- left_join(left_join(left_join(climate_garden_mom, last1000), lgm), holo)
+      
+      
+    # Compare climate variables
+      pairs.panels(climate_garden_mom[, c("tmax_sum", "tmax_sum_last1000", "tmax_sum_holo", "tmax_sum_lgm")])
+      
+      pairs.panels(climate_garden_mom[, c("tmin_winter", "tmin_winter_last1000", "tmin_winter_holo", "tmin_winter_lgm")])
+    
+    # Differences in temperature  
+      mean(climate_garden_mom$tmax_sum - climate_garden_mom$tmax_sum_lgm)
+      mean(climate_garden_mom$tmax_sum - climate_garden_mom$tmax_sum_last1000)
+      mean(climate_garden_mom$tmax_sum - climate_garden_mom$tmax_sum_holo)
+      
+      mean(climate_garden_mom$tmin_winter - climate_garden_mom$tmin_winter_lgm)
+      mean(climate_garden_mom$tmin_winter - climate_garden_mom$tmin_winter_last1000)
+      mean(climate_garden_mom$tmin_winter - climate_garden_mom$tmin_winter_holo)
+      
+    
   ## Read in climate data for GBS trees
     climate_gbs_mom <- read_csv("./data/cleaned_data/GBS tree climate data BCM 1950-1981 2018_03_08.csv")
     
@@ -34,6 +76,16 @@
                                  by = c("id" = "gbs_name"))
     
     climate_gbs_mom$accession
+    
+    ## TEMPORARY - ADD IN PLACEHOLDER HISTORIC CLIMATE VARIABLES
+      climate_gbs_mom$tmax_sum_last1000 <- climate_gbs_mom$tmax_sum
+      climate_gbs_mom$tmax_sum_lgm <- climate_gbs_mom$tmax_sum
+      climate_gbs_mom$tmax_sum_holo <- climate_gbs_mom$tmax_sum
+      
+      climate_gbs_mom$tmin_winter_last1000 <- climate_gbs_mom$tmin_winter
+      climate_gbs_mom$tmin_winter_lgm <- climate_gbs_mom$tmin_winter
+      climate_gbs_mom$tmin_winter_holo <- climate_gbs_mom$tmin_winter
+      
   
       
   ## Add random climate variable for testing
@@ -53,6 +105,16 @@
     
     # Add random variable
     garden_climate$random <- rnorm(n = nrow(garden_climate))
+    
+    # Add comparable variables for historic WNA
+    garden_climate$tmax_sum_last1000 <- garden_climate$tmax_sum
+    garden_climate$tmax_sum_lgm <- garden_climate$tmax_sum
+    garden_climate$tmax_sum_holo <- garden_climate$tmax_sum
+    
+    garden_climate$tmin_winter_last1000 <- garden_climate$tmin_winter
+    garden_climate$tmin_winter_lgm <- garden_climate$tmin_winter
+    garden_climate$tmin_winter_holo <- garden_climate$tmin_winter
+    
 
     
 
@@ -61,15 +123,21 @@
      ## Core variables from Riordan et al. 2016 Am J Botany  
     ## Except we are excluding AET because it is very strongly correlated with cwd
     climate_vars <- c("tmax_sum",
+                      "tmax_sum_last1000",
+                      "tmax_sum_lgm",
+                      "tmax_sum_holo",
                       "tmin_winter",
-                      "random",
+                      "tmin_winter_last1000",
+                      "tmin_winter_lgm",
+                      "tmin_winter_holo",
+                      "random")
                       #  "tmax",
                       #"tmin",
                       # "latitude",
                       #  "longitude",
                       #  "elevation")
                       #"cwd", 
-                      "bioclim_04") # Temperature seasonality
+                      #"bioclim_04") # Temperature seasonality
     #"bioclim_15", # Precipitation seasonality
     # "bioclim_18", # Precipitation of Warmest Quarter
     #"bioclim_19") # Precipitation of Coldest Quarter
@@ -136,14 +204,14 @@
     climate_gbs_mom_pca_vals
     
   # Join back to main dataframes
-    dat_all_clim <- bind_cols(dat_all_clim, dat_all_clim_pca_vals)
-    garden_climate <- bind_cols(garden_climate, garden_climate_pca_vals)
-    climate_gbs_mom <- bind_cols(climate_gbs_mom, climate_gbs_mom_pca_vals)
+    # dat_all_clim <- bind_cols(dat_all_clim, dat_all_clim_pca_vals)
+    # garden_climate <- bind_cols(garden_climate, garden_climate_pca_vals)
+    # climate_gbs_mom <- bind_cols(climate_gbs_mom, climate_gbs_mom_pca_vals)
     
     
     
   ## Add PCs to list of climate vars
-      climate_vars <- c(climate_vars, colnames(garden_climate_pca_vals))
+    # climate_vars <- c(climate_vars, colnames(garden_climate_pca_vals))
     
       
       
@@ -153,6 +221,7 @@
       dat_gbs_only_clim <- dplyr::filter(dat_all_clim,
                                          accession %in% climate_gbs_mom$accession)
       dim(dat_gbs_only_clim)
+      
     
 # Calculating difference in climate variables -----------------------------
 
@@ -192,13 +261,13 @@
 # Correlations in climate variables ---------------------------------------
 
   ## Climate variables in seedlings
-  pairs.panels(dat_all_clim[, climate_vars], scale = TRUE)
+ # pairs.panels(dat_all_clim[, climate_vars], scale = TRUE)
 
   ## Climate variables for moms
  # pairs.panels(climate_mom[, climate_vars], scale = TRUE)
   
   ## Climate distances for seedlings
-  pairs.panels(dat_all_clim[, climate_vars_dif], scale = TRUE)
+ # pairs.panels(dat_all_clim[, climate_vars_dif], scale = TRUE)
 
 
 # Scaling predictor variables -------------------------------------------------------
