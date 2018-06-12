@@ -4,23 +4,23 @@
 # Re-run models with LGM climate difference and see if significant SNPs overlap
 
 # Load libraries ----------------------------------------------------------
-
-# install_github("jdstorey/qvalue")
-library(qvalue)
-library(MuMIn)
-library(vegan)
-library(beepr)
-library(patchwork)
-
-# function to transform from raw to scaled variables
-  forward_transform <- function(x, var, means, sds){
-    ( x - means[var]) / sds[var]
-  }
   
-  # Function to back transform variables
-  back_transform <- function(x, var, means, sds){
-    (x * sds[var]) + means[var]
-  }
+  # install_github("jdstorey/qvalue")
+  library(qvalue)
+  library(MuMIn)
+  library(vegan)
+  library(beepr)
+  library(patchwork)
+  
+  # function to transform from raw to scaled variables
+    forward_transform <- function(x, var, means, sds){
+      ( x - means[var]) / sds[var]
+    }
+    
+    # Function to back transform variables
+    back_transform <- function(x, var, means, sds){
+      (x * sds[var]) + means[var]
+    }
 
 
 # Goal is to run an individual gam for each SNP, like a fancy GWAS, and then correct for multiple testing after
@@ -181,31 +181,44 @@ library(patchwork)
     dat_all_scaled$section_block <- factor(dat_all_scaled$section_block) 
     dat_all_scaled$accession <- factor(dat_all_scaled$accession)
     dat_all_scaled$site <- factor(dat_all_scaled$site)
-  
-  # With all 5,000+ seedlings
-  gam_all <- bam(height_2017 ~ section_block + 
-                          + s(height_2014, bs= "cr")  
-                          + s(tmax_sum_dif, bs="cr")
-                          + s(accession, bs = "re"),
-                          data = dat_all_scaled,
-                          discrete = TRUE, 
-                          nthreads = 8,
-                          method = "fREML", family = "gaussian", 
-                          control = list(trace = TRUE))
-  
-  summary(gam_all)
+    
 
-# Plot overall model fit
-  test_fit <- dat_all_scaled
-  test_fit$pred <- gam_all$fitted.values
+  for(var in climate_vars_dif){
+    
+    cat("Working on:", var, "... \n")
+    
+    form <- formula(paste0("height_2017 ~ section_block + s(height_2014, bs =\"cr\") + s(", var, " , bs = \"cr\") + s(accession, bs = \"re\")"))
+    
+    # With all 5,000+ seedlings
+    gam_all <- bam(formula = form,
+                   data = dat_all_scaled,
+                   discrete = TRUE, 
+                   nthreads = 8,
+                   method = "fREML", family = "gaussian", 
+                   control = list(trace = FALSE))
+    
+    summary(gam_all)
+    
+    # Plot overall model fit
+    test_fit <- dat_all_scaled
+    test_fit$pred <- gam_all$fitted.values
+    
+    
+    pdf(paste0("./output/model_visualizations/full models/",var, "_", Sys.Date(), ".pdf" ),
+        height = 5, width = 8)
+    ggplot(test_fit, aes(x = pred, y = height_2017, bg = section_block)) + geom_point(alpha = 0.75, pch = 21) + theme_bw(15) + 
+      geom_abline(slope = 1, intercept = 0, lwd = 1.5, col = "forestgreen") 
+    
+    visreg(gam_all, partial = TRUE)
+    visreg(gam_all, partial = FALSE)
+    
+    gam.check(gam_all)
+    
+    dev.off()
+  }  
+    
   
-  ggplot(test_fit, aes(x = pred, y = height_2017, bg = section_block)) + geom_point(alpha = 0.75, pch = 21) + theme_bw(15) + 
-    geom_abline(slope = 1, intercept = 0, lwd = 1.5, col = "forestgreen") 
-  
-  visreg(gam_all, partial = TRUE)
-  visreg(gam_all, partial = FALSE)
-  
-  gam.check(gam_all)
+ 
 
   
 # Function for plotting predictions ---------------------------------------
@@ -312,7 +325,7 @@ library(patchwork)
     
 # Numerical    
   
-  save_flag = TRUE
+  save_flag = FALSE
   path <- "./figs_tables/2018_06_08 Jamie meeting/"
   
   plot_pred(xvar = "height_2014", add_points = FALSE, save = save_flag, path = path, filename = "height_2014_no_points.pdf")
