@@ -21,37 +21,99 @@
     
     climate_garden_mom
     
+ 
+  ## Function for calculating growing degree days     
+  # Code for GDD - https://rdrr.io/cran/pollen/src/R/gdd.R  
+    
+    test_0 <- function(x){
+      ifelse(x < 0, 0, x)
+    }
+
+    # tmax = climate_garden_mom$tmax_jan
+    # tmin = climate_garden_mom$tmin_jan
+    # tbase = 5
+    # tbase_max = 30
+    # 
+    # 
+    # adjust_for_tbase <- function(x, tbase) {
+    #   ifelse(test = x < tbase, yes = tbase, no = x)
+    # }
+    # adjust_for_tbase_max <- function(x, tbase_max) {
+    #   ifelse(test = x > tbase_max, yes = tbase_max, no = x)
+    # }
+    # 
+    # tmax_adjusted <- adjust_for_tbase(tmax, tbase)
+    # tmin_adjusted <- adjust_for_tbase(tmin, tbase)
+    # 
+    # tmax_adjusted <- adjust_for_tbase_max(tmax_adjusted, tbase_max)
+    # tmin_adjusted <- adjust_for_tbase_max(tmin_adjusted, tbase_max)
+    # 
+    # gdd_temp <- (tmax_adjusted + tmin_adjusted) / 2 - tbase
+    
+  calc_gdd <- function(dat, threshold){
+    
+      (  test_0(((dat$tmax_jan + dat$tmin_jan) / 2 - threshold)) * 31) + # Jan
+      (  test_0(((dat$tmax_feb + dat$tmin_feb) / 2 - threshold)) * 28) + # Feb
+      (  test_0(((dat$tmax_mar + dat$tmin_mar) / 2 - threshold)) * 31) + # Mar
+      (  test_0(((dat$tmax_apr + dat$tmin_apr) / 2 - threshold)) * 30) + # Apr
+      (  test_0(((dat$tmax_may + dat$tmin_may) / 2 - threshold)) * 31) + # May
+      (  test_0(((dat$tmax_jun + dat$tmin_jun) / 2 - threshold)) * 30) + # Jun
+      (  test_0(((dat$tmax_jul + dat$tmin_jul) / 2 - threshold)) * 31) + # Jul
+      (  test_0(((dat$tmax_aug + dat$tmin_aug) / 2 - threshold)) * 31) + # Aug
+      (  test_0(((dat$tmax_sep + dat$tmin_sep) / 2 - threshold)) * 30) + # Sep
+      (  test_0(((dat$tmax_oct + dat$tmin_oct) / 2 - threshold)) * 31) + # Oct
+      (  test_0(((dat$tmax_nov + dat$tmin_nov) / 2 - threshold)) * 30) + # Nov
+      (  test_0(((dat$tmax_dec + dat$tmin_dec) / 2 - threshold)) * 31)   # Dec
+    }
+      
+  climate_garden_mom$DD18 <- calc_gdd(dat = climate_garden_mom, threshold = 18)
+    
+  summary(climate_garden_mom$DD18)
     
   ## Read in historical / paleo climate data from WNA to compare with BCM
     
     # Last 1000 years
-      last1000 <-   read_csv("./data/cleaned_data/maternal tree climate data ClimateWna Last1000 2018_06_11_4GCM-Ensemble.csv") %>%
+      last1000 <-   read_csv("./data/gis/climate_data/climateWNA/maternal tree climate data ClimateWNA Last1000 2018_06_11_4GCM-Ensemble_past1000MSY.csv") %>%
                     rename(accession = ID2 , 
-                           tmax_sum_last1000 = Tmax_sm,
-                           tmin_winter_last1000 = Tmin_wt) %>%
-                    dplyr::select(accession, tmax_sum_last1000, tmin_winter_last1000)
+                           tmax_sum = Tmax_sm,
+                           tmin_winter = Tmin_wt) %>%
+                    dplyr::select(-ID1, -Latitude, -Longitude, -Elevation)
+      
+      colnames(last1000)[-1] <- paste0(colnames(last1000)[-1], "_last1000")
+      
     # Last glacial maximum
-      lgm <- read_csv("./data/cleaned_data/maternal tree climate data ClimateWna LGM 2018_06_11_4GCM-Ensemble.csv") %>%
+      lgm <- read_csv("./data/gis/climate_data/climateWNA/maternal tree climate data ClimateWNA LGM 2018_06_11_4GCM-Ensemble_lgmMSY.csv") %>%
         rename(accession = ID2 , 
-               tmax_sum_lgm = Tmax_sm,
-               tmin_winter_lgm = Tmin_wt) %>%
-        dplyr::select(accession, tmax_sum_lgm, tmin_winter_lgm)
+               tmax_sum = Tmax_sm,
+               tmin_winter = Tmin_wt) %>%
+        dplyr::select(-ID1, -Latitude, -Longitude, -Elevation)
+      
+      colnames(lgm)[-1] <- paste0(colnames(lgm)[-1], "_lgm")
     
     # Mid-holocene  
-      holo <- read_csv("./data/cleaned_data/maternal tree climate data ClimateWna MidHolocene 2018_06_11_4GCM-Ensemble.csv") %>%
+      holo <- read_csv("./data/gis/climate_data/climateWNA/maternal tree climate data ClimateWNA Holocene 2018_06_11_4GCM-Ensemble_midHoloceneMSY.csv") %>%
         rename(accession = ID2 , 
-               tmax_sum_holo = Tmax_sm,
-               tmin_winter_holo = Tmin_wt) %>%
-        dplyr::select(accession, tmax_sum_holo, tmin_winter_holo)
+               tmax_sum = Tmax_sm,
+               tmin_winter = Tmin_wt) %>%
+        dplyr::select(-ID1, -Latitude, -Longitude, -Elevation)
+      
+      colnames(holo)[-1] <- paste0(colnames(holo)[-1], "_holo")
+      
       
     # Join together in main climate dataset
       climate_garden_mom <- left_join(left_join(left_join(climate_garden_mom, last1000), lgm), holo)
       
+      dim(climate_garden_mom)
+      
       
     # Compare climate variables
-      pairs.panels(climate_garden_mom[, c("tmax_sum", "tmax_sum_last1000", "tmax_sum_holo", "tmax_sum_lgm")])
+      pairs.panels(climate_garden_mom[, c("tmax_sum", "tmax_sum_last1000", 
+                                          "tmax_sum_holo", "tmax_sum_lgm")])
       
-      pairs.panels(climate_garden_mom[, c("tmin_winter", "tmin_winter_last1000", "tmin_winter_holo", "tmin_winter_lgm")])
+      pairs.panels(climate_garden_mom[, c("tmin_winter", "tmin_winter_last1000", 
+                                          "tmin_winter_holo", "tmin_winter_lgm")])
+      
+      pairs.panels(climate_garden_mom[, c("tmax_sum", "tmin_winter", "DD18", "DD18_lgm", "DD5_last1000")])
     
     # Differences in temperature  
       mean(climate_garden_mom$tmax_sum - climate_garden_mom$tmax_sum_lgm)
@@ -85,6 +147,10 @@
       climate_gbs_mom$tmin_winter_last1000 <- climate_gbs_mom$tmin_winter
       climate_gbs_mom$tmin_winter_lgm <- climate_gbs_mom$tmin_winter
       climate_gbs_mom$tmin_winter_holo <- climate_gbs_mom$tmin_winter
+      climate_gbs_mom$DD18_lgm <- calc_gdd(dat = climate_gbs_mom, threshold = 18)
+      
+    ## Calculating growing degree days
+      climate_gbs_mom$DD18 <- calc_gdd(dat = climate_gbs_mom, threshold = 18)
       
   
       
@@ -115,6 +181,9 @@
     garden_climate$tmin_winter_lgm <- garden_climate$tmin_winter
     garden_climate$tmin_winter_holo <- garden_climate$tmin_winter
     
+    ## Calculating growing degree days
+    garden_climate$DD18 <- calc_gdd(dat = garden_climate, threshold = 18)
+    garden_climate$DD18_lgm <- garden_climate$DD18
 
     
 
@@ -123,13 +192,14 @@
      ## Core variables from Riordan et al. 2016 Am J Botany  
     ## Except we are excluding AET because it is very strongly correlated with cwd
     climate_vars <- c("tmax_sum",
-                      "tmax_sum_last1000",
+                    #  "tmax_sum_last1000",
                       "tmax_sum_lgm",
-                      "tmax_sum_holo",
+                    #  "tmax_sum_holo",
                       "tmin_winter",
-                      "tmin_winter_last1000",
+                    #  "tmin_winter_last1000",
                       "tmin_winter_lgm",
-                      "tmin_winter_holo",
+                     # "tmin_winter_holo",
+                      "DD18", "DD18_lgm",
                       "random")
                       #  "tmax",
                       #"tmin",
@@ -325,7 +395,7 @@
   
 
 
-
+pairs.panels(climate_garden_mom[, climate_vars])
 
   
   
