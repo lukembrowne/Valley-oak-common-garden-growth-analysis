@@ -273,17 +273,15 @@
       if(response_variable == "height"){
         
         # Exclude based on percentle
-        dat_all$height_2017[dat_all$height_2017 <= quantile(dat_all$height_2017, 0.01,
-                                                            na.rm = TRUE) |
-                              dat_all$height_2017 >= quantile(dat_all$height_2017, 0.99,
-                                                              na.rm = TRUE)] <- NA
+        # dat_all$height_2017[dat_all$height_2017 <= quantile(dat_all$height_2017, 0.01,
+        #                                                     na.rm = TRUE) |
+        #                       dat_all$height_2017 >= quantile(dat_all$height_2017, 0.99,
+        #                                                       na.rm = TRUE)] <- NA
 
         ## Filter out NA heights
         dat_all <- dplyr::filter(dat_all, !is.na(height_2017))
         dat_all <- dplyr::filter(dat_all, !is.na(height_2014))  
-  
-        
-      
+ 
       }
 
     

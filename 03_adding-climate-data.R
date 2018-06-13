@@ -66,9 +66,9 @@
       (  test_0(((dat$tmax_dec + dat$tmin_dec) / 2 - threshold)) * 31)   # Dec
     }
       
-  climate_garden_mom$DD18 <- calc_gdd(dat = climate_garden_mom, threshold = 18)
+  climate_garden_mom$DD5 <- calc_gdd(dat = climate_garden_mom, threshold = 5)
     
-  summary(climate_garden_mom$DD18)
+  summary(climate_garden_mom$DD5)
     
   ## Read in historical / paleo climate data from WNA to compare with BCM
     
@@ -113,7 +113,7 @@
       pairs.panels(climate_garden_mom[, c("tmin_winter", "tmin_winter_last1000", 
                                           "tmin_winter_holo", "tmin_winter_lgm")])
       
-      pairs.panels(climate_garden_mom[, c("tmax_sum", "tmin_winter", "DD18", "DD18_lgm", "DD5_last1000")])
+      pairs.panels(climate_garden_mom[, c("tmax_sum", "tmin_winter", "DD5", "DD5_lgm", "DD5_last1000")])
     
     # Differences in temperature  
       mean(climate_garden_mom$tmax_sum - climate_garden_mom$tmax_sum_lgm)
@@ -139,18 +139,38 @@
     
     climate_gbs_mom$accession
     
-    ## TEMPORARY - ADD IN PLACEHOLDER HISTORIC CLIMATE VARIABLES
-      climate_gbs_mom$tmax_sum_last1000 <- climate_gbs_mom$tmax_sum
-      climate_gbs_mom$tmax_sum_lgm <- climate_gbs_mom$tmax_sum
-      climate_gbs_mom$tmax_sum_holo <- climate_gbs_mom$tmax_sum
-      
-      climate_gbs_mom$tmin_winter_last1000 <- climate_gbs_mom$tmin_winter
-      climate_gbs_mom$tmin_winter_lgm <- climate_gbs_mom$tmin_winter
-      climate_gbs_mom$tmin_winter_holo <- climate_gbs_mom$tmin_winter
-      climate_gbs_mom$DD18_lgm <- calc_gdd(dat = climate_gbs_mom, threshold = 18)
-      
-    ## Calculating growing degree days
-      climate_gbs_mom$DD18 <- calc_gdd(dat = climate_gbs_mom, threshold = 18)
+    # Reading in paleo climate data
+    # Last 1000 years
+    last1000 <-   read_csv("./data/gis/climate_data/climateWNA/GBS tree climate data Climate WNA 2018_06_12_4GCM-Ensemble_past1000MSY.csv") %>%
+      rename(id = ID1 , 
+             tmax_sum = Tmax_sm,
+             tmin_winter = Tmin_wt) %>%
+      dplyr::select(-ID2, -Latitude, -Longitude, -Elevation)
+    
+    colnames(last1000)[-1] <- paste0(colnames(last1000)[-1], "_last1000")
+    
+    # Last glacial maximum
+    lgm <- read_csv("./data/gis/climate_data/climateWNA/GBS tree climate data Climate WNA 2018_06_12_4GCM-Ensemble_lgmMSY.csv") %>%
+      rename(id = ID1 , 
+             tmax_sum = Tmax_sm,
+             tmin_winter = Tmin_wt) %>%
+      dplyr::select(-ID2, -Latitude, -Longitude, -Elevation)
+    
+    colnames(lgm)[-1] <- paste0(colnames(lgm)[-1], "_lgm")
+    
+    # Mid-holocene  
+    holo <- read_csv("./data/gis/climate_data/climateWNA/GBS tree climate data Climate WNA 2018_06_12_4GCM-Ensemble_midHoloceneMSY.csv") %>%
+      rename(id = ID1 , 
+             tmax_sum = Tmax_sm,
+             tmin_winter = Tmin_wt) %>%
+      dplyr::select(-ID2, -Latitude, -Longitude, -Elevation)
+    colnames(holo)[-1] <- paste0(colnames(holo)[-1], "_holo")
+    
+    
+    # Join together in main climate dataset
+    climate_gbs_mom <- left_join(left_join(left_join(climate_gbs_mom, last1000), lgm), holo)
+    
+    dim(climate_gbs_mom)
       
   
       
@@ -182,8 +202,8 @@
     garden_climate$tmin_winter_holo <- garden_climate$tmin_winter
     
     ## Calculating growing degree days
-    garden_climate$DD18 <- calc_gdd(dat = garden_climate, threshold = 18)
-    garden_climate$DD18_lgm <- garden_climate$DD18
+    garden_climate$DD5 <- calc_gdd(dat = garden_climate, threshold = 5)
+    garden_climate$DD5_lgm <- garden_climate$DD5
 
     
 
@@ -199,7 +219,7 @@
                     #  "tmin_winter_last1000",
                       "tmin_winter_lgm",
                      # "tmin_winter_holo",
-                      "DD18", "DD18_lgm",
+                      "DD5", "DD5_lgm",
                       "random")
                       #  "tmax",
                       #"tmin",
@@ -216,74 +236,74 @@
     
 # PCA on climate variables ------------------------------------------------
 
-    # PCA based on climate data of maternal trees in provenance trial
-      clim_pca_home <- prcomp(climate_garden_mom[, 
-                                                 climate_vars[-which(climate_vars == "random")]], scale = TRUE)
-      summary(clim_pca_home)
-      
-    
-    ## Format as dataframe
-      clim_pca_home_vals <- as.data.frame(clim_pca_home$x)
-    
-    ## Scree plot of PCA
-      fviz_screeplot(clim_pca_home)
-    
-    ## Contributions of each axis
-      # fviz_contrib(clim_pca_home, choice = "var", axes = c(1))
-      # fviz_contrib(clim_pca_home, choice = "var", axes = c(2))
-      # fviz_contrib(clim_pca_home, choice = "var", axes = c(3))
-      # fviz_contrib(clim_pca_home, choice = "var", axes = c(4))
-      # fviz_contrib(clim_pca_home, choice = "var", axes = c(5))
-    
-    ## Arrows plot
-      fviz_pca_var(clim_pca_home, axes = c(1,2))
-    
-    ## Predict PC values for
-    # 1) Seedlings in common garden
-    # 2) Chico  & IFG based on pca of climate of origin
-    # 3) GBS moms
-    # Need to be sure that the garden climate variables are scaled first
-    
-    dat_all_clim_scaled <- dat_all_clim  
-    garden_climate_scaled <- garden_climate # Scaled based on seedling climate of origin!!!
-    climate_gbs_mom_scaled <- climate_gbs_mom
-    
-    for(var in climate_vars){
-      
-      dat_all_clim_scaled[, var] <- (pull(dat_all_clim_scaled, var) - mean(pull(dat_all_clim, var))) / sd(pull(dat_all_clim, var))
-      
-      garden_climate_scaled[, var] <- (pull(garden_climate_scaled, var) - mean(pull(dat_all_clim, var))) / sd(pull(dat_all_clim, var))
-      
-      climate_gbs_mom_scaled[, var] <- (pull( climate_gbs_mom_scaled, var) - mean(pull(dat_all_clim, var))) / sd(pull(dat_all_clim, var))
-      
-    }
-    
-    dat_all_clim_scaled[, climate_vars]
-    garden_climate_scaled[, climate_vars]
-    climate_gbs_mom_scaled[, climate_vars]
-    
-  # Predict PCA values  
-   
-    dat_all_clim_pca_vals <-   as.data.frame(predict(clim_pca_home, dat_all_clim_scaled))
-    dat_all_clim_pca_vals
-    
-    garden_climate_pca_vals <-   as.data.frame(predict(clim_pca_home, garden_climate_scaled))
-    garden_climate_pca_vals
-    
-    climate_gbs_mom_pca_vals <- as.data.frame(predict(clim_pca_home, climate_gbs_mom_scaled))
-    climate_gbs_mom_pca_vals
-    
-  # Join back to main dataframes
-    # dat_all_clim <- bind_cols(dat_all_clim, dat_all_clim_pca_vals)
-    # garden_climate <- bind_cols(garden_climate, garden_climate_pca_vals)
-    # climate_gbs_mom <- bind_cols(climate_gbs_mom, climate_gbs_mom_pca_vals)
-    
-    
-    
-  ## Add PCs to list of climate vars
-    # climate_vars <- c(climate_vars, colnames(garden_climate_pca_vals))
-    
-      
+  #   # PCA based on climate data of maternal trees in provenance trial
+  #     clim_pca_home <- prcomp(climate_garden_mom[, 
+  #                                                climate_vars[-which(climate_vars == "random")]], scale = TRUE)
+  #     summary(clim_pca_home)
+  #     
+  #   
+  #   ## Format as dataframe
+  #     clim_pca_home_vals <- as.data.frame(clim_pca_home$x)
+  #   
+  #   ## Scree plot of PCA
+  #     fviz_screeplot(clim_pca_home)
+  #   
+  #   ## Contributions of each axis
+  #     # fviz_contrib(clim_pca_home, choice = "var", axes = c(1))
+  #     # fviz_contrib(clim_pca_home, choice = "var", axes = c(2))
+  #     # fviz_contrib(clim_pca_home, choice = "var", axes = c(3))
+  #     # fviz_contrib(clim_pca_home, choice = "var", axes = c(4))
+  #     # fviz_contrib(clim_pca_home, choice = "var", axes = c(5))
+  #   
+  #   ## Arrows plot
+  #     fviz_pca_var(clim_pca_home, axes = c(1,2))
+  #   
+  #   ## Predict PC values for
+  #   # 1) Seedlings in common garden
+  #   # 2) Chico  & IFG based on pca of climate of origin
+  #   # 3) GBS moms
+  #   # Need to be sure that the garden climate variables are scaled first
+  #   
+  #   dat_all_clim_scaled <- dat_all_clim  
+  #   garden_climate_scaled <- garden_climate # Scaled based on seedling climate of origin!!!
+  #   climate_gbs_mom_scaled <- climate_gbs_mom
+  #   
+  #   for(var in climate_vars){
+  #     
+  #     dat_all_clim_scaled[, var] <- (pull(dat_all_clim_scaled, var) - mean(pull(dat_all_clim, var))) / sd(pull(dat_all_clim, var))
+  #     
+  #     garden_climate_scaled[, var] <- (pull(garden_climate_scaled, var) - mean(pull(dat_all_clim, var))) / sd(pull(dat_all_clim, var))
+  #     
+  #     climate_gbs_mom_scaled[, var] <- (pull( climate_gbs_mom_scaled, var) - mean(pull(dat_all_clim, var))) / sd(pull(dat_all_clim, var))
+  #     
+  #   }
+  #   
+  #   dat_all_clim_scaled[, climate_vars]
+  #   garden_climate_scaled[, climate_vars]
+  #   climate_gbs_mom_scaled[, climate_vars]
+  #   
+  # # Predict PCA values  
+  #  
+  #   dat_all_clim_pca_vals <-   as.data.frame(predict(clim_pca_home, dat_all_clim_scaled))
+  #   dat_all_clim_pca_vals
+  #   
+  #   garden_climate_pca_vals <-   as.data.frame(predict(clim_pca_home, garden_climate_scaled))
+  #   garden_climate_pca_vals
+  #   
+  #   climate_gbs_mom_pca_vals <- as.data.frame(predict(clim_pca_home, climate_gbs_mom_scaled))
+  #   climate_gbs_mom_pca_vals
+  #   
+  # # Join back to main dataframes
+  #   # dat_all_clim <- bind_cols(dat_all_clim, dat_all_clim_pca_vals)
+  #   # garden_climate <- bind_cols(garden_climate, garden_climate_pca_vals)
+  #   # climate_gbs_mom <- bind_cols(climate_gbs_mom, climate_gbs_mom_pca_vals)
+  #   
+  #   
+  #   
+  # ## Add PCs to list of climate vars
+  #   # climate_vars <- c(climate_vars, colnames(garden_climate_pca_vals))
+  #   
+  #     
       
 # Filter down to seedlings with and without GBS data ----------------------
       
@@ -395,15 +415,9 @@
   
 
 
-pairs.panels(climate_garden_mom[, climate_vars])
+ pairs.panels(climate_garden_mom[, c("latitude", "longitude", climate_vars)])
 
-  
-  
-  
-  
-  
-  
-  
+ 
     
 
 
