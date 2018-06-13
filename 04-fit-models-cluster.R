@@ -5,7 +5,17 @@
 
 # Load libraries ----------------------------------------------------------
   
+  source("./01_clean-process-explore-data.R")
+  source("./03_adding-climate-data.R")
+  
+  dim(dat_all_scaled)
+  dim(dat_gbs_only_scaled)
+
+
   # install_github("jdstorey/qvalue")
+  library(gamm4)
+  library(visreg)
+  library(rrBLUP)
   library(qvalue)
   library(MuMIn)
   library(vegan)
@@ -174,6 +184,118 @@
   
   
   
+  
+# Function for plotting predictions ---------------------------------------
+  
+  plot_pred <- function(xvar,
+                        add_points = TRUE,
+                        add_residuals = FALSE,
+                        save = FALSE,
+                        path = "./",
+                        filename = "",
+                        main = ""){
+    
+    # Test to see what type of variable it is - factor or numeric
+    type <- ifelse(is.factor(pull(dat_all_scaled, xvar)), "factor", "numeric")
+    
+    # Make predictions
+    v <- visreg(gam_all, xvar = xvar, 
+                scale = "response", rug = FALSE, ylab = "5 yr height (cm)", plot = FALSE)
+    
+    dat_all_scaled_trans <- dat_all_scaled
+    
+    
+    # If xvariable is not a factor, backtranform to original scale for plotting
+    if(type == "numeric"){
+      # Transform x axis + assign variables for lo and hi CI
+      v$fit <- v$fit %>%
+        # Back transform X axis
+        mutate(!!xvar := back_transform(x = get(xvar),
+                                        var = xvar,
+                                        means = scaled_var_means_all,
+                                        sds = scaled_var_sds_all))
+      
+      dat_all_scaled_trans <- dat_all_scaled %>%
+        # Back transform X axis
+        mutate(!!xvar := back_transform(x = get(xvar),
+                                        var = xvar,
+                                        means = scaled_var_means_all,
+                                        sds = scaled_var_sds_all))
+    } # End factor if
+    
+    
+    # Add partial residuals
+    dat_all_scaled_trans$resid <- v$res$visregRes
+    
+    ## Main GGPLOT
+    gg <- 
+      ggplot(dat_all_scaled_trans, aes(x = get(xvar), y = height_2017)) + 
+      xlab(xvar) + ylab("5 yr height (cm)") +
+      ggtitle(main) +
+      theme_bw()
+    
+    # Add raw points to graph?
+    if(add_points == TRUE){
+      gg <- gg + 
+        geom_jitter(data = dat_all_scaled_trans, aes(x = get(xvar), y = height_2017),
+                    size = 0.5, alpha = 0.5)
+    }
+    
+    ## Add partial residuals to graph?
+    if(add_residuals == TRUE){
+      gg <- gg + 
+        geom_point(data = dat_all_scaled_trans, aes(x = get(xvar), y = resid),
+                   size = 0.5, alpha = 0.5)
+    }
+    
+    
+    # If numeric, add points and lines
+    if(type == "numeric"){
+      gg <- gg + 
+        geom_ribbon(data = v$fit, aes(ymin = visregLwr, ymax = visregUpr), fill = "forestgreen", alpha = 0.75) +
+        geom_line(data = v$fit, aes(x = get(xvar), y = visregFit), lwd = 2) 
+    }
+    
+    # If factor, make point_range
+    if(type == "factor"){
+      gg <- gg + 
+        geom_pointrange(data = v$fit, aes(x = get(xvar), y = visregFit, 
+                                          ymin = visregLwr, ymax = visregUpr,
+                                          fill = get(xvar)),
+                        size = 1.5, shape = 21) +
+        guides(fill=FALSE) # Remove legend
+    }
+    
+    
+    
+    # Add verticle line at 0 if a climate transfer function
+    if(grepl(pattern = "_dif", x = xvar)){
+      gg <- gg + geom_vline(aes(xintercept = 0), lty = 2) 
+    }
+    
+    # General theme and margins
+    gg <- gg + theme(plot.margin = (margin(1.5,1.5,1.5,1.5, "cm")),
+                     text = element_text(size = 20))
+    
+    # Printing to file
+    if(save){
+      ggsave(paste0(path, filename))
+    }
+    
+    print(gg)
+    
+    return(gg)
+    
+  } # End plot_pred function
+  
+  
+  # Numerical    
+  
+  save_flag = FALSE
+  path <- "./figs_tables/2018_06_08 Jamie meeting/"
+  
+  
+  
 # Run FULL models with all seedlings (no genomic data) --------------------
 
   # Convert factors
@@ -214,179 +336,20 @@
     
     gam.check(gam_all)
     
+   p = plot_pred(xvar = var, add_points = FALSE, add_residuals = FALSE,
+              save = FALSE, path = "", filename = "")
+   
+  # print(p)
+    
+    p =  plot_pred(xvar = var, add_points = FALSE, add_residuals = TRUE,
+              save = FALSE, path = "", filename = "")
+    
+   # print(p)
+    
     dev.off()
-  }  
     
-  
- 
-
-  
-# Function for plotting predictions ---------------------------------------
-
-  plot_pred <- function(xvar,
-                        add_points = TRUE,
-                        add_residuals = FALSE,
-                        save = FALSE,
-                        path = "./",
-                        filename = "",
-                        main = ""){
-  
-      # Test to see what type of variable it is - factor or numeric
-      type <- ifelse(is.factor(pull(dat_all_scaled, xvar)), "factor", "numeric")
-      
-      # Make predictions
-        v <- visreg(gam_all, xvar = xvar, 
-             scale = "response", rug = FALSE, ylab = "5 yr height (cm)", plot = FALSE)
-        
-        dat_all_scaled_trans <- dat_all_scaled
-        
-     
-    # If xvariable is not a factor, backtranform to original scale for plotting
-      if(type == "numeric"){
-          # Transform x axis + assign variables for lo and hi CI
-          v$fit <- v$fit %>%
-            # Back transform X axis
-            mutate(!!xvar := back_transform(x = get(xvar),
-                                                       var = xvar,
-                                                       means = scaled_var_means_all,
-                                                       sds = scaled_var_sds_all))
-          
-          dat_all_scaled_trans <- dat_all_scaled %>%
-            # Back transform X axis
-            mutate(!!xvar := back_transform(x = get(xvar),
-                                            var = xvar,
-                                            means = scaled_var_means_all,
-                                            sds = scaled_var_sds_all))
-      } # End factor if
-        
-        
-        # Add partial residuals
-        dat_all_scaled_trans$resid <- v$res$visregRes
-      
-      ## Main GGPLOT
-        gg <- 
-          ggplot(dat_all_scaled_trans, aes(x = get(xvar), y = height_2017)) + 
-          xlab(xvar) + ylab("5 yr height (cm)") +
-          ggtitle(main) +
-          theme_bw()
-        
-      # Add raw points to graph?
-        if(add_points == TRUE){
-          gg <- gg + 
-            geom_jitter(data = dat_all_scaled_trans, aes(x = get(xvar), y = height_2017),
-                        size = 0.5, alpha = 0.5)
-        }
-      
-      ## Add partial residuals to graph?
-        if(add_residuals == TRUE){
-          gg <- gg + 
-            geom_point(data = dat_all_scaled_trans, aes(x = get(xvar), y = resid),
-          size = 0.5, alpha = 0.5)
-        }
-     
-      
-      # If numeric, add points and lines
-        if(type == "numeric"){
-         gg <- gg + 
-            geom_ribbon(data = v$fit, aes(ymin = visregLwr, ymax = visregUpr), fill = "forestgreen", alpha = 0.75) +
-            geom_line(data = v$fit, aes(x = get(xvar), y = visregFit), lwd = 2) 
-        }
-      
-      # If factor, make point_range
-        if(type == "factor"){
-          gg <- gg + 
-            geom_pointrange(data = v$fit, aes(x = get(xvar), y = visregFit, 
-                                              ymin = visregLwr, ymax = visregUpr,
-                                                        fill = get(xvar)),
-                                      size = 1.5, shape = 21) +
-            guides(fill=FALSE) # Remove legend
-        }
-      
-      
-      
-      # Add verticle line at 0 if a climate transfer function
-        if(grepl(pattern = "_dif", x = xvar)){
-          gg <- gg + geom_vline(aes(xintercept = 0), lty = 2) 
-        }
-      
-      # General theme and margins
-        gg <- gg + theme(plot.margin = (margin(1.5,1.5,1.5,1.5, "cm")),
-                         text = element_text(size = 20))
-      
-      # Printing to file
-      if(save){
-        ggsave(paste0(path, filename))
-      }
-        
-      print(gg)
-      
-  } # End plot_pred function
-
-    
-# Numerical    
-  
-  save_flag = FALSE
-  path <- "./figs_tables/2018_06_08 Jamie meeting/"
-  
-  plot_pred(xvar = "height_2014", add_points = FALSE, save = save_flag, path = path, filename = "height_2014_no_points.pdf")
-  plot_pred(xvar = "height_2014", add_points = TRUE, save = save_flag, path = path, filename = "height_2014_points.pdf")
-  
-  plot_pred(xvar = "tmax_sum_dif", add_points = FALSE, add_residuals = TRUE, main = "Tmax _summer 1950-1980", 
-            save = save_flag, path = path, filename = "tmax_sum_dif_no_points.pdf")
-  plot_pred(xvar = "tmax_sum_dif", add_points = FALSE, main = "Tmax _summer 1950-1980", 
-            save = save_flag, path = path, filename = "tmax_sum_dif_points.pdf")
-  
-# Historic  
-  plot_pred(xvar = "tmax_sum_last1000_dif", add_points = FALSE, add_residuals = TRUE,
-            main = "Tmax_summer Last Millennium (1,000 yrs ago)",
-            save = save_flag, path = path, filename = "tmax_sum_last1000_dif_no_points.pdf")
-  plot_pred(xvar = "tmax_sum_last1000_dif", add_points = FALSE, main = "Tmax_summer Last Millennium (1,000 yrs ago)",
-            save = save_flag, path = path, filename = "tmax_sum_last1000_dif_points.pdf")
-  
-  plot_pred(xvar = "tmax_sum_holo_dif", add_points = FALSE, add_residuals = TRUE, main = "Tmax_summer Mid-Holocene (6,000 yrs ago)",
-            save = save_flag, path = path, filename = "tmax_sum_holo_dif_no_points.pdf")
-  plot_pred(xvar = "tmax_sum_holo_dif", add_points = TRUE, main = "Tmax_summer Mid-Holocene (6,000 yrs ago)",
-            save = save_flag, path = path, filename = "tmax_sum_holo_dif_points.pdf")
-  
-  plot_pred(xvar = "tmax_sum_lgm_dif", add_points = FALSE, add_residuals = TRUE, 
-            main = "Tmax_summer Last Glacial Maximum (21,000 yrs ago)",
-            save = save_flag, path = path, filename = "tmax_sum_lgm_dif_no_points.pdf")
-  
-  plot_pred(xvar = "tmax_sum_lgm_dif", add_points = FALSE, add_residuals = FALSE, 
-            main = "Tmax_summer Last Glacial Maximum (21,000 yrs ago)",
-            save = save_flag, path = path, filename = "tmax_sum_lgm_dif_points.pdf")
-  
-  
- # Tmin winter 
-  plot_pred(xvar = "tmin_winter_dif", add_points = FALSE, save = save_flag, path = path, filename = "tmin_winter_dif_no_points.pdf")
-  plot_pred(xvar = "tmin_winter_dif", add_points = TRUE, save = save_flag, path = path, filename = "tmin_winter_dif_points.pdf")
-  
-  
-  plot_pred(xvar = "tmin_winter_last1000_dif",  add_points = FALSE, add_residuals = TRUE, 
-            main = "Tmin_winter Last Millenium (1,000 yrs ago)",
-            save = save_flag, path = path, filename = "tmin_winter_last1000_dif_no_points.pdf")
-  plot_pred(xvar = "tmin_winter_last1000_dif", add_points = FALSE,  add_residuals = FALSE, 
-            main = "Tmin_winter Last Millenium (1,000 yrs ago)",
-            save = save_flag, path = path, filename = "tmin_winter_last1000_dif_points.pdf")
-  
-  plot_pred(xvar = "tmin_winter_holo_dif", add_points = FALSE, 
-            save = save_flag, path = path, filename = "tmin_winter_holo_dif_no_points.pdf")
-  plot_pred(xvar = "tmin_winter_holo_dif", add_points = TRUE, 
-            save = save_flag, path = path, filename = "tmin_winter_holo_dif_points.pdf")
-  
-  plot_pred(xvar = "tmin_winter_lgm_dif", add_points = FALSE, add_residuals = TRUE, 
-            main = "Tmin_winter Last Glacial Maximum (21,000 yrs ago)",
-            save = save_flag, path = path, filename = "tmin_winter_lgm_dif_no_points.pdf")
-  plot_pred(xvar = "tmin_winter_lgm_dif", add_points = FALSE,  add_residuals = FALSE, 
-            main = "Tmin_winter Last Glacial Maximum (21,000 yrs ago)",
-            save = save_flag, path = path, filename = "tmin_winter_lgm_dif_points.pdf")
-  
-# Factors
-  plot_pred(xvar = "section_block", save = save_flag, path = path, filename = "section_block.pdf")  
-  plot_pred(xvar = "site", save = save_flag, path = path, filename = "site.pdf")  
-  plot_pred(xvar = "accession", add_points = FALSE, save = save_flag, path = path, filename = "accession.pdf")
-      
-      
+  }  # END LOOP
+   
   
 # Gam code from cluster for testing -------------------------------------------
 
@@ -395,7 +358,7 @@
   gam_list <- list()
   x = 1
   
-  ## Convert fixed and random parts of formula to actual formula objetc
+  ## Convert fixed and random parts of formula to actual formula object
   # No idea why we need to call formula twice, but it works
   make_formula <- function(fixed, random){
     return(formula(formula(enquote(paste0(fixed, random)))))
@@ -755,7 +718,7 @@
 
 # Read in cluster run output ----------------------------------------------
 
-  path_to_summaries <- "./output/model_summaries_tmax_sum/"  
+  path_to_summaries <- "./output/model_summaries_tmax_sum_lgm_dif/"  
   
   sum_df <- ldply(list.files(path_to_summaries, full = TRUE), read_csv)
   
@@ -763,6 +726,10 @@
   sum_df
   
   summary(sum_df)
+  
+  
+  ## Missing snps
+  snp_col_names[which(!paste0("snp_", snp_col_names) %in% sum_df$snp)]
   
   
   
@@ -795,17 +762,12 @@
       sum_df <- sum_df %>%
         mutate(q_val = qvals$qvalues)
       
-        qvals$qvalues
-        qvals$lfdr
         qvals$pi0 # overall proportion of true null hypotheses
       
       # Sort by lowest q value  
       sum_df %>%
         dplyr::arrange(q_val)
-      
-  
  
-      
   # Calculate average height prediction
     avg_height_pred <- mean(c(pull(sum_df, height_change_gen_0), 
                             pull(sum_df, height_change_gen_1),
@@ -833,16 +795,17 @@
     # Based on q value
     top_snps = sum_df %>%
       dplyr::filter(q_val < 0.05) %>%
-    #  dplyr::filter(beneficial_gen_0 == 1 | beneficial_gen_1 == 1 | beneficial_gen_2 == 1) %>%
-      #  dplyr::select(snp) %>%
+    #  dplyr::filter(p_val_int < 0.001) %>%
+      dplyr::top_n(-round(nrow(sum_df)*.01), p_val_int) %>% # Take only 1% of snps
+      dplyr::filter(beneficial_gen_0 == 1 | beneficial_gen_1 == 1 | beneficial_gen_2 == 1) %>%
       dplyr::mutate(snp = gsub("snp_", "", snp)) %>%
       dplyr::arrange(q_val)
     
     top_snps
   
   ## SCP code to copy over model plots
-    for(snp in paste0("snp_", top_snps$snp)){
-      system(paste0("scp lukembro@dtn2.hoffman2.idre.ucla.edu:/u/flashscratch/l/lukembro/qlobata_growth/run_2876655_tmax_sum_dif/model_plots/", snp, ".pdf ./output/model_visualizations/"))
+    for(snp in paste0("snp_", top_snps$snp)[1:15]){
+      system(paste0("scp lukembro@dtn2.hoffman2.idre.ucla.edu:/u/flashscratch/l/lukembro/qlobata_growth/run_291_tmax_sum_dif/model_plots/", snp, "_gg.pdf ./output/model_visualizations/"))
       
      # gg <-  ggplot(dat_snp, aes(tmax_sum_dif, pull(dat_snp, snp))) +
      #    geom_jitter() +
@@ -876,18 +839,18 @@
   dev.off()
   CMplot(man_df, plot.type=c("m"), LOG10=TRUE, threshold=1e-3,
          bin.size=1e6,
-         chr.den.col=c("darkgreen", "yellow", "red"), file.output = TRUE)
+         chr.den.col=c("darkgreen", "yellow", "red"), file.output = FALSE)
   
 ## QQplot  
   dev.off()
-  CMplot(man_df, plot.type="q", box=TRUE,file.output = TRUE)
+  CMplot(man_df, plot.type="q", box=TRUE,file.output = FALSE)
   
 # With Q values  
    man_df <- left_join(man_df1, sum_df[, c("snp", "q_val")], by = c("SNP" = "snp"))
    dev.off()
    CMplot(man_df, plot.type=c("m"), LOG10=TRUE, threshold= 0.05,
           bin.size=1e6, ylim = c(0, 2),
-          chr.den.col=c("darkgreen", "yellow", "red"), file.output = TRUE)
+          chr.den.col=c("darkgreen", "yellow", "red"), file.output = FALSE)
   
 
   
@@ -896,12 +859,13 @@
 # RDA on top snps ---------------------------------------------------------
 
   rda_scaled <- flashpcaR::scale2(gen_dat_clim[, top_snps$snp], impute = 2)
+   
+  # rda_scaled <- flashpcaR::scale2(gen_dat_clim[, snp_col_names], impute = 2)
   
-
-  
-  rda_full <- vegan::rda(rda_scaled ~ latitude + 
-                           longitude + elevation + tmax_sum + tmin_winter,
-                         data = gen_dat_clim)
+    rda_full <- vegan::rda(rda_scaled ~ latitude + 
+                             longitude + elevation +
+                             tmax_sum + tmin_winter,
+                           data = gen_dat_clim)
   
   rda_full
   summary(rda_full)
@@ -943,6 +907,8 @@
   # Extract row indices of outlier snps
   sig_snps <- which(rownames(loadings) %in% outlier_snps_names) 
   
+  sig_snps <- which(rownames(loadings) %in% top_snps$snp)
+  
   # Color of outlier SNPs
   snp_cols <- rep("grey90",  times = nrow(loadings)) # Set default color
   snp_cols[sig_snps] <- "red"
@@ -952,11 +918,19 @@
   snp_labels[sig_snps] <- outlier_snps_names
   
   # Make biplot
-  plot(rda_full, type = "n", scaling = 3) # Create empty plot 
+  plot(rda_full, type = "n", scaling = 3, xlim = c(-1, 1), ylim = c(-1,1)) # Create empty plot 
   points(rda_full, display = "species", pch = 21,
          col = "black", bg = snp_cols, scaling = 3)
-  text(rda_full, display = "species", labels = snp_labels, cex = .75, scaling = 3)
+  
+  points(rda_full, display = "species", pch = 21, # Overplot sig snps
+         col = "black", select = sig_snps, bg = "red", scaling = 3)
+ # text(rda_full, display = "species", labels = snp_labels, cex = .75, scaling = 3)
   text(rda_full, scaling = 3, display = "bp", col="black") # Environmental vectors  
+  
+  
+  
+  
+  # Plot onto map
   
   
   # Get map of California - already loaded in ggplot2 package
@@ -982,33 +956,62 @@
   
 
 # Gradient forest test ----------------------------------------------------
+  library(gradientForest)
   
-  gf_scaled <- flashpcaR::scale2(gen_dat_clim[, top_snps$snp], impute = 2)
-   
+  gf_sample <- top_snps$snp
+  
+  
+  r2_ran <- NULL
+  for(x in 1:10){
     
-    library(gradientForest)
+    cat("working on:", x, "...\n")
     
-    climate_vars_gf <- c("tmax_sum", "tmin_winter", "bioclim_04", 
-                         "random", "cwd", "ppt", "longitude", "elevation",
-                         "latitude")
+    gf_sample <- sample(snp_col_names, length(top_snps$snp))
     
-    pairs.panels(gen_dat_clim[, climate_vars_gf])
-    
-    length(top_snps$snp)
-    top_snps$snp
-    
-    gf <- gradientForest(cbind(gen_dat_clim[, climate_vars_gf],
-                                     bglr_gen_scaled ),
-                         predictor.vars = climate_vars_gf, 
-                       # response.vars = top_snps$snp,
-                       response.vars = gsub("snp_", "", sum_df$snp),
-                        trace = TRUE)
+    gf_scaled <- flashpcaR::scale2(gen_dat_clim[, gf_sample], impute = 2)
+     
+      
+      
+      
+      climate_vars_gf <- c("tmax_sum", "tmax_sum_lgm",
+                           "tmin_winter", "tmin_winter_lgm", 
+                           "DD5", "DD5_lgm",
+                           "random",  "longitude", "elevation",
+                           "latitude")
 
-    gf$result # Rsquared of positive loci
-    gf$species.pos.rsq
+      gf <- gradientForest(cbind(gen_dat_clim[, climate_vars_gf],
+                                       bglr_gen_scaled ),
+                           predictor.vars = climate_vars_gf, 
+                          response.vars = top_snps$snp,
+                         #response.vars = gsub("snp_", "", sum_df$snp),
+                          trace = TRUE,
+                         ntree = 100, mtry = 2,
+                         corr.threshold = 0.7)
+  
+      gf$result # Rsquared of positive loci
+      gf$species.pos.rsq
+      
+      mean(gf$result)
+      
+      cat("\n", mean(gf$result), "\n")
+      
+      r2_ran[x] <- mean(gf$result)
+      if(x == 1) {importance_df <- importance(gf)}
+      importance_df <- rbind(importance_df, importance(gf))
+  }
     
-    mean(gf$result)
-    
+  
+  colMeans(importance_df)
+  
+  importance(gf)
+  
+  
+  
+  
+  
+  
+  
+  
     plot(gf, plot.type = "O")
     
     most_important <- names(importance(gf))
@@ -1043,12 +1046,7 @@
     plot(gen_dat_clim$latitude, pull(gen_dat_clim, snp))
     
     
-    
-    
-    
-    
-    
-    
+
     
 
 # Simulate data to test out interaction effects in gams -------------------
