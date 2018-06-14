@@ -179,6 +179,38 @@
     climate_garden_mom$random <- rnorm(n = nrow(climate_garden_mom))
     
     
+    
+  ## Calculating MEMs
+    
+    library(spmoran)
+    
+    # Moms in common garden
+    mem <- meigen(climate_garden_mom[, c("longitude", "latitude")])
+    
+    mem$ev # Eigenvalues
+    mem$sf # Eigenvectors
+    
+    climate_garden_mom$mem1 <- mem$sf[, 1]
+    climate_garden_mom$mem2 <- mem$sf[, 2]
+    climate_garden_mom$mem3 <- mem$sf[, 3]
+    climate_garden_mom$mem4 <- mem$sf[, 4]
+    
+    # ggplot(climate_garden_mom, aes(x = longitude, y = latitude, size = mem1, col = mem1)) +
+    # geom_point() 
+    
+    
+    # GBS samples
+    mem <- meigen(climate_gbs_mom[, c("longitude", "latitude")])
+    
+    mem$ev # Eigenvalues
+    mem$sf # Eigenvectors
+    
+    climate_gbs_mom$mem1 <- mem$sf[, 1]
+    climate_gbs_mom$mem2 <- mem$sf[, 2]
+    climate_gbs_mom$mem3 <- mem$sf[, 3]
+    climate_gbs_mom$mem4 <- mem$sf[, 4]
+    
+    
   ## Merge data to give climate of origin for each seedling
     dat_all_clim <- left_join(dat_all, climate_garden_mom, by = "accession")
     glimpse(dat_all_clim)
@@ -204,9 +236,9 @@
     ## Calculating growing degree days
     garden_climate$DD5 <- calc_gdd(dat = garden_climate, threshold = 5)
     garden_climate$DD5_lgm <- garden_climate$DD5
-
     
-
+    
+    
 # Choose climate variables ------------------------------------------------
    
      ## Core variables from Riordan et al. 2016 Am J Botany  
@@ -346,19 +378,6 @@
   #View(dat_all_clim[is.na(pull(dat_all_clim, climate_vars_dif[1])), ])
   
 
-  
-
-# Correlations in climate variables ---------------------------------------
-
-  ## Climate variables in seedlings
- # pairs.panels(dat_all_clim[, climate_vars], scale = TRUE)
-
-  ## Climate variables for moms
- # pairs.panels(climate_mom[, climate_vars], scale = TRUE)
-  
-  ## Climate distances for seedlings
- # pairs.panels(dat_all_clim[, climate_vars_dif], scale = TRUE)
-
 
 # Scaling predictor variables -------------------------------------------------------
   
@@ -415,7 +434,8 @@
   
 
 
- pairs.panels(climate_garden_mom[, c("latitude", "longitude", climate_vars)])
+ pairs.panels(climate_garden_mom[, c("latitude", "longitude", "mem1", "mem2", "mem3", 
+                                     climate_vars)])
 
  
     
