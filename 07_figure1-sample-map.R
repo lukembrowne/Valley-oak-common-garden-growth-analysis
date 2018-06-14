@@ -1,47 +1,48 @@
 # Source files ------------------------------------------------------------
 
-source("./01_clean-process-explore-data.R")
-source("./03_adding-climate-data.R")
+  source("./01_clean-process-explore-data.R")
+  source("./03_adding-climate-data.R")
 
 
 # Load libraries ----------------------------------------------------------
 
-library(raster)
-library(rasterVis)
+  library(raster)
+  library(rasterVis)
 
 
 
 # Loading in rasters ------------------------------------------------------
 
 ## Read in elevation dem and create a hillshade for mapping
-dem <- raster("./data/gis/dem/ClimateNA_DEM_cropped.tif")
-
-slope = raster::terrain(dem, opt='slope')
-aspect = raster::terrain(dem, opt='aspect')
-hill = hillShade(slope, aspect, 40, 270)
+  dem <- raster("./data/gis/dem/ClimateNA_DEM_cropped.tif")
+  
+  slope = raster::terrain(dem, opt='slope')
+  aspect = raster::terrain(dem, opt='aspect')
+  hill = hillShade(slope, aspect, 40, 270)
 
 ## Load in california outline
-cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
-                              proj4string = CRS("+proj=longlat +datum=WGS84"))
-
-lobata_range <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
-                              proj4string = CRS("+proj=longlat +datum=WGS84"))
-
-all_moms <- SpatialPoints(climate_garden_mom[, c("longitude", "latitude")], 
-                                   proj4string = CRS("+proj=longlat +datum=WGS84"))
-
-gbs_moms_sub <- climate_gbs_mom %>%
-              dplyr::filter(climate_gbs_mom$accession %in% dat_all_scaled$accession)
-plot(all_moms)
-
-gbs_moms <- SpatialPoints(gbs_moms_sub[, c("longitude", "latitude")],
-                          proj4string = CRS("+proj=longlat +datum=WGS84"))
-plot(gbs_moms)
-
-garden_sites <- SpatialPoints(garden_climate[, c("longitude", "latitude")],
-                              proj4string = CRS("+proj=longlat +datum=WGS84"))
-plot(garden_sites)
-
+  cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
+                                proj4string = CRS("+proj=longlat +datum=WGS84"))
+  
+  lobata_range <- readShapePoly("./data/gis/valley_oak_range/qlobata_refined.shp",
+                                proj4string = CRS("+proj=longlat +datum=WGS84"))
+  
+# Make SP points for samples  
+  all_moms <- SpatialPoints(climate_garden_mom[, c("longitude", "latitude")], 
+                                     proj4string = CRS("+proj=longlat +datum=WGS84"))
+  
+  gbs_moms_sub <- climate_gbs_mom %>%
+                dplyr::filter(climate_gbs_mom$accession %in% dat_all_scaled$accession)
+  plot(all_moms)
+  
+  gbs_moms <- SpatialPoints(gbs_moms_sub[, c("longitude", "latitude")],
+                            proj4string = CRS("+proj=longlat +datum=WGS84"))
+  plot(gbs_moms)
+  
+  garden_sites <- SpatialPoints(garden_climate[, c("longitude", "latitude")],
+                                proj4string = CRS("+proj=longlat +datum=WGS84"))
+  plot(garden_sites)
+  
 
 
 
