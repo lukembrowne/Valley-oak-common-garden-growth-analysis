@@ -29,19 +29,19 @@
       ifelse(x < 0, 0, x)
     }
 
-    # tmax = climate_garden_mom$tmax_jan
-    # tmin = climate_garden_mom$tmin_jan
-    # tbase = 5
-    # tbase_max = 30
-    # 
-    # 
-    # adjust_for_tbase <- function(x, tbase) {
-    #   ifelse(test = x < tbase, yes = tbase, no = x)
-    # }
-    # adjust_for_tbase_max <- function(x, tbase_max) {
-    #   ifelse(test = x > tbase_max, yes = tbase_max, no = x)
-    # }
-    # 
+   # tmax = climate_garden_mom$tmax_jan
+    #tmin = climate_garden_mom$tmin_jan
+    tbase = 5
+    tbase_max = 50
+
+
+    adjust_for_tbase <- function(x, tbase) {
+      ifelse(test = x < tbase, yes = tbase, no = x)
+    }
+    adjust_for_tbase_max <- function(x, tbase_max) {
+      ifelse(test = x > tbase_max, yes = tbase_max, no = x)
+    }
+
     # tmax_adjusted <- adjust_for_tbase(tmax, tbase)
     # tmin_adjusted <- adjust_for_tbase(tmin, tbase)
     # 
@@ -49,21 +49,21 @@
     # tmin_adjusted <- adjust_for_tbase_max(tmin_adjusted, tbase_max)
     # 
     # gdd_temp <- (tmax_adjusted + tmin_adjusted) / 2 - tbase
-    
+    # 
   calc_gdd <- function(dat, threshold){
     
-      (  test_0(((dat$tmax_jan + dat$tmin_jan) / 2 - threshold)) * 31) + # Jan
-      (  test_0(((dat$tmax_feb + dat$tmin_feb) / 2 - threshold)) * 28) + # Feb
-      (  test_0(((dat$tmax_mar + dat$tmin_mar) / 2 - threshold)) * 31) + # Mar
-      (  test_0(((dat$tmax_apr + dat$tmin_apr) / 2 - threshold)) * 30) + # Apr
-      (  test_0(((dat$tmax_may + dat$tmin_may) / 2 - threshold)) * 31) + # May
-      (  test_0(((dat$tmax_jun + dat$tmin_jun) / 2 - threshold)) * 30) + # Jun
-      (  test_0(((dat$tmax_jul + dat$tmin_jul) / 2 - threshold)) * 31) + # Jul
-      (  test_0(((dat$tmax_aug + dat$tmin_aug) / 2 - threshold)) * 31) + # Aug
-      (  test_0(((dat$tmax_sep + dat$tmin_sep) / 2 - threshold)) * 30) + # Sep
-      (  test_0(((dat$tmax_oct + dat$tmin_oct) / 2 - threshold)) * 31) + # Oct
-      (  test_0(((dat$tmax_nov + dat$tmin_nov) / 2 - threshold)) * 30) + # Nov
-      (  test_0(((dat$tmax_dec + dat$tmin_dec) / 2 - threshold)) * 31)   # Dec
+      (  test_0(((adjust_for_tbase_max(dat$tmax_jan, tbase_max) + dat$tmin_jan) / 2 - threshold)) * 31) + # Jan
+      (  test_0(((adjust_for_tbase_max(dat$tmax_feb, tbase_max) + dat$tmin_feb) / 2 - threshold)) * 28) + # Feb
+      (  test_0(((adjust_for_tbase_max(dat$tmax_mar, tbase_max) + dat$tmin_mar) / 2 - threshold)) * 31) + # Mar
+      (  test_0(((adjust_for_tbase_max(dat$tmax_apr, tbase_max) + dat$tmin_apr) / 2 - threshold)) * 30) + # Apr
+      (  test_0(((adjust_for_tbase_max(dat$tmax_may, tbase_max) + dat$tmin_may) / 2 - threshold)) * 31) + # May
+      (  test_0(((adjust_for_tbase_max(dat$tmax_jun, tbase_max) + dat$tmin_jun) / 2 - threshold)) * 30) + # Jun
+      (  test_0(((adjust_for_tbase_max(dat$tmax_jul, tbase_max) + dat$tmin_jul) / 2 - threshold)) * 31) + # Jul
+      (  test_0(((adjust_for_tbase_max(dat$tmax_aug, tbase_max) + dat$tmin_aug) / 2 - threshold)) * 31) + # Aug
+      (  test_0(((adjust_for_tbase_max(dat$tmax_sep, tbase_max) + dat$tmin_sep) / 2 - threshold)) * 30) + # Sep
+      (  test_0(((adjust_for_tbase_max(dat$tmax_oct, tbase_max) + dat$tmin_oct) / 2 - threshold)) * 31) + # Oct
+      (  test_0(((adjust_for_tbase_max(dat$tmax_nov, tbase_max) + dat$tmin_nov) / 2 - threshold)) * 30) + # Nov
+      (  test_0(((adjust_for_tbase_max(dat$tmax_dec, tbase_max) + dat$tmin_dec) / 2 - threshold)) * 31)   # Dec
     }
       
   climate_garden_mom$DD5 <- calc_gdd(dat = climate_garden_mom, threshold = 5)
@@ -76,7 +76,8 @@
       last1000 <-   read_csv("./data/gis/climate_data/climateWNA/maternal tree climate data ClimateWNA Last1000 2018_06_11_4GCM-Ensemble_past1000MSY.csv") %>%
                     rename(accession = ID2 , 
                            tmax_sum = Tmax_sm,
-                           tmin_winter = Tmin_wt) %>%
+                           tmin_winter = Tmin_wt,
+                           tave = MAT) %>%
                     dplyr::select(-ID1, -Latitude, -Longitude, -Elevation)
       
       colnames(last1000)[-1] <- paste0(colnames(last1000)[-1], "_last1000")
@@ -85,7 +86,8 @@
       lgm <- read_csv("./data/gis/climate_data/climateWNA/maternal tree climate data ClimateWNA LGM 2018_06_11_4GCM-Ensemble_lgmMSY.csv") %>%
         rename(accession = ID2 , 
                tmax_sum = Tmax_sm,
-               tmin_winter = Tmin_wt) %>%
+               tmin_winter = Tmin_wt,
+               tave = MAT) %>%
         dplyr::select(-ID1, -Latitude, -Longitude, -Elevation)
       
       colnames(lgm)[-1] <- paste0(colnames(lgm)[-1], "_lgm")
@@ -94,7 +96,8 @@
       holo <- read_csv("./data/gis/climate_data/climateWNA/maternal tree climate data ClimateWNA Holocene 2018_06_11_4GCM-Ensemble_midHoloceneMSY.csv") %>%
         rename(accession = ID2 , 
                tmax_sum = Tmax_sm,
-               tmin_winter = Tmin_wt) %>%
+               tmin_winter = Tmin_wt,
+               tave = MAT) %>%
         dplyr::select(-ID1, -Latitude, -Longitude, -Elevation)
       
       colnames(holo)[-1] <- paste0(colnames(holo)[-1], "_holo")
@@ -106,16 +109,20 @@
       dim(climate_garden_mom)
       
       
-    # Compare climate variables
-      pairs.panels(climate_garden_mom[, c("tmax_sum", "tmax_sum_last1000", 
-                                          "tmax_sum_holo", "tmax_sum_lgm")])
-      
-      pairs.panels(climate_garden_mom[, c("tmin_winter", "tmin_winter_last1000", 
-                                          "tmin_winter_holo", "tmin_winter_lgm")])
-      
-      pairs.panels(climate_garden_mom[, c("tmax_sum", "tmin_winter", "DD5", "DD5_lgm", "DD5_last1000")])
-    
     # Differences in temperature  
+      
+    # Tmax
+      # ggplot(climate_garden_mom, aes(y = tmax_sum, x = tmax_sum_lgm)) + geom_point() + 
+      #   geom_abline(aes(intercept = 0, slope = 1)) +
+      #   xlab("Tmax summer - LGM") + ylab("Tmax summer - current") +
+      #   theme_bw(15)
+      # Tmin
+      # ggplot(climate_garden_mom, aes(y = tmin_winter, x = tmin_winter_lgm)) + geom_point() + 
+      #   geom_abline(aes(intercept = 0, slope = 1)) +
+      #   xlab("Tmin winter - LGM") + ylab("Tmin winter - current") +
+      #   theme_bw(15)
+      # 
+ 
       mean(climate_garden_mom$tmax_sum - climate_garden_mom$tmax_sum_lgm)
       mean(climate_garden_mom$tmax_sum - climate_garden_mom$tmax_sum_last1000)
       mean(climate_garden_mom$tmax_sum - climate_garden_mom$tmax_sum_holo)
@@ -144,7 +151,8 @@
     last1000 <-   read_csv("./data/gis/climate_data/climateWNA/GBS tree climate data Climate WNA 2018_06_12_4GCM-Ensemble_past1000MSY.csv") %>%
       rename(id = ID1 , 
              tmax_sum = Tmax_sm,
-             tmin_winter = Tmin_wt) %>%
+             tmin_winter = Tmin_wt,
+             tave = MAT) %>%
       dplyr::select(-ID2, -Latitude, -Longitude, -Elevation)
     
     colnames(last1000)[-1] <- paste0(colnames(last1000)[-1], "_last1000")
@@ -153,7 +161,8 @@
     lgm <- read_csv("./data/gis/climate_data/climateWNA/GBS tree climate data Climate WNA 2018_06_12_4GCM-Ensemble_lgmMSY.csv") %>%
       rename(id = ID1 , 
              tmax_sum = Tmax_sm,
-             tmin_winter = Tmin_wt) %>%
+             tmin_winter = Tmin_wt,
+             tave = MAT) %>%
       dplyr::select(-ID2, -Latitude, -Longitude, -Elevation)
     
     colnames(lgm)[-1] <- paste0(colnames(lgm)[-1], "_lgm")
@@ -162,7 +171,8 @@
     holo <- read_csv("./data/gis/climate_data/climateWNA/GBS tree climate data Climate WNA 2018_06_12_4GCM-Ensemble_midHoloceneMSY.csv") %>%
       rename(id = ID1 , 
              tmax_sum = Tmax_sm,
-             tmin_winter = Tmin_wt) %>%
+             tmin_winter = Tmin_wt,
+             tave = MAT) %>%
       dplyr::select(-ID2, -Latitude, -Longitude, -Elevation)
     colnames(holo)[-1] <- paste0(colnames(holo)[-1], "_holo")
     
@@ -177,6 +187,11 @@
   ## Add random climate variable for testing
     climate_gbs_mom$random <- rnorm(n = nrow(climate_gbs_mom))
     climate_garden_mom$random <- rnorm(n = nrow(climate_garden_mom))
+    
+    
+    ## Calculate average temperature
+    climate_gbs_mom$tave <- (climate_gbs_mom$tmax + climate_gbs_mom$tmin) / 2 
+    climate_garden_mom$tave <- (climate_garden_mom$tmax + climate_garden_mom$tmin) / 2 
     
     
     
@@ -224,6 +239,9 @@
     # Add random variable
     garden_climate$random <- rnorm(n = nrow(garden_climate))
     
+    # Add average temps
+    garden_climate$tave <- (garden_climate$tmax + garden_climate$tmin) / 2
+    
     # Add comparable variables for historic WNA
     garden_climate$tmax_sum_last1000 <- garden_climate$tmax_sum
     garden_climate$tmax_sum_lgm <- garden_climate$tmax_sum
@@ -232,6 +250,10 @@
     garden_climate$tmin_winter_last1000 <- garden_climate$tmin_winter
     garden_climate$tmin_winter_lgm <- garden_climate$tmin_winter
     garden_climate$tmin_winter_holo <- garden_climate$tmin_winter
+    
+    garden_climate$tave_last1000 <- garden_climate$tave
+    garden_climate$tave_lgm <- garden_climate$tave
+    garden_climate$tave_holo <- garden_climate$tave
     
     ## Calculating growing degree days
     garden_climate$DD5 <- calc_gdd(dat = garden_climate, threshold = 5)
@@ -244,6 +266,9 @@
      ## Core variables from Riordan et al. 2016 Am J Botany  
     ## Except we are excluding AET because it is very strongly correlated with cwd
     climate_vars <- c("tmax_sum",
+                      "tmax","tmin",
+                      "tave",
+                      "tave_lgm",
                     #  "tmax_sum_last1000",
                       "tmax_sum_lgm",
                     #  "tmax_sum_holo",
@@ -251,7 +276,9 @@
                     #  "tmin_winter_last1000",
                       "tmin_winter_lgm",
                      # "tmin_winter_holo",
-                      "DD5", "DD5_lgm",
+                      "DD5",
+                    "DD5_lgm",
+                  #  "bioclim_04",
                       "random")
                       #  "tmax",
                       #"tmin",
@@ -269,73 +296,73 @@
 # PCA on climate variables ------------------------------------------------
 
   #   # PCA based on climate data of maternal trees in provenance trial
-  #     clim_pca_home <- prcomp(climate_garden_mom[, 
+  #     clim_pca_home <- prcomp(climate_garden_mom[,
   #                                                climate_vars[-which(climate_vars == "random")]], scale = TRUE)
   #     summary(clim_pca_home)
-  #     
-  #   
+  # 
+  # 
   #   ## Format as dataframe
   #     clim_pca_home_vals <- as.data.frame(clim_pca_home$x)
-  #   
+  # 
   #   ## Scree plot of PCA
   #     fviz_screeplot(clim_pca_home)
-  #   
+  # 
   #   ## Contributions of each axis
   #     # fviz_contrib(clim_pca_home, choice = "var", axes = c(1))
   #     # fviz_contrib(clim_pca_home, choice = "var", axes = c(2))
   #     # fviz_contrib(clim_pca_home, choice = "var", axes = c(3))
   #     # fviz_contrib(clim_pca_home, choice = "var", axes = c(4))
   #     # fviz_contrib(clim_pca_home, choice = "var", axes = c(5))
-  #   
+  # 
   #   ## Arrows plot
   #     fviz_pca_var(clim_pca_home, axes = c(1,2))
-  #   
+  # 
   #   ## Predict PC values for
   #   # 1) Seedlings in common garden
   #   # 2) Chico  & IFG based on pca of climate of origin
   #   # 3) GBS moms
   #   # Need to be sure that the garden climate variables are scaled first
-  #   
-  #   dat_all_clim_scaled <- dat_all_clim  
+  # 
+  #   dat_all_clim_scaled <- dat_all_clim
   #   garden_climate_scaled <- garden_climate # Scaled based on seedling climate of origin!!!
   #   climate_gbs_mom_scaled <- climate_gbs_mom
-  #   
+  # 
   #   for(var in climate_vars){
-  #     
+  # 
   #     dat_all_clim_scaled[, var] <- (pull(dat_all_clim_scaled, var) - mean(pull(dat_all_clim, var))) / sd(pull(dat_all_clim, var))
-  #     
+  # 
   #     garden_climate_scaled[, var] <- (pull(garden_climate_scaled, var) - mean(pull(dat_all_clim, var))) / sd(pull(dat_all_clim, var))
-  #     
-  #     climate_gbs_mom_scaled[, var] <- (pull( climate_gbs_mom_scaled, var) - mean(pull(dat_all_clim, var))) / sd(pull(dat_all_clim, var))
-  #     
+  # 
+  #    climate_gbs_mom_scaled[, var] <- (pull( climate_gbs_mom_scaled, var) - mean(pull(dat_all_clim, var))) / sd(pull(dat_all_clim, var))
+  # 
   #   }
-  #   
+  # 
   #   dat_all_clim_scaled[, climate_vars]
   #   garden_climate_scaled[, climate_vars]
   #   climate_gbs_mom_scaled[, climate_vars]
-  #   
-  # # Predict PCA values  
-  #  
+  # 
+  # # Predict PCA values
+  # 
   #   dat_all_clim_pca_vals <-   as.data.frame(predict(clim_pca_home, dat_all_clim_scaled))
   #   dat_all_clim_pca_vals
-  #   
+  # 
   #   garden_climate_pca_vals <-   as.data.frame(predict(clim_pca_home, garden_climate_scaled))
   #   garden_climate_pca_vals
-  #   
+  # 
   #   climate_gbs_mom_pca_vals <- as.data.frame(predict(clim_pca_home, climate_gbs_mom_scaled))
   #   climate_gbs_mom_pca_vals
-  #   
+  # 
   # # Join back to main dataframes
-  #   # dat_all_clim <- bind_cols(dat_all_clim, dat_all_clim_pca_vals)
-  #   # garden_climate <- bind_cols(garden_climate, garden_climate_pca_vals)
+  #   dat_all_clim <- bind_cols(dat_all_clim, dat_all_clim_pca_vals)
+  #   garden_climate <- bind_cols(garden_climate, garden_climate_pca_vals)
   #   # climate_gbs_mom <- bind_cols(climate_gbs_mom, climate_gbs_mom_pca_vals)
-  #   
-  #   
-  #   
+  # 
+  # 
+  # 
   # ## Add PCs to list of climate vars
-  #   # climate_vars <- c(climate_vars, colnames(garden_climate_pca_vals))
-  #   
-  #     
+  #    climate_vars <- c(climate_vars, colnames(garden_climate_pca_vals))
+  # 
+
       
 # Filter down to seedlings with and without GBS data ----------------------
       
@@ -434,10 +461,21 @@
   
 
 
- pairs.panels(climate_garden_mom[, c("latitude", "longitude", "mem1", "mem2", "mem3", 
+ pairs.panels(climate_garden_mom[, c("latitude", "longitude", 
+                                     #"mem1", "mem2", "mem3", 
                                      climate_vars)])
-
  
-    
+ pairs.panels(climate_garden_mom[, c("tmax_sum", "tmin_winter", "DD5", "tmax_sum_lgm","tmin_winter_lgm", "DD5_lgm")], ellipses = F)
+ 
+ pairs.panels(climate_garden_mom[, c("tmax_sum",
+                                     "tmax_sum_lgm",
+                                     "tmin_winter", 
+                                     "tmin_winter_lgm",
+                                     "DD5", 
+                                     "DD5_lgm")], ellipses = F, cex = 2)
+ 
+ #pairs.panels(dat_all_scaled[, climate_vars_dif])
+ 
+
 
 
