@@ -156,8 +156,9 @@
   ## Write to file
   
   # write_csv(dat_mom_final, path = "./data/cleaned_data/GBS tree climate data BCM 1951-1980 2018_03_08.csv")
-   write_csv(dat_mom_final2 %>%
-               mutate_if(is.numeric, scale), path = "./data/cleaned_data/Sorel tree climate data BCM 1950-1981 2018_05_16.csv")
+  
+  
+  
   
 
 # Read in current BCM climate data for common garden sites ----------------------------------------
@@ -428,9 +429,65 @@
     
     ## Write to file
     
-    write_csv(dat_garden_final, 
-    path = "./data/cleaned_data/common garden climate data BCM 2014-2016 2018_03_08.csv")
+    # write_csv(dat_garden_final, 
+    # path = "./data/cleaned_data/common garden climate data BCM 2014-2016 2018_03_08.csv")
 
   
-  
+
+# Extract values for future climate scenarios -----------------------------
+
+    ## Get locations of maternal trees in common garden
+    dat_mom <- gs_read(gs_key("1DUEV-pqV28D6qJl6vJM6S1VLWbxc9E71afufulDRbIc"), ws = 2)
+    
+    ## Subset down to those with accession numbers
+    dat_mom <- dat_mom[!is.na(dat_mom$Accession),]
+    dim(dat_mom) ## Should be 659
+    
+    
+    ## Directory path where future climate scenarios are located
+    dir_name <- "./data/gis/climate_data/BCM/future/"
+    
+    ## Creates vector with list of file paths to all .tif raster files
+    raster_files <- list.files(dir_name, full.names = TRUE, recursive = TRUE)
+    raster_files <- raster_files[grep("*[[:digit:]].tif$", raster_files)] # Only those with .tif extension
+    raster_files <- raster_files[grep("jja_ave", raster_files)] # Only tmax sum files
+    
+    raster_files
+    
+    
+    ## Loop through raster files and add climate values to dat_mom dataframe
+    for(file in raster_files){
+      
+      cat("Working on file:", file, "...\n")
+      
+      ## Load in raster
+      raster_temp <- raster::stack(file)
+      
+      ## Project to lat long
+      raster_latlong <- raster::projectRaster(raster_temp, crs="+proj=longlat +datum=WGS84") 
+      
+      ## Extract climate values to dataframe
+      col_name <-  names(raster_temp) ## Use for adding back to dataframe
+      
+      dat_mom[, col_name] <-  raster::extract(raster_latlong, dat_mom[, c("Longitude", "Latitude")])
+      
+    } ## End file loop
+    
+    head(dat_mom)
+    
+    ## Save as backup just in case
+    dat_mom2 <- dat_mom
+    
+    ## Rename columns
+    
+    ## Replace tmn with tmin and tmx with tmax
+    colnames(dat_mom) <- gsub("tmx", "tmax_sum", colnames(dat_mom))
+    
+    names(dat_mom)
+    
+    ## Write to file
+    
+    # write_csv(dat_mom, path = "./data/cleaned_data/maternal tree FUTURE climate data BCM 2018_06_18.csv")
+    
+
 

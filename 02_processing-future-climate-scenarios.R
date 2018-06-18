@@ -12,98 +12,117 @@ library(climates)
 
 ## Some maybe useful rasters like DD5 can be calculated with the envirem package http://envirem.github.io/ENVIREM_tutorial.html
 
+## Some info about climate scenarios - https://cmip.llnl.gov/cmip5/availability.html
+
 
 # Download future climate scenarios ---------------------------------------
 
   ## Future climate files downloaded from:   https://geo.pointblue.org/commonsmap/index.php?ds=1129
     
     # Choose climate scenario
-     scenario = "CCSM4_rcp85"
-    
+     scenarios = c("CCSM4_rcp85", "MIROC_rcp85", "IPSL_rcp85", "CNRM_rcp85")
+     
     # Climate variables in bcm format
-      bcm_clim_vars <- c("aet", "cwd", "ppt", "tmn", "tmx")
+    #  bcm_clim_vars <- c("aet", "cwd", "ppt", "tmn", "tmx")
+      bcm_clim_vars <- "tmx"
     
     # Time periods - including water year (wy), months, and seasons (jja, djf)
-      time_periods <- c("wy", "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep",
-                        "oct", "nov", "dec", "jja", "djf")
-  
-    # Directory to save output files  
-    output_dir <- paste0("./data/gis/climate_data/BCM/future/", scenario, "/")
-    
+      # time_periods <- c("wy", "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep",
+      #                   "oct", "nov", "dec", "jja", "djf")
+      time_periods <- "jja"
+
     errors <- NULL
+    
+ # Loop through scenarios   
+  for(scenario in scenarios){   
   
-  # Loop through climate vars    
-  for(climate_var in bcm_clim_vars){
-    
-    # Loop through time periods / months / seasons
-    for(time_period in time_periods){
+    # Loop through climate vars    
+    for(climate_var in bcm_clim_vars){
       
-      cat("\n Working on:", climate_var, " in ", time_period, " ...\n")
-      
-    ## Combinations to skip  
-      if((climate_var == "aet" | climate_var == "cwd") & time_period != "wy"){
-        cat("Skipping this combination...\n")
-        next
+      # Loop through time periods / months / seasons
+      for(time_period in time_periods){
+        
+        # Directory to save output files  
+        output_dir <- paste0("./data/gis/climate_data/BCM/future/", scenario, "/")
+        
+        # Create directory
+        dir.create(output_dir)
+
+        cat("\n Working on:", climate_var, " in ", time_period, " for scenario:", scenario, " ...\n")
+        
+      ## Combinations to skip  
+        if((climate_var == "aet" | climate_var == "cwd") & time_period != "wy"){
+          cat("Skipping this combination...\n")
+          next
+        }
+        
+        if(climate_var == "tmn" & time_period == "jja"){
+          cat("Skipping this combination...\n")
+          next
+        }
+        
+        if(climate_var == "tmx" & time_period == "djf"){
+          cat("Skipping this combination...\n")
+          next
+        }
+        
+        if(climate_var == "ppt" & time_period %in% c("jja", "djf")){
+          cat("Skipping this combination...\n")
+          next
+        } 
+        
+        
+     # Since water years are labeled a bit differently, need to set up two separate labels for water year   
+      if(time_period != "wy"){  
+        time_period1 <- time_period
+        time_period2 <- time_period
+      } else {
+        time_period1 <- ""
+        time_period2 <- "wy"
       }
+        
+        # Make URL to file - example from the interactive BCM map (https://geo.pointblue.org/commonsmap/index.php?ds=1129) and then copying link address on the "Download data" button
+        url <- paste0("https://geo.pointblue.org/commonsmap/add2.php?ds=1129&commonsuser=lukembrowne::lukembrowne@gmail.com&guid=bb94c436-12bd-4b82-a2ee-479b2e01205e&raster_path=/mnt/data/tif/BCM2014/&srid=3310&active_raster=", climate_var, "2070_2099", time_period1, "_ave_", scenario, "&width=null&height=null&llx=-433493.711264374&lly=-623577.7967801094&urx=654964.4482971333&ury=613350.9509733636&variable=flint_30yr&stat=ave&bounds=-13869908.243,3803287.923,-12585021.03,5366378.461&model=", scenario, "&year=2070_2099&climatevar=", climate_var, "&bcm_style=flint_", climate_var, "_ave&legend=flint_", climate_var, "_ave&month=", time_period2, "&raster=", climate_var, "2070_2099", time_period1, "_ave_", scenario)
+        
+      # Download file
+        file <- GET(url, write_disk(paste0(output_dir, "tmp.file"), 
+                                    overwrite = TRUE), progress())
+        
+      ## Check to make sure it's a big enough file
+        size = as.numeric(headers(file)$`content-length`) / 1000000
+        cat("Size of file is: ", round(size, 2), " mb... \n")
+        if(size < 5){
+          cat("**** Error: size of file is < 5mb... \n\n")
+        errors <- c(errors, paste0(climate_var, "--", time_period))
+        }
+        
+      ## Rename file  
+        filename <- str_match(headers(file)$`content-disposition`, "\"(.*)\"")[2]
+        # rename
+        file.rename(paste0(output_dir, "tmp.file"), paste0(output_dir, filename)) 
+        
+      ## Unzip the file to folder
+        unzip(paste0(output_dir, "/", filename),
+              exdir = paste0(output_dir, gsub(pattern = ".zip", "", filename)))
       
-      if(climate_var == "tmn" & time_period == "jja"){
-        cat("Skipping this combination...\n")
-        next
-      }
+      ## Remove .zip file
+        file.remove(paste0(output_dir, filename))
+        
+      } # End time period loop
       
-      if(climate_var == "tmx" & time_period == "djf"){
-        cat("Skipping this combination...\n")
-        next
-      }
-      
-      if(climate_var == "ppt" & time_period %in% c("jja", "djf")){
-        cat("Skipping this combination...\n")
-        next
-      } 
-      
-      
-   # Since water years are labeled a bit differently, need to set up two separate labels for water year   
-    if(time_period != "wy"){  
-      time_period1 <- time_period
-      time_period2 <- time_period
-    } else {
-      time_period1 <- ""
-      time_period2 <- "wy"
-    }
-      
-      # Make URL to file - example from the interactive BCM map (https://geo.pointblue.org/commonsmap/index.php?ds=1129) and then copying link address on the "Download data" button
-      url <- paste0("https://geo.pointblue.org/commonsmap/add2.php?ds=1129&commonsuser=lukembrowne::lukembrowne@gmail.com&guid=bb94c436-12bd-4b82-a2ee-479b2e01205e&raster_path=/mnt/data/tif/BCM2014/&srid=3310&active_raster=", climate_var, "2070_2099", time_period1, "_ave_CCSM4_rcp85&width=null&height=null&llx=-433493.711264374&lly=-623577.7967801094&urx=654964.4482971333&ury=613350.9509733636&variable=flint_30yr&stat=ave&bounds=-13869908.243,3803287.923,-12585021.03,5366378.461&model=", scenario, "&year=2070_2099&climatevar=", climate_var, "&bcm_style=flint_", climate_var, "_ave&legend=flint_", climate_var, "_ave&month=", time_period2, "&raster=", climate_var, "2070_2099", time_period1, "_ave_", scenario)
-      
-    # Download file
-      file <- GET(url, write_disk(paste0(output_dir, "tmp.file"), 
-                                  overwrite = TRUE), progress())
-      
-    ## Check to make sure it's a big enough file
-      size = as.numeric(headers(file)$`content-length`) / 1000000
-      cat("Size of file is: ", round(size, 2), " mb... \n")
-      if(size < 5){
-        cat("**** Error: size of file is < 5mb... \n\n")
-      errors <- c(errors, paste0(climate_var, "--", time_period))
-      }
-      
-    ## Rename file  
-      filename <- str_match(headers(file)$`content-disposition`, "\"(.*)\"")[2]
-      # rename
-      file.rename(paste0(output_dir, "tmp.file"), paste0(output_dir, filename)) 
-      
-    ## Unzip the file to folder
-      unzip(paste0(output_dir, "/", filename),
-            exdir = paste0(output_dir, gsub(pattern = ".zip", "", filename)))
+    } # End climate variable loop 
     
-    ## Remove .zip file
-      file.remove(paste0(output_dir, filename))
+  } # End scenario loop
       
-    } # End time period loop
-    
-  } # End climate variable loop 
-    
   errors
    
+  
+  
+  
+  
+  
+  
+  
   
   
    
@@ -260,59 +279,6 @@ library(climates)
   load("./output/raster_dfs_2018-04-20.RData")
 
 
-  
-## Testing out predicting breeding values from raster maps
-  
-  ## Extract values from raster into dataframe
-  extracted_vals = raster::extract(raster_hist[["tmax_sum"]], 
-                                   1:ncell(raster_hist[["tmax_sum"]]))
-  extracted_vals <- as.data.frame(extracted_vals)
-  
-  ### Scale extracted values to match with scaled variables
-  extracted_vals_scaled <- extracted_vals
-  
-  var = "tmax_sum"
-      extracted_vals_scaled <- (extracted_vals - scaled_var_means[var]) / 
-        scaled_var_sds[var]
-  
-  summary(extracted_vals_scaled)
-  
-  bvs <- bglr_test$ETA[[1]]$u
-  gebv_lm <- lm(bvs ~ y)
-  
-  
-  
-  gebvs <- predict(gebv_lm, newdata = data.frame(y = extracted_vals_scaled[, 1]))
-  
-  raster_gebvs <- raster_hist[["tmax_sum"]]
-  values(raster_gebvs) <- gebvs
-  
-  levelplot(raster_gebvs)
-  
-  
-
-  cor.test(values(raster_hist[["tmax_sum"]]), values(raster_dif[["tmax_sum_dif"]]), na.rm = T)
-
-  
-  ran <- sample(1:1500000, size = 300000)
-  
-  plot(values(raster_hist[["tmax_sum"]])[ran],
-       values(raster_dif[["tmax_sum_dif"]])[ran], pch = ".")
-  
-  
-  
-  
-  
-  raster_init <- raster("./data/gis/climate_data/BCM/future/CCSM4_rcp85/aet2070_2099_ave_CCSM4_rcp85_1524086336/aet2070_2099_ave_CCSM4_rcp85_1524086336.tif")
-  
-  raster_init ## Initialize raster
-  values(raster_init) <- raster_dif_df$tmax_sum_dif
-  
-  mask(raster_init, lobata_range)
-  
-  
-  
-  
   
   
   
