@@ -27,18 +27,31 @@
   lobata_range <- readShapePoly("./data/gis/valley_oak_range/qlobata_refined.shp",
                                 proj4string = CRS("+proj=longlat +datum=WGS84"))
   
+  lobata_range_rough <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
+                                      proj4string = CRS("+proj=longlat +datum=WGS84")) 
+  
+  
+## Tmax summer
+  tmax_rast_cropped <- raster("./data/gis/climate_data/BCM/cropped_tmax/tmax_sum_1951-1980_cropped.tif", proj4string = CRS("+proj=longlat +datum=WGS84"))
+  plot(tmax_rast_cropped)
+  
+  
 # Make SP points for samples  
   all_moms <- SpatialPoints(climate_garden_mom[, c("longitude", "latitude")], 
                                      proj4string = CRS("+proj=longlat +datum=WGS84"))
   
+  plot(all_moms)
+  
+  # Moms with gbs samples
   gbs_moms_sub <- climate_gbs_mom %>%
                 dplyr::filter(climate_gbs_mom$accession %in% dat_all_scaled$accession)
-  plot(all_moms)
+  
   
   gbs_moms <- SpatialPoints(gbs_moms_sub[, c("longitude", "latitude")],
                             proj4string = CRS("+proj=longlat +datum=WGS84"))
   plot(gbs_moms)
   
+  # Sites of common gardens
   garden_sites <- SpatialPoints(garden_climate[, c("longitude", "latitude")],
                                 proj4string = CRS("+proj=longlat +datum=WGS84"))
   plot(garden_sites)
@@ -48,25 +61,27 @@
 
 # Make and save Plot ---------------------------------------------------------------
 
-     pixel_num = 1e5
-      hsTheme <- modifyList(GrTheme(), list(regions=list(alpha=.15)))
-       demTheme <- modifyList(RdBuTheme(), list(regions=list(alpha=.5)))
-       
-    p = levelplot(dem, contour = FALSE, margin = FALSE, par.settings = demTheme, 
-                  maxpixels = pixel_num, colorkey = TRUE) +
-      levelplot(hill,  margin = FALSE, par.settings=hsTheme, maxpixels = pixel_num) +
-      latticeExtra::layer(sp.polygons(cali_outline, lwd=2)) + 
-      latticeExtra::layer(sp.polygons(lobata_range,fill = "black", alpha = 0.25)) +
-      latticeExtra::layer(sp.points(all_moms, pch = 21, cex = 1.5,
-                                    fill = "steelblue2", col = "grey10", alpha = .5)) +
-      latticeExtra::layer(sp.points(gbs_moms, pch = 21, cex = 1.5,
-                                    fill = "forestgreen", col = "grey10", alpha = .5))  +
+     pixel_num = 1e6
+     hsTheme <- modifyList(GrTheme(), list(regions=list(alpha= .15)))
+     tmaxTheme <- modifyList(BuRdTheme(), list(regions=list(alpha=1)))
+    
+    p = levelplot(tmax_rast_cropped, contour = FALSE, margin = FALSE, par.settings = tmaxTheme, 
+                  maxpixels = pixel_num, colorkey = TRUE, main = "Maximum temperature summer",
+                  bty = "l")  +
+      levelplot(hill,  margin = FALSE, par.settings=hsTheme) +
+      latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
+     latticeExtra::layer(sp.polygons(lobata_range_rough, fill = "purple", alpha = 0.15)) +
+      latticeExtra::layer(sp.points(all_moms, pch = 21, cex = 1,
+                                    fill = "steelblue2", col = "grey10", alpha = .75)) +
+      latticeExtra::layer(sp.points(gbs_moms, pch = 21, cex = 1,
+                                    fill = "forestgreen", col = "grey10", alpha = .75))  +
       latticeExtra::layer(sp.points(garden_sites, pch = 22, cex = 2, 
                                     col = "grey10", fill = "orange"))
     
     print(p)
     
-    pdf(paste0("./figs_tables/Figure1_sample_map_", Sys.Date(), ".pdf"))
+    png(paste0("./figs_tables/Figure1_sample_map_", Sys.Date(), ".png"), res = 300,
+        height = 2400, width = 1600)
     print(p)
-      dev.off()
+    dev.off()
 
