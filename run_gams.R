@@ -14,7 +14,7 @@
   library(patchwork) # Installed on home directory
 
 # Load data
- load("../gam_cluster_2018-06-07.Rdata")
+ load("../gam_cluster_2018-06-22.Rdata")
 
 
 # Save functions
@@ -56,7 +56,7 @@
     start_time <- Sys.time()
     
     # Choose snp
-    snp <- paste0("snp_", snp_col_names[snp_index])
+    snp <- snp_col_names[snp_index]
     
     # Make sure there's at least 3 levels
       if(length(table(dat_snp[, snp])) < 3){
@@ -70,34 +70,26 @@
     # Convert to factor
     # dat_snp[, snp] <- as.factor(pull(dat_snp, snp))
     
-  
-
-    
-  # For SNPS as factors    
-     
-    # Stack overflow on adding m = 1 to by= smooths - https://stats.stackexchange.com/questions/32730/how-to-include-an-interaction-term-in-gam
-     
-    # fixed_effects_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\") + s(", climate_var_dif,", by =",snp,", bs=\"cr\", m = 1) + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
-    
-    # fixed_effects_no_int <- paste0(paste0("height_2017 ~ site + ", snp, " + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\")  + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
-    
-
 
 # Run gams
    	cat("Working on: ", snp, "... number: ", x, " ...\n" )
 
   # For SNPS as continuous  
-    fixed_effects_int <- paste0(paste0("height_2017 ~ section_block + s(height_2014, bs=\"cr\") + te(", snp, ", bs=\"cr\", k = ", k, ") +  te(", climate_var_dif,", bs=\"cr\") + ti(", climate_var_dif,", ",snp,", bs=\"cr\", k =", k," ) + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
+    fixed_effects_int <- paste0(paste0("height_2017 ~ section_block + s(height_2014, bs=\"cr\") + te(", snp, ", bs=\"cr\", k = ", k, ") +  te(", climate_var_dif,", bs=\"cr\") + ti(", climate_var_dif,", ",snp,", bs=\"cr\", k =", k," )"))
     
-    fixed_effects_no_int <- paste0(paste0("height_2017 ~ section_block + s(height_2014, bs=\"cr\") + te(", snp, ", bs=\"cr\", k = ", k, ") +  te(", climate_var_dif,", bs=\"cr\")  + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")"))
+    ## Add gen pcs
+   # fixed_effects_int <- paste0(fixed_effects_int, "+ s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")")
     
-  
+    ## Add MEMs
+  #  fixed_effects_int <- paste0(fixed_effects_int,  "+ s(mem1, bs =\"cr\") + s(mem2, bs =\"cr\") + s(mem3, bs =\"cr\") + s(mem4, bs =\"cr\")")
+
+
   # Gam with interaction effect
     gam_snp_int = bam(formula = make_formula(fixed_effects_int, random_effects),
                   data = dat_snp, 
                   discrete = TRUE,
                   nthreads = 8,
-                  method = "fREML", family = "tw")
+                  method = "fREML", family = "gaussian")
 
    # Check for convergence
     if(!gam_snp_int$mgcv.conv){
@@ -147,8 +139,31 @@
     pred_sub <-  pred_sub  %>%
       dplyr::filter(genotype_scaled %in% pull(dat_snp, snp)) %>% 
       dplyr::mutate(!!snp := genotype_scaled)
+
+
+
+  ## Visreg plots
+    pdf(paste0("./model_plots/", snp,".pdf"), width = 8, height = 5)
+
+   # With partial residuals
+    visreg(gam_snp_int, xvar = climate_var_dif, by = snp,
+           overlay = TRUE, partial = TRUE, 
+           breaks = c(unique(pred_sub$genotype_scaled)),
+           xtrans = function(x) {(x *  scaled_var_sds_gbs_only[climate_var_dif]) + scaled_var_means_gbs_only[climate_var_dif]},
+           ylab = "5 year height (cm)")
     
-    # Make PREDICTION
+    # Without partial residuals
+    visreg(gam_snp_int, xvar = climate_var_dif, by = snp,
+           overlay = TRUE, partial = FALSE, rug = FALSE,
+           breaks = c(unique(pred_sub$genotype_scaled)),
+           xtrans = function(x) {(x *  scaled_var_sds_gbs_only[climate_var_dif]) + scaled_var_means_gbs_only[climate_var_dif]},
+           ylab = "5 year height (cm)")
+    
+    dev.off()      
+
+
+    
+  # Make PREDICTION
     gam_preds <-  predict(gam_snp_int, 
                           newdata = pred_sub,
                           type = "response",
@@ -184,6 +199,7 @@
       labs(col = "Genotype") +
       ylab("5 yr height (cm)") +
       xlab(climate_var_dif) +
+      ggtitle(snp) +
       theme_bw(15)
   
   # Density plots of genotypes       
@@ -193,16 +209,17 @@
       geom_vline(aes(xintercept = 0), lty = 2) +
       labs(fill = "Genotype") +
       xlab(climate_var_dif) +
+      ggtitle(snp) +
       theme_bw(15)
     
   # Plot to PDF  
-    pdf(paste0("./model_plots/", snp,".pdf"), width = 15, height = 5)  
+    pdf(paste0("./model_plots/", snp,"_gg.pdf"), width = 15, height = 5)  
      print(p1 + p2)
     dev.off()
    
 
 
-   # Make prediction for 3 degree increase in temperature
+   # Make prediction for XXXX degree increase in temperature
     for(genotype in c(0,1,2)){
       
       if(!genotype %in% as.numeric(as.character(pred_sub$genotype))){
@@ -212,8 +229,8 @@
       
       pred_sub_temp <- pred_sub[pred_sub$genotype == genotype, ]
       
-      height_change <- (pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 3][1] - 
-                          pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 0][1]) / pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 3][1] * 100 
+      height_change <- (pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 4.88][1] - 
+                          pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 0][1]) / pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 4.88][1] * 100 
       
       gam_snp_int[paste0("height_change_gen_", genotype)] <- height_change
       
