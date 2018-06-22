@@ -181,6 +181,24 @@ var = "tmax_sum_dif"
                 add_points = FALSE, add_residuals = FALSE,
                 save = FALSE, path = path, filename = "")
   
+  ## Add future climate distance
+  
+  future <- read_csv("./data/cleaned_data/maternal tree FUTURE climate data BCM 2018_06_18.csv")
+  climate_garden_mom2 <- left_join(climate_garden_mom, future, by = c("accession" = "Accession"))
+  
+  ccsm4 <-  climate_garden_mom2$tmax_sum2070_2099jja_ave_CCSM4_rcp85_1529358915 - climate_garden_mom2$tmax_sum
+  cnrm <-  climate_garden_mom2$tmax_sum2070_2099jja_ave_CNRM_rcp85_1529358976 - climate_garden_mom2$tmax_sum
+  ipsl <-  climate_garden_mom2$tmax_sum2070_2099jja_ave_IPSL_rcp85_1529358959 - climate_garden_mom2$tmax_sum
+  miroc <-  climate_garden_mom2$tmax_sum2070_2099jja_ave_MIROC_rcp85_1529357403 - climate_garden_mom2$tmax_sum
+  
+  future_mean <- mean(apply(cbind(ccsm4, cnrm, ipsl, miroc), MARGIN = 1, mean))
+  
+  p = p + geom_vline(xintercept = future_mean)
+  
+  p
+  
+  
+  
   
   # print(p)
   
