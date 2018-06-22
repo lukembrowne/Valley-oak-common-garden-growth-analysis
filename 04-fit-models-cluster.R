@@ -629,19 +629,25 @@
    # View(sum_df[which(sum_df$beneficial_gen_0 == 1 & sum_df$beneficial_gen_1 == 1 & sum_df$beneficial_gen_2 == 1),])
     
     
-  ## Select top snps
-    
+
+# Select top snps ---------------------------------------------------------
+
     # Based on q value
     top_snps = sum_df %>%
     #  dplyr::filter(q_val < 0.05) %>%
     #  dplyr::filter(p_val_int < 0.001) %>%
       dplyr::filter(beneficial_gen_0 == 1 | beneficial_gen_1 == 1 | beneficial_gen_2 == 1) %>%
-      dplyr::top_n(-round(nrow(sum_df)*.01), p_val_int) %>% # Take only 1% of snps
-     
+      dplyr::top_n(-round(nrow(sum_df)*.01), p_val_int) %>% # Take only XXX% of snps
       dplyr::mutate(snp = gsub("snp_", "", snp)) %>%
       dplyr::arrange(q_val)
     
     top_snps
+    
+    dim(top_snps)
+    
+    summary(top_snps)
+    
+    summary(top_snps$p_val_int)
     
     
   ## Convert top SNPs genotypes to precense absence
@@ -652,7 +658,7 @@
       
       sub <- sum_df[sum_df$snp == paste0("snp_", snp),]
       
-      ben0 <- sub$beneficial_gen_0 == 1
+      ben0 <- sub$beneficial_gen_0 == 1 # Check if true
       ben1 <- sub$beneficial_gen_1 == 1
       ben2 <- sub$beneficial_gen_2 == 1
     
@@ -684,7 +690,7 @@
   
   ## SCP code to copy over model plots
     for(snp in paste0("snp_", top_snps$snp)[1:15]){
-      system(paste0("scp lukembro@dtn2.hoffman2.idre.ucla.edu:/u/flashscratch/l/lukembro/qlobata_growth/run_291_tmax_sum_dif/model_plots/", snp, "_gg.pdf ./output/model_visualizations/"))
+    #  system(paste0("scp lukembro@dtn2.hoffman2.idre.ucla.edu:/u/flashscratch/l/lukembro/qlobata_growth/run_291_tmax_sum_dif/model_plots/", snp, "_gg.pdf ./output/model_visualizations/"))
       
      # gg <-  ggplot(dat_snp, aes(tmax_sum_dif, pull(dat_snp, snp))) +
      #    geom_jitter() +
@@ -735,103 +741,7 @@
   
   
 
-# RDA on top snps ---------------------------------------------------------
 
-  rda_scaled <- flashpcaR::scale2(gen_dat_clim[, top_snps$snp], impute = 2)
-   
-  # rda_scaled <- flashpcaR::scale2(gen_dat_clim[, snp_col_names], impute = 2)
-  
-    rda_full <- vegan::rda(rda_scaled ~ latitude + 
-                             longitude + elevation +
-                             tmax_sum + tmin_winter,
-                           data = gen_dat_clim)
-  
-  rda_full
-  summary(rda_full)
-  
-  anova(rda_full)
-  
-  anova(rda_full, by="axis", permutations = 100)
-  
-  anova(rda_full, 
-        by = "margin",
-        permutations = 100)
-  
-  round(summary(rda_full)$biplot[, c(1,2)], 2)
-  
-  plot(rda_full)
-  
-  
-  loadings <- summary(rda_full)$species # Extracts loadings for each SNP (named species here)
-  head(loadings)
-  
-  # Plot histogram of the loadings
-  hist(loadings[, 1], xlab = "RDA1", breaks = 30, col = "skyblue2", main = "RDA1")
-
-  # Outliers function from Forester et al.
-  outliers <- function(loadings, sd_cutoff){
-    # find loadings +/-z sd from mean loading
-    lims <- mean(loadings) + c(-1, 1) * sd_cutoff * sd(loadings)
-    loadings[loadings < lims[1] | loadings > lims[2]] # locus names in these tails
-  }
-  
-  cand_rda1 <- outliers(loadings[, 1], sd_cutoff = 2) 
-  cand_rda1
-  
-  cand_rda2 <- outliers(loadings[, 2], sd_cutoff = 2)
-  cand_rda2
-  
-  outlier_snps_names <- c(names(cand_rda1), names(cand_rda2))
-  
-  # Extract row indices of outlier snps
-  sig_snps <- which(rownames(loadings) %in% outlier_snps_names) 
-  
-  sig_snps <- which(rownames(loadings) %in% top_snps$snp)
-  
-  # Color of outlier SNPs
-  snp_cols <- rep("grey90",  times = nrow(loadings)) # Set default color
-  snp_cols[sig_snps] <- "red"
-  
-  # Labels of outlier SNPs
-  snp_labels <- rep("", times = nrow(loadings))
-  snp_labels[sig_snps] <- outlier_snps_names
-  
-  # Make biplot
-  plot(rda_full, type = "n", scaling = 3, xlim = c(-1, 1), ylim = c(-1,1)) # Create empty plot 
-  points(rda_full, display = "species", pch = 21,
-         col = "black", bg = snp_cols, scaling = 3)
-  
-  points(rda_full, display = "species", pch = 21, # Overplot sig snps
-         col = "black", select = sig_snps, bg = "red", scaling = 3)
- # text(rda_full, display = "species", labels = snp_labels, cex = .75, scaling = 3)
-  text(rda_full, scaling = 3, display = "bp", col="black") # Environmental vectors  
-  
-  
-  
-  
-  # Plot onto map
-  
-  
-  # Get map of California - already loaded in ggplot2 package
-  ca_map <- dplyr::filter(ggplot2::map_data("state"), region == "california")
-  
-  
-  # Get loadings for each individual
-  ind_loadings <- summary(rda_full)$sites
-  head(ind_loadings)
-  
-  
-  # Plot values for first RDA axis
-  ggplot(ca_map, aes(x = long, y = lat)) +
-    geom_polygon(color = "black", fill = "grey80") +
-    geom_point(data = gen_dat_clim, aes(x = longitude, y = latitude, 
-                                        fill = ind_loadings[, 1]), # Color by first RDA axis
-               color = "black", pch = 21, size = 5) +
-    scale_fill_gradientn(colours = terrain.colors(10), 
-                         name = "RDA1") +
-    theme_bw() + coord_equal(ratio = 1)
-  
-  
   
 
 # Gradient forest test ----------------------------------------------------
@@ -1140,23 +1050,22 @@
 
 # Testing random forest on just beneficial alleles ------------------------
 
+    
+    
   library(randomForest)    
     
     climate_vars_rf <-  c("tmax_sum", 
-                          # "tmax_sum_lgm",
                           # "tmin_winter", 
+                          # "cwd",
+                          # "aet",
+                          # "bioclim_15",
+                          # "bioclim_18",
+                          # "bioclim_19",
                           # "bioclim_04",
-                          #"tmin_winter_lgm", 
-                          #  "DD5",
-                          #  "DD5_lgm",
-                          "random", 
+                          "elevation",
                           "latitude",
-                          # "mem1",
-                          #  "mem2",
-                          #  "mem3",
-                          #  "mem4",
-                           "elevation",
-                           "longitude")
+                          "longitude",
+                          "random")
     
     pairs.panels(gen_dat_ben[, climate_vars_rf])
     
@@ -1165,16 +1074,25 @@
     
     
     
-    ## Factors
+    ## Convert to factor 
     gf_factor <- gen_dat_ben[ ,top_snps$snp]
-    gf_factor <- gf_factor %>%
-      replace(is.na(.), 0) %>% # SHould replace with most common case?
-      mutate_all(as.factor) 
+
+    ## Count number of positives - where allele is found
+    pos_thresh <- 25
     
-    ## Count number of positives
-    pos_thresh <- 50
-    gf_factor <- gf_factor[, -which(apply(gf_factor, 2, function(x) sum(x == 1)) < pos_thresh)]
-    gf_factor <- gf_factor[, -which(apply(gf_factor, 2, function(x) sum(x == 0)) < pos_thresh)]
+    # For presences
+    ind1 <- which(apply(gf_factor, 2, function(x) sum(x == 1, na.rm = TRUE))
+                  < pos_thresh)
+    if(length(ind1) > 0) gf_factor <- gf_factor[, -ind1] # Need to check if indexes were found
+    
+    # For absences
+     ind2 <- which(apply(gf_factor, 2, function(x) sum(x == 0, na.rm = TRUE)) < pos_thresh)
+     if(length(ind2 ) > 0) gf_factor <- gf_factor[, -ind2]
+    
+    # Replace missing data and convert to factor
+    gf_factor <- gf_factor %>%
+    #  replace(is.na(.), 0) %>% # SHould replace with most common case?
+      mutate_all(as.factor) 
     
     dim(gf_factor)
     summary(gf_factor)  
@@ -1235,7 +1153,8 @@
     dim(rf_rast_df_nona)
     
   # TO COMPLETELY RANDOMIZE ENVIRONMENTAL VARIABLES
-    # gen_dat_ben_randomized <- gen_dat_ben[sample(1:nrow(gen_dat_ben)),]
+     gen_dat_ben_randomized <- gen_dat_ben[sample(1:nrow(gen_dat_ben)),]
+    
     # for(var in climate_vars_rf){
     #   gen_dat_ben_randomized[, var] <- rnorm(length(pull(gen_dat_ben_randomized, var)),
     #                                          mean = mean(pull(gen_dat_ben_randomized, var)),
@@ -1246,6 +1165,8 @@
   # Begin loop over SNPS  
     stack <- stack()
     oob_error <- NULL
+    class0_error <- NULL
+    class1_error <- NULL
     
     x = 1
     
@@ -1254,26 +1175,63 @@
       cat("Working on snp #:", x, "\t", snp, "...\n")
       
       # DO NOT RANDOMIZE CLIMATE VARIABLES
-     # X = gen_dat_ben[, climate_vars_rf]
+      X = gen_dat_ben[, climate_vars_rf]
       
       ## RANDOMIZE CLIMATE VARIABLES?
-      X = as.data.frame(gen_dat_ben_randomized[, climate_vars_rf])
+    #  X = as.data.frame(gen_dat_ben_randomized[, climate_vars_rf])
+      
+     y = pull(gf_factor, snp)
+     n1 <- sum(y == 1, na.rm = TRUE)
+     n0 <- sum(y == 0, na.rm = TRUE)
+     
+     not_NAs <- !is.na(y) # Find NAs
+     
+   #  X$y <- y
       
       # Run random forest model
-      rf <- randomForest(y = pull(gf_factor, snp),
-                         x = X, 
+      rf <- randomForest(y = y[not_NAs], # Don't include NAs
+                         x = X[not_NAs, ], 
                          importance = TRUE,
-                         ntree = 500,
-                         mtry = 1)
+                         sampsize = c(min(n0, n1), min(n0, n1)),
+                       #  replace = FALSE,
+                       #  classwt = c(1, 100000),
+                         ntree = 1000)
+                    
       
       rf
       
-      print(importance(rf))
-      print(mean(rf$err.rate[, 1]))
+     # print(importance(rf))
+    #  cat("OOB error rate: ", mean(rf$err.rate[, 1]), "\n")
+      cat("Class1 error rate: ", rf$confusion[2,3], "\n")
+      
+      
+      # ROC plot
+      # The closer the curve follows the left-hand border and then the top border of the ROC space, the more accurate the test. The closer the curve comes to the 45-degree diagonal of the ROC space, the less accurate the test.
+      roc0 <- roc(rf$votes[,1],factor(1 * (rf$y==0)))
+      roc1 <- roc(rf$votes[,2],factor(1 * (rf$y==1)))
+      
+      plot(roc0,
+           main="ROC curves", col = "blue", lwd = 2)
+      plot(roc1, add = TRUE, col = "green", lwd = 2)
+      legend("topright", legend = c(0, 1), col = c("blue", "green"), lty = 1, lwd = 2)
+      
+      
 
     #  plot(rf)
       
     #  varImpPlot(rf)
+      
+      # Save importance and OOB error rates
+      if(x == 1){
+        importance <- data.frame(t(importance(rf)[, 3]))
+      }
+      
+      oob_error[x] <- mean(rf$err.rate[, 1])
+      class0_error[x] <- rf$confusion[1, 3]
+      class1_error[x] <- rf$confusion[2,3] # Error rate for predicting presence
+      importance <- rbind(importance, importance(rf)[, 3])
+      
+      
       
       # Plot partial plot
       
@@ -1295,46 +1253,61 @@
       # }
       
       ## Predict across a raster
-      rf_rast_df_nona$pred = predict(rf, rf_rast_df_nona, type = "prob")[, 2] # Second column is positives
       
+      # Second column is positives
+      rf_rast_df_nona$pred = predict(rf, rf_rast_df_nona, type = "prob")[, 2]
+
       rf_rast_df_temp <- left_join(rf_rast_df, rf_rast_df_nona[, c("cell_id", "pred")])
 
        rast <- tmax_rast
       values(rast) <- rf_rast_df_temp$pred
-      
+
     #  levelplot(rast, margin = FALSE)
-      
+
       stack <- stack(stack, rast)
       
-      if(x == 1){
-        importance <- data.frame(t(importance(rf)[, 3]))
-      }
-      
-      oob_error[x] <- mean(rf$err.rate[, 1])
-      importance <- rbind(importance, importance(rf)[, 3])
       
       x = x + 1
       
     } # End loop over SNPs
 
-    oob_error
-    mean(oob_error)
     
-    importance
-    sort(colMeans(importance), decreasing = TRUE) # Higher is better
+    
+    ## Errors
+      oob_error
+      mean(oob_error)
+      
+      class0_error
+      mean(class0_error)
+      
+      class1_error
+      mean(class1_error)
+      
+      pairs.panels(cbind(oob_error, class0_error, class1_error))
+      
+    
+    ## Importance
+      importance
+      sort(colMeans(importance), decreasing = TRUE) # Higher is better
+       
+      
+      sort(colMeans(importance[which(class1_error < .50), ]), decreasing = TRUE) 
+      sort(colMeans(importance[-which(class1_error < .50), ]), decreasing = TRUE) 
      
-    stack
-    
-    mean_stack <-  mean(stack)
-    
-    levelplot(mean_stack, margin = FALSE)
-    
-    mean_stack_range <- mask(mean_stack, lobata_range_rough)
-    
-    levelplot(mean_stack_range, margin = FALSE, contour = FALSE)
-    ## ADD ON OBSERVED POINTS FROM SAMPLES OF WHETHER BENEFICIAL ALLELE WAS POSITIVE OR NOT
-    ## Make plot 3d based on elevation
-    
+      
+       
+    # Looking at rasters
+      stack
+      
+      mean_stack <-  mean(stack)
+      
+      levelplot(mean_stack, margin = FALSE)
+      
+      mean_stack_range <- mask(mean_stack, lobata_range_rough)
+      
+      levelplot(mean_stack_range, margin = FALSE, contour = FALSE)
+      ## Make plot 3d based on elevation
+      
     
     # Plot partial dependence plots of TMax
     ggplot(pp_tmax, aes(x = tmax_sum, y = tmax_prob,
@@ -1348,6 +1321,103 @@
  
 
  ## Can maybe overlay a bunch of partial plots of each SNP to show general trends in which direction the gradients are going
+    
+
+# RDA on top snps ---------------------------------------------------------
+    
+    rda_scaled <- flashpcaR::scale2(gen_dat_clim[, top_snps$snp], impute = 2)
+    
+    # rda_scaled <- flashpcaR::scale2(gen_dat_clim[, snp_col_names], impute = 2)
+    
+    rda_full <- vegan::rda(rda_scaled ~ latitude + 
+                             longitude + elevation +
+                             tmax_sum + tmin_winter,
+                           data = gen_dat_clim)
+    
+    rda_full
+    summary(rda_full)
+    
+    anova(rda_full)
+    
+    anova(rda_full, by="axis", permutations = 100)
+    
+    anova(rda_full, 
+          by = "margin",
+          permutations = 100)
+    
+    round(summary(rda_full)$biplot[, c(1,2)], 2)
+    
+    plot(rda_full)
+    
+    
+    loadings <- summary(rda_full)$species # Extracts loadings for each SNP (named species here)
+    head(loadings)
+    
+    # Plot histogram of the loadings
+    hist(loadings[, 1], xlab = "RDA1", breaks = 30, col = "skyblue2", main = "RDA1")
+    
+    # Outliers function from Forester et al.
+    outliers <- function(loadings, sd_cutoff){
+      # find loadings +/-z sd from mean loading
+      lims <- mean(loadings) + c(-1, 1) * sd_cutoff * sd(loadings)
+      loadings[loadings < lims[1] | loadings > lims[2]] # locus names in these tails
+    }
+    
+    cand_rda1 <- outliers(loadings[, 1], sd_cutoff = 2) 
+    cand_rda1
+    
+    cand_rda2 <- outliers(loadings[, 2], sd_cutoff = 2)
+    cand_rda2
+    
+    outlier_snps_names <- c(names(cand_rda1), names(cand_rda2))
+    
+    # Extract row indices of outlier snps
+    sig_snps <- which(rownames(loadings) %in% outlier_snps_names) 
+    
+    sig_snps <- which(rownames(loadings) %in% top_snps$snp)
+    
+    # Color of outlier SNPs
+    snp_cols <- rep("grey90",  times = nrow(loadings)) # Set default color
+    snp_cols[sig_snps] <- "red"
+    
+    # Labels of outlier SNPs
+    snp_labels <- rep("", times = nrow(loadings))
+    snp_labels[sig_snps] <- outlier_snps_names
+    
+    # Make biplot
+    plot(rda_full, type = "n", scaling = 3, xlim = c(-1, 1), ylim = c(-1,1)) # Create empty plot 
+    points(rda_full, display = "species", pch = 21,
+           col = "black", bg = snp_cols, scaling = 3)
+    
+    points(rda_full, display = "species", pch = 21, # Overplot sig snps
+           col = "black", select = sig_snps, bg = "red", scaling = 3)
+    # text(rda_full, display = "species", labels = snp_labels, cex = .75, scaling = 3)
+    text(rda_full, scaling = 3, display = "bp", col="black") # Environmental vectors  
+    
+    
+    
+    
+    # Plot onto map
+    
+    
+    # Get map of California - already loaded in ggplot2 package
+    ca_map <- dplyr::filter(ggplot2::map_data("state"), region == "california")
+    
+    
+    # Get loadings for each individual
+    ind_loadings <- summary(rda_full)$sites
+    head(ind_loadings)
+    
+    
+    # Plot values for first RDA axis
+    ggplot(ca_map, aes(x = long, y = lat)) +
+      geom_polygon(color = "black", fill = "grey80") +
+      geom_point(data = gen_dat_clim, aes(x = longitude, y = latitude, 
+                                          fill = ind_loadings[, 1]), # Color by first RDA axis
+                 color = "black", pch = 21, size = 5) +
+      scale_fill_gradientn(colours = terrain.colors(10), 
+                           name = "RDA1") +
+      theme_bw() + coord_equal(ratio = 1)
     
     
     
