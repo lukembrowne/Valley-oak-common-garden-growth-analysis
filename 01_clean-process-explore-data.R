@@ -147,11 +147,11 @@
       # dat_all$height_2017 <- round(dat_all$height_2017 / 5) * 5
       
       ## Calculate height difference
-      dat_all$height_dif <- dat_all$height_2017 - dat_all$height_2015
-      
-      summary(dat_all$height_dif); hist(dat_all$height_dif)
-      
-      plot(dat_all$height_2015, dat_all$height_dif, pch = 19, cex = 0.5)
+      # dat_all$height_dif <- dat_all$height_2017 - dat_all$height_2015
+      # 
+      # summary(dat_all$height_dif); hist(dat_all$height_dif)
+      # 
+      # plot(dat_all$height_2015, dat_all$height_dif, pch = 19, cex = 0.5)
       
       
     ## Calculate relative growth rates: over 2 years
@@ -160,20 +160,20 @@
       
       summary(dat_all$rgr)
       
-      ## Plots of 2015 vs 2017
-      plot(jitter(dat_all$height_2015), jitter(dat_all$height_2017),
-           pch = 19, cex = 0.5, las = 1,
-           xlab = "Height 2015 (cm)", ylab = "Height 2017 (cm)")
-      abline(a = 0, b = 1, lwd = 2, col = "steelblue")
+      # ## Plots of 2015 vs 2017
+      # plot(jitter(dat_all$height_2015), jitter(dat_all$height_2017),
+      #      pch = 19, cex = 0.5, las = 1,
+      #      xlab = "Height 2015 (cm)", ylab = "Height 2017 (cm)")
+      # abline(a = 0, b = 1, lwd = 2, col = "steelblue")
       
       ## Plot of RGR
-      plot(dat_all$height_2014, dat_all$rgr, pch = 19, cex = 0.5, las = 1)
-      cor.test(dat_all$height_2015, dat_all$rgr)
+      # plot(dat_all$height_2014, dat_all$rgr, pch = 19, cex = 0.5, las = 1)
+      # cor.test(dat_all$height_2015, dat_all$rgr)
       
       ## Histogram of RGR
-        ggplot(dat_all, aes(rgr)) + geom_histogram(fill = "steelblue2",
-                                                   col = "black") + theme_bw() +
-          xlab("Relative growth rate (rgr)")
+        # ggplot(dat_all, aes(rgr)) + geom_histogram(fill = "steelblue2",
+        #                                            col = "black") + theme_bw() +
+        #   xlab("Relative growth rate (rgr)")
       
       ## View 'outliers
       # View(dat_all[dat_all$rgr < -1 & !is.na(dat_all$rgr), ])
@@ -186,76 +186,102 @@
 
      
   ## Reading in 012 genotype matrix created with vcftools, processing and cleaning in R
-  ## Should be 15,627 Loci based on file gbs451.GDP4.AN50.biallelic.QD10.MAF10.MIS10.vcf from Sorel received March 2018    
       
-  ## Read in position of SNPs - first column is chromosome number, second column is position
-  snp_pos <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs.all.012.pos", 
-                             col_names = c("chrom", "pos"))
-  snp_pos
-  
-  ## Read in genotype cols
-  
-  ## provide column names since they are not included in vcftools output
-  ## First column is sequence of numbers 0-450, which we will remove later
-  col_names <- c("NUM", paste0(snp_pos$chrom, "_", snp_pos$pos))
-  
-  ## Set missing values (-1) to NA
-  genotypes <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs.all.012",
-                               col_names = col_names, na = "-1")
-  
-  ## Remove first column
-  genotypes <- dplyr::select(genotypes, -NUM)
-  dim(genotypes) # Changes depends on filtering options
-  genotypes
-  
-  ## Read in individual
-  indv <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs.all.012.indv",
-                          col_names = "ID")
-  dim(indv)
-  indv 
-  
-  ## Read in file that has gbs_name, locality, and sork lab sample number, in the other of GBS samples
-    sample_key <- readr::read_tsv("./data/GBS_data/gbs451.locality_sample_key.txt")
-    sample_key
+  ## MOMS IN GARDEN      
+    ## Read in position of SNPs - first column is chromosome number, second column is position
+    snp_pos <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_garden_moms.012.pos", 
+                               col_names = c("chrom", "pos"))
+    snp_pos
     
-    ## Link up with accession number
-    # accession_key <- gs_read(gs_key("1DUEV-pqV28D6qJl6vJM6S1VLWbxc9E71afufulDRbIc"), ws = 2)
-    accession_key <- read_csv("./data/cleaned_data/Maternal tree locations and sample IDs - Locations and sample IDs.csv")
-    accession_key
+    ## Read in genotype cols
     
-    sample_key <- dplyr::left_join(sample_key, accession_key, 
-                                   by = c("locality" = "Locality", "sample" = "Sample #")) %>%
-                  rename(accession = Accession)
+    ## provide column names since they are not included in vcftools output
+    ## First column is sequence of numbers 0-450, which we will remove later
+    col_names <- c("NUM", paste0("snp_", snp_pos$chrom, "_", snp_pos$pos))
     
-    sample_key
+    ## Set missing values (-1) to NA
+    genotypes <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_garden_moms.012",
+                                 col_names = col_names, na = "-1")
     
-    ## How many GBS samples have accession numbers? 
-    length(table(sample_key$accession))
+    ## Remove first column
+    genotypes <- dplyr::select(genotypes, -NUM)
+    dim(genotypes) # Changes depends on filtering options
+    genotypes
     
-      ## Gbs samples NOT in common garden to check for typos etc that may be wrongly excluding samples
-      # View(sample_key[is.na(sample_key$accession), ])
+    ## Read in individual
+    indv <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_garden_moms.012.indv",
+                            col_names = "ID")
+    dim(indv)
+    indv 
     
-    ## Output list of samples in common garden with GBS data
-      #write_tsv(data.frame(gbs_name = sample_key$gbs_name[!is.na(sample_key$accession)]),
-      #  path = "./data/GBS_data/samples_w_accession_number.txt",
-      #  col_names = FALSE)
-    
+    ## Read in file that has gbs_name, locality, and sork lab sample number, in the other of GBS samples
+      sample_key <- readr::read_tsv("./data/GBS_data/gbs451.locality_sample_key.txt")
+      sample_key
       
-    ## Join individual names and genotype data and subset to those that are in the common garden
-    gen_dat <- dplyr::left_join(dplyr::select(sample_key, gbs_name, accession),
-                                dplyr::bind_cols(indv, genotypes),
-                                                 by = c("gbs_name" = "ID")) 
-    
-    dim(gen_dat)
-    gen_dat
-    
-  ## Subset gen_dat to just individuals we have GBS data for
-    gen_dat <- gen_dat %>%
-      filter(gbs_name %in% indv$ID)
-    
-    dim(gen_dat)
-  
+      ## Link up with accession number
+      # accession_key <- gs_read(gs_key("1DUEV-pqV28D6qJl6vJM6S1VLWbxc9E71afufulDRbIc"), ws = 2)
+      accession_key <- read_csv("./data/cleaned_data/Maternal tree locations and sample IDs - Locations and sample IDs.csv")
+      accession_key
       
+      sample_key <- dplyr::left_join(sample_key, accession_key, 
+                                     by = c("locality" = "Locality", "sample" = "Sample #")) %>%
+                    rename(accession = Accession)
+      
+      sample_key
+      
+      ## How many GBS samples have accession numbers? 
+      length(table(sample_key$accession))
+      
+        ## Gbs samples NOT in common garden to check for typos etc that may be wrongly excluding samples
+        # View(sample_key[is.na(sample_key$accession), ])
+      
+      ## Output list of samples in common garden with GBS data
+        #write_tsv(data.frame(gbs_name = sample_key$gbs_name[!is.na(sample_key$accession)]),
+        #  path = "./data/GBS_data/samples_w_accession_number.txt",
+        #  col_names = FALSE)
+      
+        
+      ## Join individual names and genotype data and subset to those that are in the common garden
+      gen_dat <- dplyr::left_join(dplyr::select(sample_key, gbs_name, accession),
+                                  dplyr::bind_cols(indv, genotypes),
+                                                   by = c("gbs_name" = "ID")) 
+      
+      dim(gen_dat)
+      gen_dat
+      
+    ## Subset gen_dat to just individuals we have GBS data for
+      gen_dat <- gen_dat %>%
+        filter(gbs_name %in% indv$ID)
+      
+      dim(gen_dat)
+      
+      
+      
+  ## ALL TREES WITH GBS SAMPLES  
+      
+      ## Set missing values (-1) to NA
+      genotypes_all <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_all_moms.012",
+                                   col_names = col_names, na = "-1")
+      
+      ## Remove first column
+      genotypes_all <- dplyr::select(genotypes_all, -NUM)
+      dim(genotypes_all) # Changes depends on filtering options
+      genotypes_all
+      
+      ## Read in individual
+      indv_all <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_all_moms.012.indv",
+                              col_names = "ID")
+      dim(indv_all)
+      indv_all
+    
+      ## Join individual names and genotype data and subset to those that are in the common garden
+      gen_dat_all <- dplyr::left_join(dplyr::select(sample_key, gbs_name, accession),
+                                  dplyr::bind_cols(indv_all, genotypes_all),
+                                  by = c("gbs_name" = "ID")) 
+      
+      dim(gen_dat_all)
+      gen_dat_all
+
     
 # Filtering data ----------------------------------------------------------
       
@@ -272,10 +298,10 @@
       
       if(response_variable == "height"){
         
-        # Exclude based on percentle
-        # dat_all$height_2017[dat_all$height_2017 <= quantile(dat_all$height_2017, 0.01,
+        # # Exclude based on percentle
+        # dat_all$height_2017[dat_all$height_2017 <= quantile(dat_all$height_2017, 0.025,
         #                                                     na.rm = TRUE) |
-        #                       dat_all$height_2017 >= quantile(dat_all$height_2017, 0.99,
+        #                       dat_all$height_2017 >= quantile(dat_all$height_2017, 0.975,
         #                                                       na.rm = TRUE)] <- NA
 
         ## Filter out NA heights
