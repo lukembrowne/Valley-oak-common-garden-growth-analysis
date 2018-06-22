@@ -109,29 +109,6 @@
       dim(climate_garden_mom)
       
       
-    # Differences in temperature  
-      
-    # Tmax
-      # ggplot(climate_garden_mom, aes(y = tmax_sum, x = tmax_sum_lgm)) + geom_point() + 
-      #   geom_abline(aes(intercept = 0, slope = 1)) +
-      #   xlab("Tmax summer - LGM") + ylab("Tmax summer - current") +
-      #   theme_bw(15)
-      # Tmin
-      # ggplot(climate_garden_mom, aes(y = tmin_winter, x = tmin_winter_lgm)) + geom_point() + 
-      #   geom_abline(aes(intercept = 0, slope = 1)) +
-      #   xlab("Tmin winter - LGM") + ylab("Tmin winter - current") +
-      #   theme_bw(15)
-      # 
- 
-      mean(climate_garden_mom$tmax_sum - climate_garden_mom$tmax_sum_lgm)
-      mean(climate_garden_mom$tmax_sum - climate_garden_mom$tmax_sum_last1000)
-      mean(climate_garden_mom$tmax_sum - climate_garden_mom$tmax_sum_holo)
-      
-      mean(climate_garden_mom$tmin_winter - climate_garden_mom$tmin_winter_lgm)
-      mean(climate_garden_mom$tmin_winter - climate_garden_mom$tmin_winter_last1000)
-      mean(climate_garden_mom$tmin_winter - climate_garden_mom$tmin_winter_holo)
-      
-    
   ## Read in climate data for GBS trees
     climate_gbs_mom <- read_csv("./data/cleaned_data/GBS tree climate data BCM 1950-1981 2018_03_08.csv")
     
