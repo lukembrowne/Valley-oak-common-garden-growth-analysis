@@ -72,9 +72,9 @@
       latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
      latticeExtra::layer(sp.polygons(lobata_range_rough, fill = "purple", alpha = 0.15)) +
       latticeExtra::layer(sp.points(all_moms, pch = 21, cex = 1,
-                                    fill = "steelblue2", col = "grey10", alpha = .75)) +
+                                    fill = "forestgreen", col = "grey10", alpha = .75)) +
       latticeExtra::layer(sp.points(gbs_moms, pch = 21, cex = 1,
-                                    fill = "forestgreen", col = "grey10", alpha = .75))  +
+                                    fill = "steelblue2", col = "grey10", alpha = .75))  +
       latticeExtra::layer(sp.points(garden_sites, pch = 22, cex = 2, 
                                     col = "grey10", fill = "orange"))
     
