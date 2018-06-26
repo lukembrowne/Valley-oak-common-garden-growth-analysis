@@ -1,6 +1,5 @@
 
 # Load libraries ----------------------------------------------------------
-  library(plyr)
   library(tidyverse)
   library(googlesheets)
   library(maptools)
