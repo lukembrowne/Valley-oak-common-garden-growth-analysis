@@ -18,6 +18,7 @@
   library(vegan)
   library(beepr)
   library(patchwork)
+  library(rasterVis)
   
   # function to transform from raw to scaled variables
     forward_transform <- function(x, var, means, sds){
@@ -36,12 +37,19 @@
 
   # Joining climate and genetic data
   # Do an inner join to avoid having GBS moms with climate data but poor genotyping data
-  gen_dat_clim <- inner_join(climate_gbs_mom, 
+ 
+  # Just moms in common garden  
+   gen_dat_clim <- inner_join(climate_gbs_mom, 
                              dplyr::select(gen_dat, -accession), 
                              by = c("id" = "gbs_name"))
   dim(gen_dat_clim)
   
-  climate_gbs_mom$id[!is.na(climate_gbs_mom$accession)]
+  # All GBS samples
+  gen_dat_clim_all <- inner_join(climate_gbs_mom, 
+                             dplyr::select(gen_dat_all, -accession), 
+                             by = c("id" = "gbs_name"))
+  dim(gen_dat_clim_all)
+  
   
   # Getting genetic data
   snp_col_names <- colnames(gen_dat[, -c(1, 2)])
@@ -62,28 +70,21 @@
   
   ## Calculate PCA on genetic data
     pca_gen = prcomp(bglr_gen_scaled, center = FALSE, scale = FALSE)
-    biplot(pca_gen)
+   # biplot(pca_gen)
     summary(pca_gen)
-    screeplot(pca_gen, bstick = TRUE)
+  #  screeplot(pca_gen, bstick = TRUE)
     
     pcs <- as.data.frame(pca_gen$x[, 1:10])
     colnames(pcs) <- paste0(colnames(pcs), "_gen")
     
     bglr_gen_scaled <- bind_cols(bglr_gen_scaled, pcs)
 
-  
-  # Genetic data as numeric - with mean imputed genotypes
+    
+  # Set up dataframe with SNP data, height data, and climate data
     dat_snp = left_join(dat_gbs_only_scaled,
-                        bind_cols(gen_dat_clim[, "accession"],
-                                           bglr_gen_scaled),
-                        by = "accession")
-    dim(dat_snp)
-  
-  # For using snps as factors
-  dat_snp = left_join(dat_gbs_only_scaled,
-                    bind_cols(gen_dat_clim[, c("accession", snp_col_names)],
-                                       pcs),
-                    by = "accession")
+                      bind_cols(gen_dat_clim[, c("accession", snp_col_names)],
+                                         pcs),
+                      by = "accession")
   
    
   # Set up factors  
@@ -91,9 +92,6 @@
     dat_snp$section_block <- factor(dat_snp$section_block)
     dat_snp$section <- factor(dat_snp$section)
     
-    
-    # Adding snp_ to column names - useful for gams
-    colnames(dat_snp)[which(colnames(dat_snp) %in% snp_col_names)] <- paste0("snp_", colnames(dat_snp[, snp_col_names]))
     
   # Scale PCA axes
     dat_snp$PC1_gen <- (dat_snp$PC1_gen - mean(dat_snp$PC1_gen)) / sd(dat_snp$PC1_gen)
@@ -104,33 +102,38 @@
  
     
   # Scale genotypes  
-    scaled_snps_means <- apply(dat_snp[, paste0("snp_", snp_col_names)], MARGIN = 2,
+    scaled_snps_means <- apply(dat_snp[, snp_col_names], MARGIN = 2,
           function(x) mean(x, na.rm = TRUE))
     
-    scaled_snps_sds <- apply(dat_snp[, paste0("snp_", snp_col_names)], MARGIN = 2,
+    scaled_snps_sds <- apply(dat_snp[, snp_col_names], MARGIN = 2,
                                function(x) sd(x, na.rm = TRUE))
     
-    dat_snp[, paste0("snp_", snp_col_names)] <-   apply(dat_snp[, paste0("snp_",
-                                             snp_col_names)], MARGIN = 2,
+    dat_snp[, snp_col_names] <-   apply(dat_snp[, 
+                                             snp_col_names], MARGIN = 2,
                     function(x) (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE))
     
-    dat_snp[1:10, 150:160]
+    dat_snp[1:10, 1050:1060]
     
     # Mean impute
-    dat_snp[, paste0("snp_", snp_col_names)] <- apply(dat_snp[, paste0("snp_",
-                                                    snp_col_names)], MARGIN = 2,
+    dat_snp[, snp_col_names] <- apply(dat_snp[, 
+                                                    snp_col_names], MARGIN = 2,
                function(x) ifelse(is.na(x), yes = 0, no = x))
     
-    dat_snp[1:10, 150:160]
+    dat_snp[1:10, 1050:1060]
     
-    summary(dat_snp[, 150:160])
+    summary(dat_snp[, 1050:1060])
     
     
     
 # Set a prediction data frame
 
 
- # Prediction frame with a 3 degree increase
+ # Prediction frame with a XXXX degree increase
+    
+    
+    
+  degree_increase = 4.88  
+    
   # Set up each climate variable individually
   pred <-  expand.grid(height_2014 = 0,
                   site = "Chico",
@@ -147,7 +150,7 @@
                           var_temp = c(seq(min(dat_all_scaled[ ,var]),
                                                max(dat_all_scaled[ ,var]),
                                                length.out = 50), 
-                                           forward_transform(c(0, 3),
+                                           forward_transform(c(0, degree_increase),
                                                              var = var,
                                                              means = scaled_var_means_gbs_only,
                                                              sds = scaled_var_sds_gbs_only)))
@@ -172,7 +175,8 @@
   pred
 
 # Save data to file that will be uploaded to cluster  
-  # save(dat_snp, snp_col_names, pred,
+  # save(dat_snp,
+  #      snp_col_names, pred,
   #      scaled_snps_means, scaled_snps_sds,
   #      scaled_var_means_gbs_only, scaled_var_sds_gbs_only,
   #   file = paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
@@ -197,7 +201,6 @@
   random_effects <-  '+ s(accession, bs = "re")'
   
   
-  
 # Loop through snps by index based on task id
   for(snp_index in task_id:(task_id + interval - 1)){
     
@@ -210,7 +213,7 @@
     start_time <- Sys.time()
     
     # Choose snp
-    snp <- paste0("snp_", snp_col_names[snp_index])
+    snp <- snp_col_names[snp_index]
     
     # Choose numbers of knots
     k = length(table(pull(dat_snp, snp)))
@@ -548,9 +551,9 @@
 
 # Read in cluster run output ----------------------------------------------
 
-  path_to_summaries <- "./output/model_summaries_tmax_sum_lgm_dif/"  
+  path_to_summaries <- "./output/model_summaries_run_3007996/"  
   
-  sum_df <- ldply(list.files(path_to_summaries, full = TRUE), read_csv)
+  sum_df <- plyr::ldply(list.files(path_to_summaries, full = TRUE), read_csv)
   
   dim(sum_df)
   sum_df
@@ -559,7 +562,7 @@
   
   
   ## Missing snps
-  snp_col_names[which(!paste0("snp_", snp_col_names) %in% sum_df$snp)]
+  snp_col_names[which(!snp_col_names %in% sum_df$snp)]
   
   
   
@@ -571,9 +574,9 @@
   table(sum_df$converged)
   
   # Filter to just those that converged
-  sum_df <- sum_df %>%
-    dplyr::filter(converged)
-  dim(sum_df)
+  # sum_df <- sum_df %>%
+  #   dplyr::filter(converged)
+  # dim(sum_df)
   
   
   
@@ -609,36 +612,31 @@
  
   # Calculate average height prediction
     avg_height_pred <- mean(c(pull(sum_df, height_change_gen_0), 
-                            pull(sum_df, height_change_gen_1),
-                            pull(sum_df, height_change_gen_2)), na.rm = TRUE)
+                              pull(sum_df, height_change_gen_1),
+                              pull(sum_df, height_change_gen_2)), na.rm = TRUE)
     
     avg_height_pred
     
-    avg_height_pred <- 0
+    avg_height_pred <- -2
   
   # Figuring out which allele is beneficial
     sum_df <- sum_df %>%
-        mutate(beneficial_gen_0 = ifelse(height_change_gen_0 > avg_height_pred, 1, 0),
-               beneficial_gen_1 = ifelse(height_change_gen_1 > avg_height_pred, 1, 0),
-               beneficial_gen_2 = ifelse(height_change_gen_2 > avg_height_pred, 1, 0))
+            mutate(beneficial_gen_0 = ifelse(height_change_gen_0 >= avg_height_pred, 1, 0),
+                   beneficial_gen_1 = ifelse(height_change_gen_1 >= avg_height_pred, 1, 0),
+                   beneficial_gen_2 = ifelse(height_change_gen_2 >= avg_height_pred, 1, 0))
     
     table(sum_df$beneficial_gen_0)
     table(sum_df$beneficial_gen_1)
     table(sum_df$beneficial_gen_2)
-    
-   # View(sum_df[which(sum_df$beneficial_gen_0 == 1 & sum_df$beneficial_gen_1 == 1 & sum_df$beneficial_gen_2 == 1),])
-    
-    
+
 
 # Select top snps ---------------------------------------------------------
 
     # Based on q value
     top_snps = sum_df %>%
-    #  dplyr::filter(q_val < 0.05) %>%
-    #  dplyr::filter(p_val_int < 0.001) %>%
+      dplyr::filter(q_val < 0.05) %>%
       dplyr::filter(beneficial_gen_0 == 1 | beneficial_gen_1 == 1 | beneficial_gen_2 == 1) %>%
-      dplyr::top_n(-round(nrow(sum_df)*.01), p_val_int) %>% # Take only XXX% of snps
-      dplyr::mutate(snp = gsub("snp_", "", snp)) %>%
+    #  dplyr::top_n(-round(nrow(sum_df)*.01), p_val_int) %>% # Take only XXX% of snps
       dplyr::arrange(q_val)
     
     top_snps
@@ -652,37 +650,50 @@
     
   ## Convert top SNPs genotypes to precense absence
     
-    gen_dat_ben <- gen_dat_clim
+    gen_dat_bene <- gen_dat_clim_all # Using all GBS samples
     
     for(snp in top_snps$snp){
       
-      sub <- sum_df[sum_df$snp == paste0("snp_", snp),]
+      sub <- sum_df[sum_df$snp == snp, ]
       
-      ben0 <- sub$beneficial_gen_0 == 1 # Check if true
+      ben0 <- sub$beneficial_gen_0 == 1 # Check if genotype is beneficial or not
       ben1 <- sub$beneficial_gen_1 == 1
       ben2 <- sub$beneficial_gen_2 == 1
-    
-      gen_dat_clim[, snp]
       
-      for(row in 1:nrow(gen_dat_clim)){}
-      
-     gen_dat_ben[, snp] <-  apply(gen_dat_clim[,snp], 1, function(x) {
-        if(is.na(x)){
-          NA
-        } else if(x == 0 & ben0){
-          1
-        } else if(x == 1 & ben1) {
-          1
-        } else if(x == 2 & ben2){
-          1
-        } else {
-          0
+     gen_dat_bene[, snp] <-  apply(gen_dat_clim_all[, snp], 1, function(x) {
+        if(is.na(x)){ NA
+        } else if(x == 0 & is.na(ben0)){ NA
+        } else if(x == 0 & ben0){ 1
+        } else if(x == 1 & is.na(ben1)){ NA
+        } else if(x == 1 & ben1){ 1
+        } else if(x == 2 & is.na(ben2)){ NA
+        } else if(x == 2 & ben2){ 1
+        } else {  0
         }
-      })
-    }
+      }) # End apply
+     
+    } # End SNP loop
     
-    summary(gen_dat_ben[, top_snps$snp])
+    summary(gen_dat_bene[, top_snps$snp])
     
+    
+  ## For rest of SNPs, convert non-reference alleles to 1, reference alleles to 0 for comparison
+    for(snp in snp_col_names[!snp_col_names %in% top_snps$snp]){
+
+      gen_dat_bene[, snp] <-  apply(gen_dat_clim_all[, snp], 1, function(x) {
+        if(is.na(x)){ NA
+        } else if(x == 0){ 0
+        } else if(x == 1){ 1
+        } else if(x == 2){ 1
+        } else {  0
+        }
+      }) # End apply
+      
+    } # End SNP loop
+    
+    dim(gen_dat_bene)
+    
+    summary(gen_dat_bene[, snp_col_names[!snp_col_names %in% top_snps$snp][1:50]])
     
     
     
@@ -707,10 +718,10 @@
 
   library(CMplot)
   
-  man_df1 <- data.frame(SNP = paste0("snp_", snp_col_names), 
+  man_df1 <- data.frame(SNP = snp_col_names, 
                        snp_pos)
   
-   man_df <- left_join(man_df1, sum_df[, c("snp", "p_val_int")], by = c("SNP" = "snp"))
+  man_df <- left_join(man_df1, sum_df[, c("snp", "p_val_int")], by = c("SNP" = "snp"))
  
   
   head(man_df)
@@ -739,7 +750,461 @@
   
 
   
+   
+# Random forest on just beneficial alleles ------------------------
+   
+   library(randomForest)
+   library(AUC)
+   
+
+   ## Convert to factor 
+   gf_factor <- gen_dat_bene[ , snp_col_names]
+   dim(gf_factor)
+   
+   ## Count number of positives - where allele is found
+   pos_thresh <- 25
+   
+   # For presences
+   ind1 <- which(apply(gf_factor, 2, function(x) sum(x == 1, na.rm = TRUE))
+                 < pos_thresh)
+   if(length(ind1) > 0) gf_factor <- gf_factor[, -ind1] # Need to check if indexes were found
+   
+   # For absences
+   ind2 <- which(apply(gf_factor, 2, function(x) sum(x == 0, na.rm = TRUE)) < pos_thresh)
+   if(length(ind2 ) > 0) gf_factor <- gf_factor[, -ind2]
+   
+   # # Convert to factor
+   # gf_factor <- gf_factor %>%
+   #   mutate_all(as.factor) 
+   # 
+   dim(gf_factor)
+   
+   
+   # TO RANDOMIZE GENOTYPES
+   # for(col in 1:ncol(gf_factor)){
+   #   gf_factor[, col] <- as.factor(sample(0:1, nrow(gf_factor), replace = TRUE))
+   # }
+   # summary(gf_factor)
+   
+ 
+   
+   ## Set up rasters
+     library(raster)
+   
+   
+   # Shape outlines
+     cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
+                                 proj4string = CRS("+proj=longlat +datum=WGS84"))
+     
+     lobata_range <- readShapePoly("./data/gis/valley_oak_range/qlobata_refined_grouped.shp",
+                                   proj4string = CRS("+proj=longlat +datum=WGS84"))
+     
+     lobata_range_rough <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
+                                         proj4string = CRS("+proj=longlat +datum=WGS84"))
+     
+    # Elevation map
+     dem <- raster("./data/gis/dem/ClimateNA_DEM_cropped.tif")
+     
+     # Climate rasters
+     tmax_rast <- raster("./data/gis/climate_data/BCM/historical/1951-1980/tmx1951_1980jja_ave_HST_1513103038/tmx1951_1980jja_ave_HST_1513103038.tif")
+     
+     tmin_winter <- raster("./data/gis/climate_data/BCM/historical/1951-1980/tmn1951_1980djf_ave_HST_1513102910/tmn1951_1980djf_ave_HST_1513102910.tif")
+     
+     aet <- raster("./data/gis/climate_data/BCM/historical/1951-1980/aet1951_1980_ave_HST_1513103180/aet1951_1980_ave_HST_1513103180.tif")
+     bioclim_04 <- raster("./data/gis/climate_data/BCM/historical/1951-1980/bioclim_04.tif")
+     bioclim_15 <- raster("./data/gis/climate_data/BCM/historical/1951-1980/bioclim_15.tif")
+     bioclim_18 <- raster("./data/gis/climate_data/BCM/historical/1951-1980/bioclim_18.tif")
+     bioclim_19 <- raster("./data/gis/climate_data/BCM/historical/1951-1980/bioclim_19.tif")
+     
+     
+    # Function to downscale and project raster 
+     process_raster <- function(rast){
+       rast <- aggregate(rast, fact = 20) # Make smaller by averaging across cells
+       rast_latlon <- projectRaster(rast, crs = CRS("+proj=longlat +datum=WGS84"))
+       plot(rast_latlon)
+       return(rast_latlon)
+     }
+     
+   # Aggregate and project tmax_raster
+     tmax_rast   <- process_raster(tmax_rast)
+     tmin_winter <- process_raster(tmin_winter)
+     aet         <- process_raster(aet)
+     bioclim_04  <- process_raster(bioclim_04)
+     bioclim_15  <- process_raster(bioclim_15)
+     bioclim_18  <- process_raster(bioclim_18)
+     bioclim_19  <- process_raster(bioclim_19)
+     
+   # Match up resolution and extent of DEM to climate rasters
+     dem <- resample(dem, tmax_rast) 
+     
+     compareRaster(tmax_rast, dem) # Make sure rasters are equal
+   
+   # Find lat long points
+     latlon <- xyFromCell(tmax_rast, 1:ncell(tmax_rast))
+     
+     rf_rast_df <- data.frame(cell_id = 1:ncell(tmax_rast),
+                              longitude = latlon[, 1],
+                              latitude = latlon[, 2],
+                              tmax_sum = raster::extract(tmax_rast, 1:ncell(tmax_rast)),
+                              tmin_winter = raster::extract(tmin_winter, 1:ncell(tmin_winter)),
+                              aet = raster::extract(aet, 1:ncell(aet)),
+                              elevation = raster::extract(dem, 1:ncell(dem)),
+                              bioclim_04 = raster::extract(bioclim_04, 1:ncell(bioclim_04)),
+                              bioclim_15 = raster::extract(bioclim_15, 1:ncell(bioclim_15)),
+                              bioclim_18 = raster::extract(bioclim_18, 1:ncell(bioclim_18)),
+                              bioclim_19 = raster::extract(bioclim_19, 1:ncell(bioclim_19)),
+                              random = rnorm(1:ncell(dem)))
+     rf_rast_df
+     
+     dim(rf_rast_df)
+     
+     # Remove NAs from dataframe or random forest will complain
+     rf_rast_df_nona <-  rf_rast_df %>%
+       dplyr::filter(!is.na(tmax_sum)) %>%
+       dplyr::filter(!is.na(elevation)) %>%
+       dplyr::filter(!is.na(aet)) %>%
+       dplyr::filter(!is.na(bioclim_04))
+     
+     summary(rf_rast_df_nona)
+     dim(rf_rast_df_nona)
+   
+     
+     
+   # TO COMPLETELY RANDOMIZE ENVIRONMENTAL VARIABLES
+   
+     gen_dat_ben_randomized <- gen_dat_bene[sample(1:nrow(gen_dat_bene)),]
+   
+   # for(var in climate_vars_rf){
+   #   gen_dat_ben_randomized[, var] <- rnorm(length(pull(gen_dat_ben_randomized, var)),
+   #                                          mean = mean(pull(gen_dat_ben_randomized, var)),
+   #                                          sd = sd(pull(gen_dat_ben_randomized, var)))
+   # }
+   # 
+     
+  # Choose climate variables   
+     climate_vars_rf <-  c("tmax_sum", 
+                           "tmin_winter", 
+                           # "cwd",
+                           "aet",
+                           "bioclim_04",
+                           "bioclim_15",
+                           "bioclim_18",
+                           "bioclim_19",
+                           "elevation",
+                           "latitude",
+                           "longitude",
+                           "random")
+     
+     pairs.panels(gen_dat_bene[, climate_vars_rf])
+     
+     
+# Begin loop over SNPS  
+     stack_top <- stack() # For Top SNPs
+     stack_random <- stack() # For Random SNPs
+
+     start_flag = FALSE
+     
+     reps = 2
+     
+  for(mode in c("top_snps", "random")){  
+    
+    for(rep in 1:reps){  
+    
+    # Choose SNPS to loop over  
+      if(mode == "top_snps") {
+        snps <- top_snps$snp[top_snps$snp %in% colnames(gf_factor)]
+      }
+      
+      # If random, choose same number of top snps, but snps that aren't top snps
+      if(mode == "random") {
+        snps <- sample(x = colnames(gf_factor)[!colnames(gf_factor) %in% top_snps$snp],
+                                          size = length(top_snps$snp[top_snps$snp %in% colnames(gf_factor)]))
+      }
+
+      # Loop over SNPs
+       for(snp in 1:length(snps)){
+         
+         snp_name <- snps[snp]
+         
+         cat("Working on mode:", mode, "rep: ", rep, " snp:", snp, "  ", snp_name, "...\n")
+         
+         # DO NOT RANDOMIZE CLIMATE VARIABLES
+          X = gen_dat_bene[, climate_vars_rf]
+         
+         ## RANDOMIZE CLIMATE VARIABLES?
+         #  X = as.data.frame(gen_dat_ben_randomized[, climate_vars_rf])
+         
+         y = pull(gf_factor, snp_name)
+         n1 <- sum(y == 1, na.rm = TRUE)
+         n0 <- sum(y == 0, na.rm = TRUE)
+         
+         not_NAs <- !is.na(y) # True if not NA
+         
+         # Convert to factor
+         y <- factor(y)
+         
+         # Run random forest model
+         rf <- randomForest(y = y[not_NAs], # Don't include NAs
+                              x = X[not_NAs, ], 
+                              importance = TRUE,
+                              nodesize = 10,
+                            sampsize = c(min(n0, n1), min(n0, n1)),
+                           # sampsize = c(50, min(n0, n1)),
+                              #  replace = FALSE,
+                           #   classwt = c(.5, .5),
+                       #   strata = y[not_NAs],
+                              ntree = 1000)
+         
+         
+         rf
+         
+         # print(importance(rf))
+         #  cat("OOB error rate: ", mean(rf$err.rate[, 1]), "\n")
+         cat("Class1 error rate: ", rf$confusion[2,3], "\n")
+         
+         
+         # ROC plot
+         # The closer the curve follows the left-hand border and then the top border of the ROC space, the more accurate the test. The closer the curve comes to the 45-degree diagonal of the ROC space, the less accurate the test.
+         roc0 <- roc(rf$votes[,1],factor(1 * (rf$y==0)))
+         roc1 <- roc(rf$votes[,2],factor(1 * (rf$y==1)))
+         
+         plot(roc0,
+              main= snp_name, col = "blue", lwd = 2)
+         plot(roc1, add = TRUE, col = "green", lwd = 2)
+         legend("topright", legend = c(0, 1), col = c("blue", "green"), lty = 1, lwd = 2)
+         
+         
+         
+         #  plot(rf)
+         
+         #  varImpPlot(rf)
+         
+         # Save importance and OOB error rates
+         if(start_flag == FALSE){
+           
+          # Importance 
+           importance_0 <- data.frame(mode = mode, rep = rep, snp = snp_name, type = "gen0", t(importance(rf)[, 1]))
+           importance_1 <- data.frame(mode = mode, rep = rep, snp = snp_name, type = "gen1", t(importance(rf)[, 2]))
+           importance_acc <- data.frame(mode = mode, rep = rep, snp = snp_name, type = "acc", t(importance(rf)[, 3]))
+           importance_gini <- data.frame(mode = mode, rep = rep, snp = snp_name, type = "gini", t(importance(rf)[, 4]))
+           
+           importance_df <- rbind(importance_0, importance_1, importance_acc, importance_gini)
+           
+          # Error rates
+           error_df <- data.frame(mode = mode, rep = rep, snp = snp_name, tail(rf$err.rate, 1)) # Last tree error rates
+           
+         } else { 
+          importance_df <- rbind(importance_df, data.frame(mode = mode, rep = rep, snp = snp_name, type = "gen0", t(importance(rf)[, 1])))
+          importance_df <- rbind(importance_df, data.frame(mode = mode, rep = rep, snp = snp_name, type = "gen1", t(importance(rf)[, 2])))
+          importance_df <- rbind(importance_df, data.frame(mode = mode, rep = rep, snp = snp_name, type = "acc", t(importance(rf)[, 3])))
+          importance_df <- rbind(importance_df, data.frame(mode = mode, rep = rep, snp = snp_name, type = "gini", t(importance(rf)[, 4])))
+          
+          error_df <- rbind(error_df, data.frame(mode = mode, rep = rep, snp = snp_name, tail(rf$err.rate, 1)))
+         }
   
+         # Plot partial plot
+         
+         # pp_out <- partialPlot(rf, pred.data= X, 
+         #                       x.var = "tmax_sum", plot = TRUE)
+         # pp_tmax_temp <- data.frame(snp = snp_name,
+         #                       tmax_prob = pp_out$y,
+         #                       tmax_sum = pp_out$x)
+         # 
+         # 
+         # if(x == 1){
+         #   pp_tmax = pp_tmax_temp
+         # } else {
+         #   pp_tmax <- bind_rows(pp_tmax, pp_tmax_temp)
+         # }
+         # 
+         
+         #   
+         # }
+         
+         
+         ## Predict across a raster and add to stack
+  
+             # Second column is positives
+             rf_rast_df_nona$pred = predict(rf, rf_rast_df_nona, type = "prob")[, 2]
+
+             rf_rast_df_temp <- left_join(rf_rast_df, rf_rast_df_nona[, c("cell_id", "pred")])
+
+             rast <- tmax_rast
+             values(rast) <- rf_rast_df_temp$pred
+
+             #  levelplot(rast, margin = FALSE)
+          if(mode == "top_snps") stack_top <- stack(stack_top, rast)
+          if(mode == "random")   stack_random <- stack(stack_random, rast)
+        
+             start_flag <- TRUE # Flip flag to true
+  
+       } # End loop over SNPs
+    
+     } # End rep
+    
+  } # End mode loop
+     
+   
+   
+   ## Errors
+     table(error_df$rep, error_df$mode)
+     
+     
+     error_df_gg <- error_df %>%
+       rename(gen0_error = X0, gen1_error = X1) %>%
+       gather(key = "error_type", value = "error", -mode, -snp, -rep) %>%
+       group_by(mode, snp, error_type) %>% # Average across reps by snp
+       summarise_all(mean)
+     
+     ggplot(error_df_gg, aes(error_type, error, fill = mode)) + 
+       geom_boxplot() + theme_bw(15) + geom_hline(yintercept = 0.5, lty = 2) 
+   
+   
+   ## Importance
+     
+    # Order bars by top snps 
+   importance_means_only_top <-   importance_df %>%
+       gather(key = "climate_var", value = "importance", -snp, -type, -mode, -rep) %>%
+      group_by(mode, snp, type, climate_var) %>%  ## Average across reps by snp
+      summarise_all(mean) %>%
+       select(-snp, -rep) %>%
+      group_by(mode, type, climate_var) %>%
+     summarise_all(mean) %>%
+     arrange(mode, type, importance) %>%
+     filter(mode == "top_snps") %>%
+     ungroup() %>%
+     select(-importance, -mode, -snp) %>%
+     mutate(order = row_number()) 
+   
+   # Combine into big DF with random snps too
+   importance_means <- 
+     importance_df %>%
+     gather(key = "climate_var", value = "importance", -snp, -type, -mode, -rep) %>%
+     group_by(mode, snp, type, climate_var) %>%  ## Average across reps by snp
+     summarise_all(mean) %>%
+     select(-snp, -rep) %>%
+     group_by(mode, type, climate_var) %>%
+     summarise_all(mean)  %>%
+     left_join(., importance_means_only_top, by = c("type", "climate_var"))
+   
+   importance_means
+  table(importance_means$order) # Should be multiple in each order
+     
+  # Make ggplot
+     ggplot(importance_means, aes(order, importance, fill = mode)) + 
+       geom_bar(stat = "identity", col = "black", position = position_dodge2(reverse = TRUE)) + 
+       theme_bw(15) + facet_wrap(~ type, scales = "free", ncol = 2) + 
+    #   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+       ylab("Variable importance") + xlab("") +
+       scale_x_continuous(
+         breaks = importance_means$order,
+         labels = importance_means$climate_var, expand = c(0,0)) + 
+       coord_flip()
+     
+   
+ # Looking at rasters
+    stack
+     
+    ## Take mean of rasters, weighted by class1 error - higher weights to lower error
+    bene_stack <- weighted.mean(stack, w = 1 - class1_error)
+     
+     levelplot(bene_stack, margin = FALSE,
+               main = "Probability of finding beneficial allele") +
+       latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) +
+       latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black")) +
+       latticeExtra::layer(sp.polygons(lobata_range, col = "black"))
+     
+     
+   
+     
+     
+     
+     
+   
+   # Plot partial dependence plots of TMax
+   ggplot(pp_tmax, aes(x = tmax_sum, y = tmax_prob,
+                       group = snp, alpha = .25)) + geom_line() + theme_bw()
+   
+   
+   
+   
+ ## Calculate correlation between prob of finding beneficial allele and future climate change
+   
+   # Read in future tmax scenarios
+   tmax_CCSM4 <- raster("./data/gis/climate_data/BCM/future/CCSM4_rcp85/tmx2070_2099jja_ave_CCSM4_rcp85_1529358915/tmx2070_2099jja_ave_CCSM4_rcp85_1529358915.tif")
+   tmax_CCSM4 <- projectRaster(tmax_CCSM4, crs = CRS("+proj=longlat +datum=WGS84"))
+   tmax_CCSM4 <- resample(tmax_CCSM4, tmax_rast)
+   compareRaster(tmax_CCSM4, tmax_rast)
+   levelplot(tmax_CCSM4, margin = FALSE)
+   
+   
+   tmax_CNRM <- raster("./data/gis/climate_data/BCM/future/CNRM_rcp85/tmx2070_2099jja_ave_CNRM_rcp85_1529358976/tmx2070_2099jja_ave_CNRM_rcp85_1529358976.tif")
+   tmax_CNRM <- projectRaster(tmax_CNRM, crs = CRS("+proj=longlat +datum=WGS84"))
+   tmax_CNRM <- resample(tmax_CNRM, tmax_rast)
+   compareRaster(tmax_CNRM, tmax_rast)
+   levelplot(tmax_CNRM, margin = FALSE)
+   
+   tmax_IPSL <- raster("./data/gis/climate_data/BCM/future/IPSL_rcp85/tmx2070_2099jja_ave_IPSL_rcp85_1529358959/tmx2070_2099jja_ave_IPSL_rcp85_1529358959.tif")
+   tmax_IPSL <- projectRaster(tmax_IPSL, crs = CRS("+proj=longlat +datum=WGS84"))
+   tmax_IPSL <- resample(tmax_IPSL, tmax_rast)
+   compareRaster(tmax_IPSL, tmax_rast)
+   levelplot(tmax_IPSL, margin = FALSE)
+   
+   tmax_MIROC <- raster("./data/gis/climate_data/BCM/future/MIROC_rcp85/tmx2070_2099jja_ave_MIROC_rcp85_1529357403/tmx2070_2099jja_ave_MIROC_rcp85_1529357403.tif")
+   tmax_MIROC <- projectRaster(tmax_MIROC, crs = CRS("+proj=longlat +datum=WGS84"))
+   tmax_MIROC <- resample(tmax_MIROC, tmax_rast)
+   compareRaster(tmax_MIROC, tmax_rast)
+   levelplot(tmax_MIROC, margin = FALSE)
+   
+   # Stack rasters
+    future_stack <- stack(tmax_CCSM4, tmax_CNRM, tmax_IPSL, tmax_MIROC)
+  
+    levelplot(future_stack, margin = FALSE)
+   
+   # Calculate future differences in temperature
+    future_stack_dif <- future_stack - tmax_rast 
+
+    future_stack_dif <- mean(future_stack_dif)
+    levelplot(future_stack_dif, margin = FALSE)
+    
+    
+    # Correlations in future temp differences and probability of finding allele
+      data.frame(tmax_sum_dif = values(future_stack_dif),
+                 prob_bene = values(bene_stack)) %>%
+        ggplot(., aes(tmax_sum_dif, prob_bene)) + geom_point(size = 0.15, alpha = 0.25) +
+        geom_smooth(method = "lm") + theme_bw(15) +
+        geom_smooth(col = "forestgreen") 
+      
+    cor(values(future_stack_dif), values(bene_stack),
+        use = "na.or.complete")
+    
+    
+    # Just lobata range
+      future_stack_dif_range <- mask(future_stack_dif, lobata_range_rough)
+      
+      plot(future_stack_dif_range, bene_stack_range,
+           las = 1, ylab = "Probability of finding beneficial allele",
+           xlab = "Tmax_sum_dif")
+      
+      cor(values(future_stack_dif_range), values(bene_stack_range),
+          use = "na.or.complete")
+      
+    data.frame(tmax_sum_dif = values(future_stack_dif_range),
+                         prob_bene = values(bene_stack_range)) %>%
+      ggplot(., aes(tmax_sum_dif, prob_bene)) + geom_point(size = 0.15, alpha = 0.25) +
+        geom_smooth(method = "lm") + geom_smooth(col = "forestgreen") + theme_bw(15)
+  
+      
+      
+      rasterCo  
+   
+      library(spatialEco)
+      
+     test <-  rasterCorrelation(future_stack_dif, bene_stack, s = 7)
+     test
+     levelplot(test, margin = FALSE)
+   
+   
 
 
   
@@ -778,7 +1243,7 @@
   
 
   ## Factors
-  gf_factor <- gen_dat_ben[ ,top_snps$snp]
+  gf_factor <- gen_dat_bene[ ,top_snps$snp]
   gf_factor <- gf_factor %>%
                  replace(is.na(.), 0) %>%
                 mutate_all(as.factor) 
@@ -1048,280 +1513,6 @@
 
     
 
-# Testing random forest on just beneficial alleles ------------------------
-
-    
-    
-  library(randomForest)    
-    
-    climate_vars_rf <-  c("tmax_sum", 
-                          # "tmin_winter", 
-                          # "cwd",
-                          # "aet",
-                          # "bioclim_15",
-                          # "bioclim_18",
-                          # "bioclim_19",
-                          # "bioclim_04",
-                          "elevation",
-                          "latitude",
-                          "longitude",
-                          "random")
-    
-    pairs.panels(gen_dat_ben[, climate_vars_rf])
-    
-    
-    
-    
-    
-    
-    ## Convert to factor 
-    gf_factor <- gen_dat_ben[ ,top_snps$snp]
-
-    ## Count number of positives - where allele is found
-    pos_thresh <- 25
-    
-    # For presences
-    ind1 <- which(apply(gf_factor, 2, function(x) sum(x == 1, na.rm = TRUE))
-                  < pos_thresh)
-    if(length(ind1) > 0) gf_factor <- gf_factor[, -ind1] # Need to check if indexes were found
-    
-    # For absences
-     ind2 <- which(apply(gf_factor, 2, function(x) sum(x == 0, na.rm = TRUE)) < pos_thresh)
-     if(length(ind2 ) > 0) gf_factor <- gf_factor[, -ind2]
-    
-    # Replace missing data and convert to factor
-    gf_factor <- gf_factor %>%
-    #  replace(is.na(.), 0) %>% # SHould replace with most common case?
-      mutate_all(as.factor) 
-    
-    dim(gf_factor)
-    summary(gf_factor)  
-    
-    # TO RANDOMIZE GENOTYPES
-    # for(col in 1:ncol(gf_factor)){
-    #   gf_factor[, col] <- as.factor(sample(0:1, nrow(gf_factor), replace = TRUE))
-    # }
-    # summary(gf_factor)
-    
-
-    
-  
-    ## Set up rasters
-    library(raster)
-    
-    lobata_range <- readShapePoly("./data/gis/valley_oak_range/qlobata_refined.shp",
-                                  proj4string = CRS("+proj=longlat +datum=WGS84"))
-    
-    lobata_range_rough <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
-                                        proj4string = CRS("+proj=longlat +datum=WGS84"))
-    
-    tmax_rast <- raster("./data/gis/climate_data/BCM/historical/1951-1980/tmx1951_1980jja_ave_HST_1513103038/tmx1951_1980jja_ave_HST_1513103038.tif")
-    
-    dem <- raster("./data/gis/dem/ClimateNA_DEM_cropped.tif")
-    
-    process_raster <- function(rast){
-       rast <- aggregate(rast, fact = 10) # Make smaller
-      rast_latlon <- projectRaster(rast, crs = CRS("+proj=longlat +datum=WGS84"))
-      plot(rast_latlon)
-      return(rast_latlon)
-    }
-    
-    # Aggregate and project tmax_raster
-    tmax_rast <- process_raster(tmax_rast)
-  
-    dem <- resample(dem, tmax_rast) # Match up resolution and extent
-    
-    compareRaster(tmax_rast, dem) # Make sure rasters are equal
-
-    # Find lat long points
-    latlon <- xyFromCell(tmax_rast, 1:ncell(tmax_rast))
-    
-    rf_rast_df <- data.frame(cell_id = 1:ncell(tmax_rast),
-                             longitude = latlon[, 1],
-                             latitude = latlon[, 2],
-                             tmax_sum = raster::extract(tmax_rast, 1:ncell(tmax_rast)),
-                             elevation = raster::extract(dem, 1:ncell(dem)),
-                             random = rnorm(1:ncell(dem)))
-    rf_rast_df
-    
-    dim(rf_rast_df)
-    
-    rf_rast_df_nona <-  rf_rast_df %>%
-      filter(!is.na(tmax_sum)) %>%
-      filter(!is.na(elevation))
-    
-    dim(rf_rast_df_nona)
-    
-  # TO COMPLETELY RANDOMIZE ENVIRONMENTAL VARIABLES
-     gen_dat_ben_randomized <- gen_dat_ben[sample(1:nrow(gen_dat_ben)),]
-    
-    # for(var in climate_vars_rf){
-    #   gen_dat_ben_randomized[, var] <- rnorm(length(pull(gen_dat_ben_randomized, var)),
-    #                                          mean = mean(pull(gen_dat_ben_randomized, var)),
-    #                                          sd = sd(pull(gen_dat_ben_randomized, var)))
-    # }
-    # 
-    
-  # Begin loop over SNPS  
-    stack <- stack()
-    oob_error <- NULL
-    class0_error <- NULL
-    class1_error <- NULL
-    
-    x = 1
-    
-    for(snp in colnames(gf_factor)){
-      
-      cat("Working on snp #:", x, "\t", snp, "...\n")
-      
-      # DO NOT RANDOMIZE CLIMATE VARIABLES
-      X = gen_dat_ben[, climate_vars_rf]
-      
-      ## RANDOMIZE CLIMATE VARIABLES?
-    #  X = as.data.frame(gen_dat_ben_randomized[, climate_vars_rf])
-      
-     y = pull(gf_factor, snp)
-     n1 <- sum(y == 1, na.rm = TRUE)
-     n0 <- sum(y == 0, na.rm = TRUE)
-     
-     not_NAs <- !is.na(y) # Find NAs
-     
-   #  X$y <- y
-      
-      # Run random forest model
-      rf <- randomForest(y = y[not_NAs], # Don't include NAs
-                         x = X[not_NAs, ], 
-                         importance = TRUE,
-                         sampsize = c(min(n0, n1), min(n0, n1)),
-                       #  replace = FALSE,
-                       #  classwt = c(1, 100000),
-                         ntree = 1000)
-                    
-      
-      rf
-      
-     # print(importance(rf))
-    #  cat("OOB error rate: ", mean(rf$err.rate[, 1]), "\n")
-      cat("Class1 error rate: ", rf$confusion[2,3], "\n")
-      
-      
-      # ROC plot
-      # The closer the curve follows the left-hand border and then the top border of the ROC space, the more accurate the test. The closer the curve comes to the 45-degree diagonal of the ROC space, the less accurate the test.
-      roc0 <- roc(rf$votes[,1],factor(1 * (rf$y==0)))
-      roc1 <- roc(rf$votes[,2],factor(1 * (rf$y==1)))
-      
-      plot(roc0,
-           main="ROC curves", col = "blue", lwd = 2)
-      plot(roc1, add = TRUE, col = "green", lwd = 2)
-      legend("topright", legend = c(0, 1), col = c("blue", "green"), lty = 1, lwd = 2)
-      
-      
-
-    #  plot(rf)
-      
-    #  varImpPlot(rf)
-      
-      # Save importance and OOB error rates
-      if(x == 1){
-        importance <- data.frame(t(importance(rf)[, 3]))
-      }
-      
-      oob_error[x] <- mean(rf$err.rate[, 1])
-      class0_error[x] <- rf$confusion[1, 3]
-      class1_error[x] <- rf$confusion[2,3] # Error rate for predicting presence
-      importance <- rbind(importance, importance(rf)[, 3])
-      
-      
-      
-      # Plot partial plot
-      
-      # pp_out <- partialPlot(rf, pred.data= X, 
-      #                       x.var = "tmax_sum", plot = TRUE)
-      # pp_tmax_temp <- data.frame(snp = snp,
-      #                       tmax_prob = pp_out$y,
-      #                       tmax_sum = pp_out$x)
-      # 
-      # 
-      # if(x == 1){
-      #   pp_tmax = pp_tmax_temp
-      # } else {
-      #   pp_tmax <- bind_rows(pp_tmax, pp_tmax_temp)
-      # }
-      # 
-      
-      #   
-      # }
-      
-      ## Predict across a raster
-      
-      # Second column is positives
-      rf_rast_df_nona$pred = predict(rf, rf_rast_df_nona, type = "prob")[, 2]
-
-      rf_rast_df_temp <- left_join(rf_rast_df, rf_rast_df_nona[, c("cell_id", "pred")])
-
-       rast <- tmax_rast
-      values(rast) <- rf_rast_df_temp$pred
-
-    #  levelplot(rast, margin = FALSE)
-
-      stack <- stack(stack, rast)
-      
-      
-      x = x + 1
-      
-    } # End loop over SNPs
-
-    
-    
-    ## Errors
-      oob_error
-      mean(oob_error)
-      
-      class0_error
-      mean(class0_error)
-      
-      class1_error
-      mean(class1_error)
-      
-      pairs.panels(cbind(oob_error, class0_error, class1_error))
-      
-    
-    ## Importance
-      importance
-      sort(colMeans(importance), decreasing = TRUE) # Higher is better
-       
-      
-      sort(colMeans(importance[which(class1_error < .50), ]), decreasing = TRUE) 
-      sort(colMeans(importance[-which(class1_error < .50), ]), decreasing = TRUE) 
-     
-      
-       
-    # Looking at rasters
-      stack
-      
-      mean_stack <-  mean(stack)
-      
-      levelplot(mean_stack, margin = FALSE)
-      
-      mean_stack_range <- mask(mean_stack, lobata_range_rough)
-      
-      levelplot(mean_stack_range, margin = FALSE, contour = FALSE)
-      ## Make plot 3d based on elevation
-      
-    
-    # Plot partial dependence plots of TMax
-    ggplot(pp_tmax, aes(x = tmax_sum, y = tmax_prob,
-                        group = snp, alpha = .25)) + geom_line() + theme_bw()
-  
-
-  
-  
- 
- 
- 
-
- ## Can maybe overlay a bunch of partial plots of each SNP to show general trends in which direction the gradients are going
-    
 
 # RDA on top snps ---------------------------------------------------------
     
