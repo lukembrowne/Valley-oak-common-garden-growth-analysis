@@ -4,6 +4,7 @@
   ## Load required packages
   library(tidyverse)
   library(raster)
+  library(rasterVis)
   library(sp)
   library(maptools)
   
@@ -21,15 +22,6 @@
   ## California Basin Characterization Model  
   ## https://ecologicalprocesses.springeropen.com/articles/10.1186/2192-1709-2-25
   
-  
-  ## GBS Moms from Paul
-  # dat_mom <- read_tsv("./data/GBS_data/Qlobata_GBS_Rangewide.txt")
-  # dat_mom
-  
-  ## Samples from Sorel
-    # dat_mom <- read_tsv("~/Desktop/2015rrbs.locations")
-    # dat_mom
-  
 
 ## Get locations of maternal trees in common garden
   dat_mom <- gs_read(gs_key("1DUEV-pqV28D6qJl6vJM6S1VLWbxc9E71afufulDRbIc"), ws = 2)
@@ -38,7 +30,20 @@
   dat_mom <- dat_mom[!is.na(dat_mom$Accession),]
   dim(dat_mom) ## Should be 659
   
-
+ 
+ ## For calculating bioclim variables across full rasters
+  # Read in raster, convert to lat long, and the make DF with lat long coordinates - HUGE DF
+  tmax_rast <- raster("./data/gis/climate_data/BCM/historical/1951-1980/tmx1951_1980jja_ave_HST_1513103038/tmx1951_1980jja_ave_HST_1513103038.tif")
+  tmax_rast <- raster::projectRaster(tmax_rast, crs="+proj=longlat +datum=WGS84") # Project
+  dat_mom <- xyFromCell(tmax_rast, 1:ncell(tmax_rast)) # Extract lat long coordinates
+  colnames(dat_mom) <- c("Longitude", "Latitude") # Rename cell names
+  dat_mom <- as.data.frame(dat_mom) # Convert to dataframe
+  dat_mom$cell_id <- 1:nrow(dat_mom) # Make column for cell ids
+  dat_mom <- dat_mom[!is.na(values(tmax_rast)), ] # Filter down to not NAs
+  
+  head(dat_mom)
+  dim(dat_mom)
+  
   ## Directory path to where 1951-1980 historical BCM climate data is located
   dir_name <- "./data/gis/climate_data/BCM/historical/1951-1980/"
   
@@ -74,8 +79,13 @@
  
   head(dat_mom)
   
+  
+  
+  
+  
+  
   ## Save as backup just in case
-  dat_mom2 <- dat_mom
+    dat_mom2 <- dat_mom
   
   ## Rename columns
   
@@ -111,10 +121,9 @@
   
   ## Reorder columns so monthly variables are sequential
   dat_mom <- dat_mom[, c(
-                        "Locality full name", "Locality", "Sample #","Accession", 
-                       #  "Latitude", "Longitude", "Elevation (m)", 
+                      #  "Locality full name", "Locality", "Sample #","Accession", 
+                         "cell_id", "Latitude", "Longitude", # If working with rasters
                       #  "ID", "Latitude", "Longitude", "Elevation", 
-                       #"Sample", "Longitude", "Latitude", "Elevation", # For sorel's samples
                          "aet",
                          "cwd", "ppt", "tmin_winter", "tmax_sum", "tmax", "tmin",
                          "ppt_jan","ppt_feb","ppt_mar","ppt_apr","ppt_may","ppt_jun",
@@ -140,26 +149,62 @@
   ## For common garden moms
   ## Reorder columns
   dat_mom_final <- dat_mom %>%
-    dplyr::select(`Locality`,Accession, Latitude, Longitude, `Elevation (m)`, 
+    dplyr::select(# `Locality`,Accession, Latitude, Longitude, `Elevation (m)`, 
+                  "cell_id", "Latitude", "Longitude", # If working with rasters
                   #`ID`, Latitude, Longitude, Elevation, # For pauls samples
-                 # Sample, Longitude, Latitude, Elevation, # For sorel's samples
                   tmax, tmax_sum, tmin, tmin_winter,
                   ppt, cwd, aet, bioclim_01:bioclim_19, tmax_jan:tmax_dec, 
                   tmin_jan:tmin_dec, ppt_jan:ppt_dec)
-  
-  dat_mom_final2 <- dat_mom_final
-  
-  dat_mom_final2 %>%
-    mutate_if(is.numeric, scale)
-  
   
   ## Write to file
   
   # write_csv(dat_mom_final, path = "./data/cleaned_data/GBS tree climate data BCM 1951-1980 2018_03_08.csv")
   
   
+## Save back as raster
+
+  # Bioclim_04 - temperature seasonality
+    rast_bioclim_04 <- tmax_rast
+    values(rast_bioclim_04) <- NA
   
+    values(rast_bioclim_04)[dat_mom_final$cell_id] <- dat_mom_final$bioclim_04
+    levelplot(rast_bioclim_04, margin = FALSE)
+    
+    writeRaster(rast_bioclim_04, "./data/gis/climate_data/BCM/historical/1951-1980/bioclim_04", 
+                format = "GTiff")
+    
+  # Bioclim_15 - Precipitation seasonality
+    rast_bioclim_15 <- tmax_rast
+    values(rast_bioclim_15) <- NA
+    
+    values(rast_bioclim_15)[dat_mom_final$cell_id] <- dat_mom_final$bioclim_15
+    levelplot(rast_bioclim_15, margin = FALSE)
+    
+    writeRaster(rast_bioclim_15, "./data/gis/climate_data/BCM/historical/1951-1980/bioclim_15", 
+                format = "GTiff")
+    
+  # Bioclim_18 - Precipitation of warmest quarter
+    rast_bioclim_18 <- tmax_rast
+    values(rast_bioclim_18) <- NA
+    
+    values(rast_bioclim_18)[dat_mom_final$cell_id] <- dat_mom_final$bioclim_18
+    levelplot(rast_bioclim_18, margin = FALSE)
+    
+    writeRaster(rast_bioclim_18, "./data/gis/climate_data/BCM/historical/1951-1980/bioclim_18", 
+                format = "GTiff")
+    
+  # Bioclim_19 - Precipitation of coolest quarter
+    rast_bioclim_19 <- tmax_rast
+    values(rast_bioclim_19) <- NA
+    
+    values(rast_bioclim_19)[dat_mom_final$cell_id] <- dat_mom_final$bioclim_19
+    levelplot(rast_bioclim_19, margin = FALSE)
+    
+    writeRaster(rast_bioclim_19, "./data/gis/climate_data/BCM/historical/1951-1980/bioclim_19", 
+                format = "GTiff")  
   
+
+    
 
 # Read in current BCM climate data for common garden sites ----------------------------------------
 
@@ -394,7 +439,6 @@
   
   
 # Calculate Bioclimatic variables for each garden site ------------------
-    
     
     bioclim_vars_garden <-  climates::bioclim2(tmin = as.data.frame(tmin_by_month[, -1]),
                                                ## Remove site column
