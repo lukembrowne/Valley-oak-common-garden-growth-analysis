@@ -451,6 +451,12 @@
                                      "DD5", 
                                      "DD5_lgm")], ellipses = F, cex = 2)
  
+ pairs.panels(climate_garden_mom[, c("tmax_sum",
+                                     "tmax",
+                                     "DD5",
+                                     "tave",
+                                     "bioclim_04")])
+ 
  #pairs.panels(dat_all_scaled[, climate_vars_dif])
  
 
