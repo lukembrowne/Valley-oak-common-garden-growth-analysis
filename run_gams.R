@@ -8,13 +8,13 @@
   climate_var_dif <- as.character(args[3])
 
 # Load libraries
-	library(mgcv)
+   library(mgcv)
 	library(tidyverse)
   library(visreg) # Installed on home directory
   library(patchwork) # Installed on home directory
 
 # Load data
- load("../gam_cluster_2018-06-22.Rdata")
+ load("../gam_cluster_2018-07-02.Rdata")
 
 
 # Save functions
@@ -75,8 +75,11 @@
    	cat("Working on: ", snp, "... number: ", x, " ...\n" )
 
   # For SNPS as continuous  
-    fixed_effects_int <- paste0(paste0("height_2017 ~ section_block + s(height_2014, bs=\"cr\") + te(", snp, ", bs=\"cr\", k = ", k, ") +  te(", climate_var_dif,", bs=\"cr\") + ti(", climate_var_dif,", ",snp,", bs=\"cr\", k =", k," )"))
+    fixed_effects_int <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + te(", snp, ", bs=\"cr\", k = ", k, ") +  te(", climate_var_dif,", bs=\"cr\") + ti(", climate_var_dif,", ",snp,", bs=\"cr\", k =", k," )"))
     
+    # With shrinkage
+	#fixed_effects_int <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"ts\") + te(", snp, ", k = ", k, ", bs=\"ts\") +  te(", climate_var_dif,", bs=\"ts\") + ti(", climate_var_dif,", ",snp, ", bs=\"ts\", k = ", k, ")"))
+
     ## Add gen pcs
    # fixed_effects_int <- paste0(fixed_effects_int, "+ s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")")
     
@@ -87,12 +90,14 @@
   # Gam with interaction effect
     gam_snp_int = bam(formula = make_formula(fixed_effects_int, random_effects),
                   data = dat_snp, 
-                  discrete = TRUE,
+                 # discrete = TRUE,
                   nthreads = 8,
-                  method = "fREML", family = "gaussian")
+                #  method = "fREML", 
+                  method = "ML",
+                  family = "gaussian")
 
    # Check for convergence
-    if(!gam_snp_int$mgcv.conv){
+   # if(!gam_snp_int$mgcv.conv){
     #  cat("Model not converged... trying again \n")
     #  gam_snp_int = bam(formula = make_formula(fixed_effects_int, random_effects),
     #                    data = dat_snp, 
@@ -105,22 +110,15 @@
     #  if(!gam_snp_int$mgcv.conv){
     #    cat("Model STILL not converged...\n")
     #  }
-    }
+   # }
     
-   
 
-   # gam_snp_no_int =  bam(formula = make_formula(fixed_effects_no_int,
-   #                                              random_effects),
-   #                       data = dat_snp, 
-   #                       discrete = TRUE,
-   #                       nthreads = 8,
-   #                       method = "fREML", family = "tw")
-    
-    # Compare AICs
-   # gam_snp_int$delta_aic <- gam_snp_int$aic - gam_snp_no_int$aic
-     gam_snp_int$delta_aic <- NA
-
-
+ ## Save sample size per genotype
+      gen_table <-  table(dat_snp_unscaled[, snp])
+      
+      gam_snp_int$n_gen0 <- gen_table["0"]
+      gam_snp_int$n_gen1 <- gen_table["1"]
+      gam_snp_int$n_gen2 <- gen_table["2"]
 
     # Make predictions
 
@@ -143,23 +141,23 @@
 
 
   ## Visreg plots
-    pdf(paste0("./model_plots/", snp,".pdf"), width = 8, height = 5)
-
-   # With partial residuals
-    visreg(gam_snp_int, xvar = climate_var_dif, by = snp,
-           overlay = TRUE, partial = TRUE, 
-           breaks = c(unique(pred_sub$genotype_scaled)),
-           xtrans = function(x) {(x *  scaled_var_sds_gbs_only[climate_var_dif]) + scaled_var_means_gbs_only[climate_var_dif]},
-           ylab = "5 year height (cm)")
-    
-    # Without partial residuals
-    visreg(gam_snp_int, xvar = climate_var_dif, by = snp,
-           overlay = TRUE, partial = FALSE, rug = FALSE,
-           breaks = c(unique(pred_sub$genotype_scaled)),
-           xtrans = function(x) {(x *  scaled_var_sds_gbs_only[climate_var_dif]) + scaled_var_means_gbs_only[climate_var_dif]},
-           ylab = "5 year height (cm)")
-    
-    dev.off()      
+  #  pdf(paste0("./model_plots/", snp,".pdf"), width = 8, height = 5)
+#
+  # # With partial residuals
+  #  visreg(gam_snp_int, xvar = climate_var_dif, by = snp,
+  #         overlay = TRUE, partial = TRUE, 
+  #         breaks = c(unique(pred_sub$genotype_scaled)),
+  #         xtrans = function(x) {(x *  scaled_var_sds_gbs_only[climate_var_dif]) + scaled_var_means_gbs_only[climate_var_dif]},
+  #         ylab = "5 year height (cm)")
+  #  
+  #  # Without partial residuals
+  #  visreg(gam_snp_int, xvar = climate_var_dif, by = snp,
+  #         overlay = TRUE, partial = FALSE, rug = FALSE,
+  #         breaks = c(unique(pred_sub$genotype_scaled)),
+  #         xtrans = function(x) {(x *  scaled_var_sds_gbs_only[climate_var_dif]) + scaled_var_means_gbs_only[climate_var_dif]},
+  #         ylab = "5 year height (cm)")
+  #  
+  #  dev.off()      
 
 
     
@@ -175,7 +173,7 @@
     
    # Backtransform climate variable
      dat_snp_trans <- dat_snp %>%
-                  dplyr::select(climate_var_dif, snp, height_2017) %>%
+                  dplyr::select(climate_var_dif, snp, rgr) %>%
                      # Back transform X axis
                      mutate(!!climate_var_dif := back_transform(x = get(climate_var_dif),
                                                      var = climate_var_dif,
@@ -190,32 +188,32 @@
                     dplyr::filter(get(snp) %in% c(0, 1, 2))
 
   
-  # Climate transfer functions by genotype     
-    p1 <-  ggplot(pred_sub) + 
-      geom_ribbon(aes(tmax_sum_dif_unscaled, ymin = pred - 2 * se, ymax = pred + 2*se, fill = factor(genotype)), 
-                  alpha = 0.25, show.legend = FALSE)  +
-      geom_line(data = pred_sub, aes(x = tmax_sum_dif_unscaled, y = pred, col = factor(genotype)), lwd = 1.5) + 
-      geom_vline(aes(xintercept = 0), lty = 2) +
-      labs(col = "Genotype") +
-      ylab("5 yr height (cm)") +
-      xlab(climate_var_dif) +
-      ggtitle(snp) +
-      theme_bw(15)
-  
-  # Density plots of genotypes       
-    p2 <- ggplot(dat_snp_trans, 
-                 aes(x = get(climate_var_dif), fill = factor(get(snp)))) + 
-      geom_histogram(binwidth = .5, col = "grey10") + 
-      geom_vline(aes(xintercept = 0), lty = 2) +
-      labs(fill = "Genotype") +
-      xlab(climate_var_dif) +
-      ggtitle(snp) +
-      theme_bw(15)
-    
-  # Plot to PDF  
-    pdf(paste0("./model_plots/", snp,"_gg.pdf"), width = 15, height = 5)  
-     print(p1 + p2)
-    dev.off()
+ # # Climate transfer functions by genotype     
+ #   p1 <-  ggplot(pred_sub) + 
+ #     geom_ribbon(aes(tmax_sum_dif_unscaled, ymin = pred - 2 * se, ymax = pred + 2*se, fill = factor(genotype)), 
+ #                 alpha = 0.25, show.legend = FALSE)  +
+ #     geom_line(data = pred_sub, aes(x = tmax_sum_dif_unscaled, y = pred, col = factor(genotype)), lwd = 1.5) + 
+ #     geom_vline(aes(xintercept = 0), lty = 2) +
+ #     labs(col = "Genotype") +
+ #     ylab("5 yr height (cm)") +
+ #     xlab(climate_var_dif) +
+ #     ggtitle(snp) +
+ #     theme_bw(15)
+ # 
+ # # Density plots of genotypes       
+ #   p2 <- ggplot(dat_snp_trans, 
+ #                aes(x = get(climate_var_dif), fill = factor(get(snp)))) + 
+ #     geom_histogram(binwidth = .5, col = "grey10") + 
+ #     geom_vline(aes(xintercept = 0), lty = 2) +
+ #     labs(fill = "Genotype") +
+ #     xlab(climate_var_dif) +
+ #     ggtitle(snp) +
+ #     theme_bw(15)
+ #   
+ # # Plot to PDF  
+ #   pdf(paste0("./model_plots/", snp,"_gg.pdf"), width = 15, height = 5)  
+ #    print(p1 + p2)
+ #   dev.off()
    
 
 
@@ -249,10 +247,10 @@
     
     
     # Save individual .Rdata file for each model
-    cat("Saving gam model to file... \n")
+   # cat("Saving gam model to file... \n")
 
-    gam_name <- paste0("gam_", climate_var_dif, "_", snp)
-    assign(gam_name, gam_snp_int) # Assign model the name
+   # gam_name <- paste0("gam_", climate_var_dif, "_", snp)
+   # assign(gam_name, gam_snp_int) # Assign model the name
 
     # save(list = gam_name, file = paste0("./gam_mods_data/", gam_name, ".Rdata"))
     
@@ -282,8 +280,13 @@
     # Sample size
     n = unlist(lapply(gam_list_summary, function(x) x$n)),
 
+    # Sample size of genotypes
+    n_gen0 = unlist(lapply(gam_list, function(x) x$n_gen0)),
+    n_gen1 = unlist(lapply(gam_list, function(x) x$n_gen1)),
+    n_gen2 = unlist(lapply(gam_list, function(x) x$n_gen2)),
+
     # Converged?
-    converged = unlist(lapply(gam_list, function(x) x$mgcv.conv)),
+   # converged = unlist(lapply(gam_list, function(x) x$mgcv.conv)),
     
     # Deviance explained
     dev_explained = unlist(lapply(gam_list_summary, function(x) x$dev.expl)),
@@ -292,14 +295,11 @@
     r_sq_adj = unlist(lapply(gam_list_summary, function(x) x$r.sq)),
     
     # Estimated degrees of freedom
-    edf = unlist(lapply(gam_list, function(x) sum(x$edf))),
+  #  edf = unlist(lapply(gam_list, function(x) sum(x$edf))),
     
     # AIC
-    aic = unlist(lapply(gam_list, function(x) x$aic)),
+   # aic = unlist(lapply(gam_list, function(x) x$aic)),
     
-    # Delta AIC with model without interaction
-    delta_aic = unlist(lapply(gam_list, function(x) x$delta_aic)),
-
     # Predictions of height
     height_change_gen_0 = unlist(lapply(gam_list, function(x) x$height_change_gen_0)),
     height_change_gen_1 = unlist(lapply(gam_list, function(x) x$height_change_gen_1)),
@@ -312,33 +312,33 @@
       yes = NA, 
       no = unlist(lapply(gam_list_summary, function(x)
         x$s.table[grep(pattern = "^ti",
-                       rownames(x$s.table)), "p-value"]))), 
+                       rownames(x$s.table)), "p-value"]))) 
     
     # Use grep to look at the last number of the smooth summary table - 
     # Should correspond to the genotype
     # Returns NA if no match
-    p_val_gen_0 = ifelse(unlist(lapply(gam_list_summary, function(x)
-                                length(x$s.table[grep(pattern = "0$",
-                                               rownames(x$s.table)), "p-value"]) == 0)), 
-                         yes = NA, 
-                         no = unlist(lapply(gam_list_summary, function(x)
-                                                    x$s.table[grep(pattern = "0$",
-                                                   rownames(x$s.table)), "p-value"]))),
-    p_val_gen_1 = ifelse(unlist(lapply(gam_list_summary, function(x)
-                          length(x$s.table[grep(pattern = "1$",
-                            rownames(x$s.table)), "p-value"]) == 0)), 
-                              yes = NA, 
-                           no = unlist(lapply(gam_list_summary, function(x)
-                                  x$s.table[grep(pattern = "1$",
-                                  rownames(x$s.table)), "p-value"]))),
-    
-    p_val_gen_2 = ifelse(unlist(lapply(gam_list_summary, function(x)
-                           length(x$s.table[grep(pattern = "2$",
-                            rownames(x$s.table)), "p-value"]) == 0)), 
-                          yes = NA, 
-                          no = unlist(lapply(gam_list_summary, function(x)
-                          x$s.table[grep(pattern = "2$",
-                                         rownames(x$s.table)), "p-value"])))
+   #p_val_gen_0 = ifelse(unlist(lapply(gam_list_summary, function(x)
+   #                            length(x$s.table[grep(pattern = "0$",
+   #                                           rownames(x$s.table)), "p-value"]) == 0)), 
+   #                     yes = NA, 
+   #                     no = unlist(lapply(gam_list_summary, function(x)
+   #                                                x$s.table[grep(pattern = "0$",
+   #                                               rownames(x$s.table)), "p-value"]))),
+   #p_val_gen_1 = ifelse(unlist(lapply(gam_list_summary, function(x)
+   #                      length(x$s.table[grep(pattern = "1$",
+   #                        rownames(x$s.table)), "p-value"]) == 0)), 
+   #                          yes = NA, 
+   #                       no = unlist(lapply(gam_list_summary, function(x)
+   #                              x$s.table[grep(pattern = "1$",
+   #                              rownames(x$s.table)), "p-value"]))),
+   #
+   #p_val_gen_2 = ifelse(unlist(lapply(gam_list_summary, function(x)
+   #                       length(x$s.table[grep(pattern = "2$",
+   #                        rownames(x$s.table)), "p-value"]) == 0)), 
+   #                      yes = NA, 
+   #                      no = unlist(lapply(gam_list_summary, function(x)
+   #                      x$s.table[grep(pattern = "2$",
+   #                                     rownames(x$s.table)), "p-value"])))
     
       )
   
