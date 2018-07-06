@@ -6,8 +6,8 @@
 
 # Choose model type -------------------------------------------------------
 
-  response_variable = "height"
-  # response_variable = "rgr"
+#  response_variable = "height"
+   response_variable = "rgr"
   # response_variable = "survival"
 
 
@@ -155,7 +155,7 @@
       
     ## Calculate relative growth rates: over 2 years
       # dat_all$rgr <- (log(dat_all$height_2017) - log(dat_all$height_2015))/ 2
-      dat_all$rgr <- (log(dat_all$height_2017) - log(dat_all$height_2014))/ 3
+      dat_all$rgr <- (log(dat_all$height_2017) - log(dat_all$height_2014)) / 3
       
       summary(dat_all$rgr)
       
@@ -291,6 +291,21 @@
       mech <- dplyr::filter(dat_all, grepl('mechanical', comments_2015) |
                               grepl('mechanical', comments_2017))
       mech$comments_2017
+      mech$comments_2015
+      dat_all <- dplyr::filter(dat_all, !(accession_progeny %in% mech$accession_progeny))
+      
+      # Weed whacker
+      mech <- dplyr::filter(dat_all, grepl('whacker', comments_2015) |
+                              grepl('whacker', comments_2017))
+      mech$comments_2015
+      mech$comments_2017
+      dat_all <- dplyr::filter(dat_all, !(accession_progeny %in% mech$accession_progeny))
+      
+      # Gopher
+      mech <- dplyr::filter(dat_all, grepl('gopher', comments_2015) |
+                              grepl('gopher', comments_2017))
+      mech$comments_2017
+      mech$comments_2015
       dat_all <- dplyr::filter(dat_all, !(accession_progeny %in% mech$accession_progeny))
 
     ## Filtering based on height
@@ -315,16 +330,17 @@
       if(response_variable == "rgr"){
 
     ## Individuals with negative growth rates
-      # neg_rgr <- dplyr::filter(dat_all, rgr < quantile(dat_all$rgr, 0.025, na.rm = TRUE)) %>% arrange(rgr)
-      #View(dplyr::select(neg_rgr, rgr, height_2015, height_2017) )
-      
+      neg_rgr <- dplyr::filter(dat_all, rgr < quantile(dat_all$rgr, 0.025, na.rm = TRUE)) %>% arrange(rgr)
+    #  View(dplyr::select(neg_rgr, rgr, height_2014, height_2015, height_2017) )
+
     ## Individuals with high positive growth rates
-      # pos_rgr <- dplyr::filter(dat_all, rgr > quantile(dat_all$rgr, 0.99, na.rm = TRUE)) %>% arrange(rgr)
-      # View(dplyr::select(pos_rgr, accession_progeny, rgr, height_2015, height_2017) )
+      pos_rgr <- dplyr::filter(dat_all, rgr > quantile(dat_all$rgr, 0.975, na.rm = TRUE)) %>% arrange(rgr)
+      # View(dplyr::select(pos_rgr, accession_progeny, rgr, height_2014,
+      #                    height_2015, height_2017) )
       
       # Change to NA outlier values in relative growth rate
-      dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.025, na.rm = TRUE) |
-                    dat_all$rgr >= quantile(dat_all$rgr, 0.975, na.rm = TRUE)] <- NA
+      dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.005, na.rm = TRUE) |
+                    dat_all$rgr >= quantile(dat_all$rgr, 0.995, na.rm = TRUE)] <- NA
   
   
       ## Filter out individuals without an estimated RGR
