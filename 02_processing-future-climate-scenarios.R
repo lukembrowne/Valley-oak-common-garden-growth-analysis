@@ -20,7 +20,8 @@ library(climates)
   ## Future climate files downloaded from:   https://geo.pointblue.org/commonsmap/index.php?ds=1129
     
     # Choose climate scenario
-     scenarios = c("CCSM4_rcp85", "MIROC_rcp85", "IPSL_rcp85", "CNRM_rcp85")
+     scenarios = c("CCSM4_rcp85", "MIROC_rcp85", "IPSL_rcp85", "CNRM_rcp85", "Fgoals_rcp85")
+     scenarios = c("MIROC_rcp45", "MPI_rcp45")
      
     # Climate variables in bcm format
     #  bcm_clim_vars <- c("aet", "cwd", "ppt", "tmn", "tmx")
@@ -117,14 +118,7 @@ library(climates)
   errors
    
   
-  
-  
-  
-  
-  
-  
-  
-  
+
    
   
 # Read in and process and clean raster files ------------------------------
