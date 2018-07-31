@@ -7,6 +7,8 @@
   library(rasterVis)
   library(sp)
   library(maptools)
+  library(googlesheets)
+  
   
   #install.packages("climates",,'http://rforge.net/',type='source', dependencies = TRUE)
   library(climates)
