@@ -188,8 +188,12 @@
       
   ## MOMS IN GARDEN      
     ## Read in position of SNPs - first column is chromosome number, second column is position
-    snp_pos <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_garden_moms.012.pos", 
-                               col_names = c("chrom", "pos"))
+  #  snp_pos <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_garden_moms.012.pos", 
+  #                             col_names = c("chrom", "pos"))
+      
+    ## Using iterative filtering
+    snp_pos <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4.012.pos", col_names = c("chrom", "pos"))
+      
     snp_pos
     
     ## Read in genotype cols
@@ -197,9 +201,13 @@
     ## provide column names since they are not included in vcftools output
     ## First column is sequence of numbers 0-450, which we will remove later
     col_names <- c("NUM", paste0("snp_", snp_pos$chrom, "_", snp_pos$pos))
-    
+
     ## Set missing values (-1) to NA
-    genotypes <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_garden_moms.012",
+    # genotypes <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_garden_moms.012",
+    #                              col_names = col_names, na = "-1")
+    
+    # Iterative filtering
+    genotypes <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4.012",
                                  col_names = col_names, na = "-1")
     
     ## Remove first column
@@ -208,7 +216,11 @@
     genotypes
     
     ## Read in individual
-    indv <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_garden_moms.012.indv",
+    # indv <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_garden_moms.012.indv",
+    #                         col_names = "ID")
+    
+    # Iterative filtering
+    indv <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4.012.indv",
                             col_names = "ID")
     dim(indv)
     indv 
@@ -259,8 +271,12 @@
   ## ALL TREES WITH GBS SAMPLES  
       
       ## Set missing values (-1) to NA
-      genotypes_all <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_all_moms.012",
-                                   col_names = col_names, na = "-1")
+      # genotypes_all <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_all_moms.012",
+      #                              col_names = col_names, na = "-1")
+      
+      # Iterative filtering
+      genotypes_all <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4.012",
+                                       col_names = col_names, na = "-1")
       
       ## Remove first column
       genotypes_all <- dplyr::select(genotypes_all, -NUM)
@@ -268,8 +284,12 @@
       genotypes_all
       
       ## Read in individual
-      indv_all <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_all_moms.012.indv",
-                              col_names = "ID")
+      # indv_all <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_all_moms.012.indv",
+      #                         col_names = "ID")
+      
+      # Iterative filtering
+      indv_all <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4.012.indv",
+                                  col_names = "ID")
       dim(indv_all)
       indv_all
     
@@ -338,11 +358,11 @@
       # View(dplyr::select(pos_rgr, accession_progeny, rgr, height_2014,
       #                    height_2015, height_2017) )
       
-      # Change to NA outlier values in relative growth rate
+    #  Change to NA outlier values in relative growth rate
       dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.005, na.rm = TRUE) |
                     dat_all$rgr >= quantile(dat_all$rgr, 0.995, na.rm = TRUE)] <- NA
-  
-  
+
+
       ## Filter out individuals without an estimated RGR
        dat_all <- dplyr::filter(dat_all, !is.na(rgr))
       }
