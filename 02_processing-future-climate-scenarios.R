@@ -18,10 +18,14 @@ library(climates)
 # Download future climate scenarios ---------------------------------------
 
   ## Future climate files downloaded from:   https://geo.pointblue.org/commonsmap/index.php?ds=1129
-    
+  ## Guide to RCP: https://skepticalscience.com/rcp.php  ; https://medium.com/@davidfurphy/what-on-earth-is-an-rcp-bbb206ddee26
+
     # Choose climate scenario
      scenarios = c("CCSM4_rcp85", "MIROC_rcp85", "IPSL_rcp85", "CNRM_rcp85", "Fgoals_rcp85")
+     
      scenarios = c("MIROC_rcp45", "MPI_rcp45")
+     
+     scenarios = c("MIROC5_rcp26", "GISS_rcp26", "MRI_rcp26")
      
     # Climate variables in bcm format
     #  bcm_clim_vars <- c("aet", "cwd", "ppt", "tmn", "tmx")
