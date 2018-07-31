@@ -8,13 +8,13 @@
   climate_var_dif <- as.character(args[3])
 
 # Load libraries
-   library(mgcv)
-	library(tidyverse)
+  library(mgcv)
+  library(tidyverse)
   library(visreg) # Installed on home directory
   library(patchwork) # Installed on home directory
 
 # Load data
- load("../gam_cluster_2018-07-02.Rdata")
+ load("../gam_cluster_2018-07-31.Rdata")
 
 
 # Save functions
@@ -59,29 +59,30 @@
     snp <- snp_col_names[snp_index]
     
     # Make sure there's at least 3 levels
-      if(length(table(dat_snp[, snp])) < 3){
-        cat("Skipping because not at least 3 levels")
-        next
-      }
+    #  if(length(table(dat_snp[, snp])) < 3){
+    #    cat("Skipping because not at least 3 levels")
+    #    next
+    #  }
 
     # Choose numbers of knots
-    k = length(table(pull(dat_snp, snp)))
+    # k = length(table(pull(dat_snp, snp)))
     
     # Convert to factor
     # dat_snp[, snp] <- as.factor(pull(dat_snp, snp))
+     dat_snp_unscaled[, snp] <- as.factor(pull(dat_snp_unscaled, snp))
     
 
 # Run gams
    	cat("Working on: ", snp, "... number: ", x, " ...\n" )
 
   # For SNPS as continuous  
-    fixed_effects_int <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + te(", snp, ", bs=\"cr\", k = ", k, ") +  te(", climate_var_dif,", bs=\"cr\") + ti(", climate_var_dif,", ",snp,", bs=\"cr\", k =", k," )"))
-    
-    # With shrinkage
-	#fixed_effects_int <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"ts\") + te(", snp, ", k = ", k, ", bs=\"ts\") +  te(", climate_var_dif,", bs=\"ts\") + ti(", climate_var_dif,", ",snp, ", bs=\"ts\", k = ", k, ")"))
+   # fixed_effects_int <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + te(", snp, ", bs=\"cr\", k = ", k, ") +  te(", climate_var_dif,", bs=\"cr\") + ti(", climate_var_dif,", ",snp,", bs=\"cr\", k =", k," )"))
 
-    ## Add gen pcs
-   # fixed_effects_int <- paste0(fixed_effects_int, "+ s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\")")
+  # For SNPs as factors
+   fixed_effects_int <- paste0(paste0("rgr ~ section_block + ", snp, "+ s(height_2014, bs=\"cr\") +  s(", climate_var_dif,", bs=\"cr\") + s(", climate_var_dif,", by = ", snp, ", bs=\"cr\")")) 
+    
+    ## Add gen pcs and interactions
+  # fixed_effects_int <- paste0(fixed_effects_int, paste0(paste0("+ s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC1_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC2_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC3_gen, bs=\"cr\")")))
     
     ## Add MEMs
   #  fixed_effects_int <- paste0(fixed_effects_int,  "+ s(mem1, bs =\"cr\") + s(mem2, bs =\"cr\") + s(mem3, bs =\"cr\") + s(mem4, bs =\"cr\")")
@@ -89,11 +90,11 @@
 
   # Gam with interaction effect
     gam_snp_int = bam(formula = make_formula(fixed_effects_int, random_effects),
-                  data = dat_snp, 
-                 # discrete = TRUE,
+                  data = dat_snp_unscaled[!is.na(pull(dat_snp_unscaled, snp)), ],
+                  discrete = TRUE,
                   nthreads = 8,
-                #  method = "fREML", 
-                  method = "ML",
+                  method = "fREML", 
+                #  method = "ML",
                   family = "gaussian")
 
    # Check for convergence
@@ -134,9 +135,19 @@
         
         
     # Make sure genotypes are represented and rename column      
-    pred_sub <-  pred_sub  %>%
-      dplyr::filter(genotype_scaled %in% pull(dat_snp, snp)) %>% 
-      dplyr::mutate(!!snp := genotype_scaled)
+    # pred_sub <-  pred_sub  %>%
+    #   dplyr::filter(genotype_scaled %in% pull(dat_snp, snp)) %>% 
+    #   dplyr::mutate(!!snp := genotype_scaled)
+
+  ## For SNPs as factors
+      pred_sub <-  pred_sub  %>%
+        dplyr::filter(genotype %in% pull(dat_snp_unscaled, snp)) %>%
+        dplyr::mutate(!!snp := genotype)
+
+	# Change accession number if genetic data is missing so we don't get errors in prediction
+	while(!(pred_sub$accession[1] %in%  gam_snp_int$model$accession)){
+	  pred_sub$accession <- as.character(as.numeric(pred_sub$accession) + 1)
+	}
 
 
 
@@ -179,11 +190,6 @@
                                                      var = climate_var_dif,
                                                      means = scaled_var_means_gbs_only,
                                                      sds = scaled_var_sds_gbs_only)) %>%
-                     # Back transform SNP
-                     mutate(!!snp := back_transform(x = get(snp),
-                                                                var = snp,
-                                                                means = scaled_snps_means,
-                                                                sds = scaled_snps_sds)) %>%
                     # Filter down to just 0,1,2 genotypes
                     dplyr::filter(get(snp) %in% c(0, 1, 2))
 
@@ -312,33 +318,33 @@
       yes = NA, 
       no = unlist(lapply(gam_list_summary, function(x)
         x$s.table[grep(pattern = "^ti",
-                       rownames(x$s.table)), "p-value"]))) 
+                       rownames(x$s.table)), "p-value"]))), 
     
     # Use grep to look at the last number of the smooth summary table - 
     # Should correspond to the genotype
     # Returns NA if no match
-   #p_val_gen_0 = ifelse(unlist(lapply(gam_list_summary, function(x)
-   #                            length(x$s.table[grep(pattern = "0$",
-   #                                           rownames(x$s.table)), "p-value"]) == 0)), 
-   #                     yes = NA, 
-   #                     no = unlist(lapply(gam_list_summary, function(x)
-   #                                                x$s.table[grep(pattern = "0$",
-   #                                               rownames(x$s.table)), "p-value"]))),
-   #p_val_gen_1 = ifelse(unlist(lapply(gam_list_summary, function(x)
-   #                      length(x$s.table[grep(pattern = "1$",
-   #                        rownames(x$s.table)), "p-value"]) == 0)), 
-   #                          yes = NA, 
-   #                       no = unlist(lapply(gam_list_summary, function(x)
-   #                              x$s.table[grep(pattern = "1$",
-   #                              rownames(x$s.table)), "p-value"]))),
-   #
-   #p_val_gen_2 = ifelse(unlist(lapply(gam_list_summary, function(x)
-   #                       length(x$s.table[grep(pattern = "2$",
-   #                        rownames(x$s.table)), "p-value"]) == 0)), 
-   #                      yes = NA, 
-   #                      no = unlist(lapply(gam_list_summary, function(x)
-   #                      x$s.table[grep(pattern = "2$",
-   #                                     rownames(x$s.table)), "p-value"])))
+   	p_val_gen_0 = ifelse(unlist(lapply(gam_list_summary, function(x)
+   	                            length(x$s.table[grep(pattern = "0$",
+   	                                           rownames(x$s.table)), "p-value"]) == 0)), 
+   	                     yes = NA, 
+   	                     no = unlist(lapply(gam_list_summary, function(x)
+   	                                                x$s.table[grep(pattern = "0$",
+   	                                               rownames(x$s.table)), "p-value"]))),
+   	p_val_gen_1 = ifelse(unlist(lapply(gam_list_summary, function(x)
+   	                      length(x$s.table[grep(pattern = "1$",
+   	                        rownames(x$s.table)), "p-value"]) == 0)), 
+   	                          yes = NA, 
+   	                       no = unlist(lapply(gam_list_summary, function(x)
+   	                              x$s.table[grep(pattern = "1$",
+   	                              rownames(x$s.table)), "p-value"]))),
+   	
+   	p_val_gen_2 = ifelse(unlist(lapply(gam_list_summary, function(x)
+   	                       length(x$s.table[grep(pattern = "2$",
+   	                        rownames(x$s.table)), "p-value"]) == 0)), 
+   	                      yes = NA, 
+   	                      no = unlist(lapply(gam_list_summary, function(x)
+   	                      x$s.table[grep(pattern = "2$",
+   	                                     rownames(x$s.table)), "p-value"])))
     
       )
   
@@ -347,12 +353,6 @@
  
  write.csv(gam_mod_summary_df, file = paste0("./model_summaries/gam_summaries_", task_id, ".csv"),
                                row.names = FALSE)
-
-
-###### LAGNIAPPE
-
-
-
 
 
 

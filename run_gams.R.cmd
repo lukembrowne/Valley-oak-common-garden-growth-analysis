@@ -18,7 +18,7 @@
 #  program output  = Specified by user program
 #  Threaded:     8-way threaded
 #  Resources requested
-#$ -l h_data=4096M,h_rt=05:00:00
+#$ -l h_data=4096M,h_rt=01:00:00
 # #
 #  Name of application for log
 #$ -v QQAPP=job
@@ -30,15 +30,15 @@
 #$ -r n
 #
 #  Job array indexes
-#$ -t 1-11814:25
+#$ -t 1-16979:100
 #
-# 11717 SNPS
+# 16979 Snps after iterative filtering
 
 # Set variable that will be passed to R script
 # Interval needs to match what is set in Job array indexes
 
-set run_label="rgr_ML"
-set interval=25
+set run_label="rgr_fREML_discrete_factor"
+set interval=100
 set climate_var_dif='tmax_sum_dif'
 
 
@@ -81,6 +81,8 @@ set climate_var_dif='tmax_sum_dif'
 # Make directories and copy over R file
 mkdir run_${JOB_ID}_${climate_var_dif}_{$run_label}
 cp ./run_gams.R ./run_${JOB_ID}_${climate_var_dif}_{$run_label}
+cp ./run_gams.R.cmd ./run_${JOB_ID}_${climate_var_dif}_{$run_label}
+cp ./gam_cluster_*.Rdata ./run_${JOB_ID}_${climate_var_dif}_{$run_label}
 cd ./run_${JOB_ID}_${climate_var_dif}_{$run_label}
 mkdir R_output
 mkdir output
