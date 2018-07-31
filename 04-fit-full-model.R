@@ -48,13 +48,26 @@ back_transform <- function(x, var, means, sds){
   mpi_45 <- climate_garden_mom2$tmax_sum2070_2099jja_ave_MPI_rcp45_1530222494 - 
     climate_garden_mom2$tmax_sum
   
+  # RCP 26 scenarios
+  giss_26 <- climate_garden_mom2$tmax_sum2070_2099jja_ave_GISS_rcp26_1531184801 - 
+    climate_garden_mom2$tmax_sum
+  miroc5_26 <- climate_garden_mom2$tmax_sum2070_2099jja_ave_MIROC5_rcp26_1531184789 - 
+    climate_garden_mom2$tmax_sum
+  mri_26 <- climate_garden_mom2$tmax_sum2070_2099jja_ave_MRI_rcp26_1531184812 - 
+    climate_garden_mom2$tmax_sum
+  
+  
+  
   future_df <-  as.data.frame(cbind(ccsm4_85,
                                     cnrm_85, 
                                     ipsl_85, 
                                     miroc_85,
                                     fgoals_85,
                                     miroc_45,
-                                    mpi_45))
+                                    mpi_45,
+                                    giss_26,
+                                    miroc5_26,
+                                    mri_26))
   
   pairs.panels(future_df)
   
@@ -65,10 +78,12 @@ back_transform <- function(x, var, means, sds){
     ggplot(., aes(tmax_sum, fill = projection)) + geom_density(alpha = 0.5) + 
     theme_bw(15) 
   
+  colMeans(future_df)
+  
   # Calculate mean increases
   future_85_mean <- mean(apply(dplyr::select(future_df, contains("85")), MARGIN = 1, mean))
   future_45_mean <- mean(apply(dplyr::select(future_df, contains("45")), MARGIN = 1, mean))
-  
+  future_26_mean <-  mean(apply(dplyr::select(future_df, contains("26")), MARGIN = 1, mean))
 
 
     
@@ -142,7 +157,7 @@ back_transform <- function(x, var, means, sds){
     geom_ribbon(data = v$fit, aes(ymin = visregLwr, ymax = visregUpr), 
                 fill = "grey80", alpha = 0.75) +
     geom_vline(aes(xintercept = 0), lty = 2) +
-  #  geom_vline(xintercept = future_45_mean) + 
+    geom_vline(xintercept = future_26_mean) + 
     geom_vline(xintercept = future_85_mean, lwd = 1.5) +
     geom_line(data = v$fit, aes(x = tmax_sum_dif, y = visregFit), lwd = 2,
               col = "forestgreen") +
@@ -163,7 +178,7 @@ back_transform <- function(x, var, means, sds){
 # Predicting changes in height based on degree increase -------------------
 
   # Set degree increases to compare for no change - medium & high emissions
-  degrees <- c(0, future_45_mean, future_85_mean)
+  degrees <- c(0, future_26_mean, future_85_mean)
   
   newdata <- data.frame(section_block = v$fit$section_block[1],
                         height_2014 = v$fit$height_2014[1],
@@ -186,20 +201,12 @@ back_transform <- function(x, var, means, sds){
   
 ## % change medium emissions scenario
   
-  ## Mean
+  ## RCP 2.6
   (newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[2]] - 
     newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[1]]) / newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[1]] * 100
   
-  ## Lwr
-  (newdata$lwr[newdata$tmax_sum_dif_unscaled == degrees[2]] - 
-      newdata$lwr[newdata$tmax_sum_dif_unscaled == degrees[1]]) / newdata$lwr[newdata$tmax_sum_dif_unscaled == degrees[1]] * 100
   
-  ## Upr
-  (newdata$upr[newdata$tmax_sum_dif_unscaled == degrees[2]] - 
-      newdata$upr[newdata$tmax_sum_dif_unscaled == degrees[1]]) / newdata$upr[newdata$tmax_sum_dif_unscaled == degrees[1]] * 100
-  
-  
-  ## % change in 5 degree increase
+  ## RCP 8.5 change in 5 degree increase
   
   ## Mean
   (newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[3]] - 
@@ -246,14 +253,23 @@ back_transform <- function(x, var, means, sds){
   raster_files
   
   future_stack <- stack()
+  x = 1
   
   ## Loop through raster files and add climate values to dat_mom dataframe
   for(file in raster_files){
     
+    # Load in raster
+    raster_temp <- raster(file)
+    
     cat("Working on file:", file, "...\n")
-    ## Load in raster
-    future_stack <- raster::stack(future_stack, raster(file))
-  
+    
+    # Check to see if extent is different, if it is - change it
+    if(x > 1 & !compareRaster(future_stack, raster_temp, stopiffalse = FALSE)){
+      extent(raster_temp) <- extent(future_stack)
+    }
+
+    future_stack <- raster::stack(future_stack, raster_temp)
+    x = x + 1
   }
   
   future_stack
@@ -335,7 +351,7 @@ back_transform <- function(x, var, means, sds){
     # writeRaster(x = future_stack_height_change,
     #             filename = paste0("./output/future_stack_height_change_", Sys.Date(), ".tif"),
     #             progress = "text")
-    
+    # 
     
   ## Average across low and high emissions scenarios
     future_stack_height_change_85 <- mean(future_stack_height_change[[c("CCSM4_rcp85", 
@@ -346,46 +362,128 @@ back_transform <- function(x, var, means, sds){
     
     summary(future_stack_height_change_85 )
     
-    future_stack_height_change_45 <- mean(future_stack_height_change[[c("MPI_rcp45", 
-                                                                        "MIROC_rcp45")]])
+    # future_stack_height_change_45 <- mean(future_stack_height_change[[c("MPI_rcp45", 
+    #                                                                     "MIROC_rcp45")]])
+    # 
+    # summary(future_stack_height_change_45)
     
-    summary(future_stack_height_change_45)
+    future_stack_height_change_26 <- mean(future_stack_height_change[[c("GISS_rcp26", 
+                                                                        "MRI_rcp26",
+                                                                        "MIROC5_rcp26")]])
+    summary(future_stack_height_change_26)
     
-    ## Project to latlong
-    future_stack_height_change_85 <- projectRaster(future_stack_height_change_85, 
-                                                   crs = CRS("+proj=longlat +datum=WGS84"))
-    names(future_stack_height_change_85) <- "RCP85"
     
-    future_stack_height_change_45 <- projectRaster(future_stack_height_change_45, 
-                                                   crs = CRS("+proj=longlat +datum=WGS84"))
-    names(future_stack_height_change_45) <- "RCP45"
     
     ## Stack them
-    future_stack_height_change_45_85 <-  stack(#future_stack_height_change_45,
-          future_stack_height_change_85)
+    future_stack_height_change_26_85 <-  stack(future_stack_height_change_26,
+                                               future_stack_height_change_85)
+    
+    
+    
+    
+    ## Project to latlong
+    future_stack_height_change_26_85 <- projectRaster(future_stack_height_change_26_85, 
+                                                   crs = CRS("+proj=longlat +datum=WGS84"))
+    
+    
+    
+    names(future_stack_height_change_26_85) <- c("RCP26", "RCP85")
+
     
     ## Crop them
-    future_stack_height_change_45_85 <- mask(future_stack_height_change_45_85, cali_outline)
+    future_stack_height_change_26_85 <- mask(future_stack_height_change_26_85, cali_outline)
     
+    summary(future_stack_height_change_26_85)
+    quantile(future_stack_height_change_26_85, probs = c(0.01, 0.99))
     
-    
+  
   ## Options for levelplot
     pixel_num = 1e6 ## Can make resolution better by making this 1e6 
     
     myTheme <- rasterTheme(region = brewer.pal('RdYlBu', n = 9))
     
-   breaks <- c(seq(-8, -4, by = 0.2))
-    
-  ## Plots of changes in height  
-    levelplot(future_stack_height_change_45_85,
+    future_stack_height_change_26_85_limits <- future_stack_height_change_26_85
+ 
+   
+   
+   ## Convert lowest and highest values
+   breaks_26 <- seq(-4.5, -1, by = 0.2)
+   
+   future_stack_height_change_26_85_limits[[1]][future_stack_height_change_26_85_limits[[1]] < min(breaks_26)] <- min(breaks_26)
+   future_stack_height_change_26_85_limits[[1]][future_stack_height_change_26_85_limits[[1]] > max(breaks_26)] <- max(breaks_26)
+   
+  
+  ## Plots of changes in height - RCP 26
+    levelplot(future_stack_height_change_26_85_limits[[1]],
               margin = FALSE,
               maxpixels = pixel_num,
               par.settings = myTheme, 
-              at = breaks) + 
+              at = breaks_26,
+              main = "Optimistic (RCP 2.6)") + 
     latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
-    latticeExtra::layer(sp.polygons(lobata_range, col = "grey50")) + 
+#    latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.75)) + 
     latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 2.75))
+    
+    dev.copy(png, paste0("./figs_tables/Figure 3 - RCP26", Sys.Date(), ".png"),
+             res = 300, units = "in", width = 6, height = 6)
+    dev.off()
+    
+    
+    ## Plots of changes in height - RCP 85
+    
+    breaks_85 <- seq(-8, -4, by = 0.2)
+    
+    future_stack_height_change_26_85_limits[[2]][future_stack_height_change_26_85_limits[[2]] < min(breaks_85)] <- min(breaks_85)
+    future_stack_height_change_26_85_limits[[2]][future_stack_height_change_26_85_limits[[2]] > max(breaks_85)] <- max(breaks_85)
+    
+    levelplot(future_stack_height_change_26_85[[2]],
+              margin = FALSE,
+              maxpixels = pixel_num,
+              par.settings = myTheme, 
+              at = breaks_85,
+              main = "Rising emissions (RCP 8.5)") + 
+      latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
+        latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.75)) + 
+      latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 2.75))
+    
+    dev.copy(png, paste0("./figs_tables/Figure 3 - RCP85", Sys.Date(), ".png"),
+             res = 300, units = "in", width = 6, height = 6)
+    dev.off()
+    
+    
+ 
+    
+     
   
+  ## Height change in historical range
+    height_change_historic_range <- raster::extract(future_stack_height_change_26_85,
+                                                    y = lobata_range_rough, df = TRUE)
+    
+    head(height_change_historic_range)
+    
+    summary(height_change_historic_range)
+    
+    quantile(height_change_historic_range$RCP26, probs = c(0.025, 0.975), na.rm = TRUE)
+    quantile(height_change_historic_range$RCP85, probs = c(0.025, 0.975), na.rm = TRUE)
+    
+   
+  ##  Density plots for each scenario
+    height_change_historic_range %>%
+     dplyr::select(RCP26) %>%
+      ggplot(., aes(RCP26)) + geom_density(alpha = 0.5, fill = "forestgreen") + 
+      ggtitle("Within historical range") +
+      xlab("% Change in Relative Growth Rate") +
+      theme_bw(15) 
+    
+    height_change_historic_range %>%
+      dplyr::select(RCP85) %>%
+      ggplot(., aes(RCP85)) + geom_density(alpha = 0.5, fill = "steelblue2") +
+      ggtitle("Within historical range") +
+      xlab("% Change in Relative Growth Rate") +
+      theme_bw(15) 
+    
+    
+    
     
     # Get values by region
     height_change_by_region <- raster::extract(future_stack_height_change_45_85,
@@ -414,6 +512,17 @@ back_transform <- function(x, var, means, sds){
     
   
   
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 # Graveyard ---------------------------------------------------------------
   
   
@@ -691,7 +800,7 @@ back_transform <- function(x, var, means, sds){
   
   
   
-# Graveyard ---------------------------------------------------------------
+# Graveyard 2 ---------------------------------------------------------------
 
   # Function for plotting predictions ---------------------------------------
   
@@ -805,4 +914,30 @@ back_transform <- function(x, var, means, sds){
   
   
 
+  
+  
+  
+  ## Average across low and high emissions scenarios
+  future_stack_temp_85 <- mean(future_stack_tmax_dif[[c("CCSM4_rcp85", 
+                                                                      "CNRM_rcp85",
+                                                                      "Fgoals_rcp85",
+                                                                      "IPSL_rcp85",
+                                                                      "MIROC_rcp85")]])
+  
+  summary(future_stack_temp_85 )
+  
+  # future_stack_height_change_45 <- mean(future_stack_height_change[[c("MPI_rcp45", 
+  #                                                                     "MIROC_rcp45")]])
+  # 
+  # summary(future_stack_height_change_45)
+  
+  future_stack_temp_26 <- mean(future_stack_tmax_dif[[c("GISS_rcp26", 
+                                                                      "MRI_rcp26",
+                                                                      "MIROC5_rcp26")]])
+  summary(future_stack_temp_26)
+  
+  levelplot(future_stack_temp_26, margin = FALSE, at = seq(0, 4, by = 0.2))
+  levelplot(future_stack_temp_85, margin = FALSE, at = seq(0, 8, by = 0.2))
+  
+  corLocal(future_stack_temp_26, future_stack_temp_85)
   
