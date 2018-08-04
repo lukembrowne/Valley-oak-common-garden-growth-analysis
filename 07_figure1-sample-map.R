@@ -65,18 +65,24 @@
      hsTheme <- modifyList(GrTheme(), list(regions=list(alpha= .15)))
      tmaxTheme <- modifyList(BuRdTheme(), list(regions=list(alpha=1)))
     
-    p = levelplot(tmax_rast_cropped, contour = FALSE, margin = FALSE, par.settings = tmaxTheme, 
-                  maxpixels = pixel_num, colorkey = TRUE, main = "Maximum temperature summer",
+    p = levelplot(tmax_rast_cropped, 
+                  contour = FALSE, 
+                  margin = FALSE, 
+                  par.settings = tmaxTheme, 
+                  maxpixels = pixel_num, 
+                  colorkey = TRUE, 
+                  main = "Maximum temperature summer",
                   bty = "l")  +
       levelplot(hill,  margin = FALSE, par.settings=hsTheme) +
       latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
-     latticeExtra::layer(sp.polygons(lobata_range_rough, fill = "purple", alpha = 0.15)) +
+      latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 2.75)) +
+      latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.75)) + 
       latticeExtra::layer(sp.points(all_moms, pch = 21, cex = 1,
                                     fill = "forestgreen", col = "grey10", alpha = .75)) +
       latticeExtra::layer(sp.points(gbs_moms, pch = 21, cex = 1,
                                     fill = "steelblue2", col = "grey10", alpha = .75))  +
       latticeExtra::layer(sp.points(garden_sites, pch = 22, cex = 2, 
-                                    col = "grey10", fill = "orange"))
+                                    col = "grey10", fill = "orange")) 
     
     print(p)
     
@@ -84,4 +90,15 @@
         height = 2400, width = 1600)
     print(p)
     dev.off()
-
+    
+    
+    ## Histogram of temp transfer distances
+    ggplot(dat_all_clim, aes(x = tmax_sum_dif)) +
+      geom_histogram(fill = "grey95", col = "black") + 
+      xlab("Tmax transfer distance") + ylab("Count") +
+      geom_vline(aes(xintercept = 0), lty = 2) +
+      geom_vline(xintercept = 1.1) + 
+      geom_vline(xintercept = 4.88, lwd = 1.5) +
+      theme_bw(15) + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+                           panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+    
