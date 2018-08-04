@@ -8,13 +8,13 @@
   climate_var_dif <- as.character(args[3])
 
 # Load libraries
-  library(mgcv)
+  library(mgcv, lib.loc = "/u/home/l/lukembro/R/x86_64-pc-linux-gnu-library/3.4") # Make sure to load latest version of mgcv
   library(tidyverse)
   library(visreg) # Installed on home directory
   library(patchwork) # Installed on home directory
 
 # Load data
- load("../gam_cluster_2018-07-31.Rdata")
+ load("../gam_cluster_2018-08-03.Rdata")
 
 
 # Save functions
@@ -58,11 +58,11 @@
     # Choose snp
     snp <- snp_col_names[snp_index]
     
-    # Make sure there's at least 3 levels
-    #  if(length(table(dat_snp[, snp])) < 3){
-    #    cat("Skipping because not at least 3 levels")
-    #    next
-    #  }
+   # Make sure there's at least 2 levels
+    if(length(table(dat_snp_unscaled[, snp])) < 2){
+      cat("Skipping because not at least 2 levels")
+      next
+    }
 
     # Choose numbers of knots
     # k = length(table(pull(dat_snp, snp)))
@@ -70,6 +70,11 @@
     # Convert to factor
     # dat_snp[, snp] <- as.factor(pull(dat_snp, snp))
      dat_snp_unscaled[, snp] <- as.factor(pull(dat_snp_unscaled, snp))
+
+
+     ## Randomize RGR data
+     dat_snp_unscaled$rgr <- sample(dat_snp_unscaled$rgr)
+
     
 
 # Run gams
@@ -96,6 +101,8 @@
                   method = "fREML", 
                 #  method = "ML",
                   family = "gaussian")
+
+    print(summary(gam_snp_int))
 
    # Check for convergence
    # if(!gam_snp_int$mgcv.conv){

@@ -18,7 +18,7 @@
 #  program output  = Specified by user program
 #  Threaded:     8-way threaded
 #  Resources requested
-#$ -l h_data=4096M,h_rt=01:00:00
+#$ -l h_data=4096M,h_rt=02:00:00
 # #
 #  Name of application for log
 #$ -v QQAPP=job
@@ -30,14 +30,14 @@
 #$ -r n
 #
 #  Job array indexes
-#$ -t 1-16979:100
-#
-# 16979 Snps after iterative filtering
+#$ -t 1-17415:100
+#-t 1-17415:100
+# 17415 Snps after iterative filtering
 
 # Set variable that will be passed to R script
 # Interval needs to match what is set in Job array indexes
 
-set run_label="rgr_fREML_discrete_factor"
+set run_label="rgr_fREML_discrete_v3"
 set interval=100
 set climate_var_dif='tmax_sum_dif'
 
