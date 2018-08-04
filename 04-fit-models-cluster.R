@@ -20,6 +20,7 @@
   library(patchwork)
   library(rasterVis)
   library(pdp)
+  library(ggrepel)
   
   # function to transform from raw to scaled variables
     forward_transform <- function(x, var, means, sds){
@@ -147,22 +148,21 @@
     
     var_unscaled <- paste0(var, "_unscaled")
     
+    
+    
     # Set scaled climate var dif, with a 0 and XXXX degree increase as well
     var_df <- expand.grid(accession = "1",
-                          var_temp = c(seq(min(dat_all_scaled[ ,var]),
-                                               max(dat_all_scaled[ ,var]),
-                                               length.out = 50), 
-                                           forward_transform(c(0, degree_increase),
-                                                             var = var,
-                                                             means = scaled_var_means_gbs_only,
-                                                             sds = scaled_var_sds_gbs_only)))
+                          var_temp = c(seq(min(dat_all_clim[ ,var]),
+                                           max(dat_all_clim[ ,var]),
+                                           length.out = 50), 0, degree_increase))
+    
     # Rename columns and set unscaled climate_var dif
     var_df <- var_df %>%
-          rename(!!var := var_temp) %>%
-          mutate(!!var_unscaled := back_transform(x = get(var),
-                                         var = var,
-                                         means = scaled_var_means_gbs_only,
-                                         sds = scaled_var_sds_gbs_only))
+      rename(!!var_unscaled := var_temp) %>%
+      mutate(!!var := forward_transform(x = get(var_unscaled),
+                                              var = var,
+                                              means = scaled_var_means_gbs_only,
+                                              sds = scaled_var_sds_gbs_only))
     
    # Do a left join if the first variable, or else just bind cols, removing accession column  
     if(nrow(pred) == 1){
@@ -205,22 +205,22 @@
   random_effects <-  '+ s(accession, bs = "re")'
   
   
-  task_id = 10; interval = 10
+  task_id = 5; interval = 5
   
   
-# Loop through snps by index based on task id
-  for(snp_index in task_id:(task_id + interval - 1)){
-    
-    # To avoid going past number of snps
-    if(snp_index > length(snp_col_names)){
-      next
-    }
-  
-    # Choose snp
-    snp <- snp_col_names[snp_index]
+# # Loop through snps by index based on task id
+#   for(snp_index in task_id:(task_id + interval - 1)){
+# 
+#     # To avoid going past number of snps
+#     if(snp_index > length(snp_col_names)){
+#       next
+#     }
+# 
+#     # Choose snp
+#     snp <- snp_col_names[snp_index]
   
  ### LOOPING THROUGH TOP SNPS   
- # for(snp in top_snps$snp){  
+   for(snp in top_snps$snp){  
     
       # For timing loops
       start_time <- Sys.time()
@@ -228,20 +228,21 @@
     # Choose numbers of knots
     k = length(table(pull(dat_snp, snp)))
     
-    # Make sure there's at least 3 levels
-    # if(length(table(dat_snp[, snp])) < 3){
-    #   cat("Skipping because not at least 3 levels")
-    #   next
-    # }
-
+    
+    # Make sure there's at least 2 levels
+    if(length(table(dat_snp_unscaled[, snp])) < 2){
+      cat("Skipping because not at least 2 levels")
+      next
+    }
     
     # Convert to factor
    # dat_snp[, snp] <- as.factor(pull(dat_snp, snp))
     dat_snp_unscaled[, snp] <- as.factor(pull(dat_snp_unscaled, snp))
     
-  
+  ## Randomize RGR data
+  #  dat_snp_unscaled$rgr <- sample(dat_snp_unscaled$rgr)
+
     # Formula for fixed effects
-    
     # Stack overflow on adding m = 1 to by= smooths - https://stats.stackexchange.com/questions/32730/how-to-include-an-interaction-term-in-gam
 
     
@@ -254,7 +255,7 @@
     fixed_effects_int <- paste0(paste0("rgr ~ section_block + ", snp, "+ s(height_2014, bs=\"cr\") +  s(", climate_var_dif,", bs=\"cr\") + s(", climate_var_dif,", by = ", snp, ", bs=\"cr\")"))
     
     ## Add gen pcs and interactions
-    fixed_effects_int <- paste0(fixed_effects_int, paste0(paste0("+ s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC1_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC2_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC3_gen, bs=\"cr\")")))
+   # fixed_effects_int <- paste0(fixed_effects_int, paste0(paste0("+ s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC1_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC2_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC3_gen, bs=\"cr\")")))
     
     ## Add MEMs
   #  fixed_effects_int <- paste0(fixed_effects_int,  "+ s(mem1, bs =\"cr\") + s(mem2, bs =\"cr\") + s(mem3, bs =\"cr\") + s(mem4, bs =\"cr\")")
@@ -264,22 +265,38 @@
     ## THe classic: snp_7_693540540
     
     ## Randomize genotype
-   # dat_snp[, snp] <- dat_snp[sample(1:nrow(dat_snp)) , snp]
+    dat_snp[, snp] <- dat_snp[sample(1:nrow(dat_snp)) , snp]
 
     start <- Sys.time()
    # Gam with interaction effect
     gam_snp_int = bam(formula = make_formula(fixed_effects_int, random_effects),
                   data = dat_snp_unscaled[!is.na(pull(dat_snp_unscaled, snp)), ],
-                discrete = TRUE, # Discrete makes the right curve up and leads to low p values!!
+                 discrete = TRUE, # Discrete makes the right curve up and leads to low p values!!
                   nthreads = 8,
                 method = "fREML",
-            #    method = "ML",
+             #   method = "ML",
                   family = "gaussian",
                   control = list(trace = FALSE))
-
-    summary(gam_snp_int)
     
-     Sys.time() - start
+    Sys.time() - start
+
+    # summary(gam_snp_int)
+    # 
+    # visreg(gam_snp_int, xvar = climate_var_dif, by = snp,
+    #       overlay = TRUE, partial = FALSE, rug = FALSE)
+    
+    
+    # gam_snp_no_int = bam(formula = make_formula(fixed_effects_no_int, random_effects),
+    #                   data = dat_snp_unscaled[!is.na(pull(dat_snp_unscaled, snp)), ],
+    #                   discrete = TRUE, # Discrete makes the right curve up and leads to low p values!!
+    #                   nthreads = 8,
+    #                   method = "fREML",
+    #                   #   method = "ML",
+    #                   family = "gaussian",
+    #                   control = list(trace = FALSE))
+    # 
+    # print(anova(gam_snp_int, gam_snp_no_int, test = "Chisq"))
+
 
     ## Look at individuals with outlier residuals
    # resid_outlier <- dat_snp$accession_progeny[residuals(gam_snp_int) < -0.5]
@@ -382,17 +399,14 @@
     #        ylab = "5 year height (cm)")
     
     # Without partial residuals
-    visreg(gam_snp_int, xvar = climate_var_dif, by = snp,
-           overlay = TRUE, partial = FALSE, rug = FALSE,
-           breaks = c(unique(pred_sub$genotype_scaled)),
-           xtrans = function(x) {(x *  scaled_var_sds_gbs_only[climate_var_dif]) + scaled_var_means_gbs_only[climate_var_dif]},
-           ylab = "Relative growth rate")
+    # visreg(gam_snp_int, xvar = climate_var_dif, by = snp,
+    #        overlay = TRUE, partial = FALSE, rug = FALSE,
+    #        breaks = c(unique(pred_sub$genotype_scaled)),
+    #        xtrans = function(x) {(x *  scaled_var_sds_gbs_only[climate_var_dif]) + scaled_var_means_gbs_only[climate_var_dif]},
+    #        ylab = "Relative growth rate")
     
   #  dev.off()
 
-    
-    
-      
     # Make PREDICTION
     gam_preds <-  predict(gam_snp_int, 
                           newdata = pred_sub,
@@ -416,17 +430,27 @@
     
     
     # Climate transfer functions by genotype
-      p1 <-  ggplot(pred_sub) +
-        geom_ribbon(aes(tmax_sum_dif_unscaled, ymin = pred - 2 * se, ymax = pred + 2*se, fill = factor(genotype)),
+      p1 <-  
+        pred_sub %>%
+      #  dplyr::filter(genotype !=  "1") %>%
+        ggplot(.) +
+        geom_ribbon(aes(tmax_sum_dif_unscaled, ymin = pred - 1.96 * se, 
+                        ymax = pred + 1.96 * se, fill = factor(genotype)),
                     alpha = 0.25, show.legend = FALSE)  +
-        geom_line(data = pred_sub, aes(x = tmax_sum_dif_unscaled, y = pred, col = factor(genotype)), lwd = 1.5) +
         geom_vline(aes(xintercept = 0), lty = 2) +
+        geom_vline(xintercept = 1.1) + 
         geom_vline(xintercept = 4.88, lwd = 1.5) +
+        geom_line(aes(x = tmax_sum_dif_unscaled, y = pred, col = factor(genotype)), lwd = 1.5) +
+        
         labs(col = "Genotype") +
-        ylab("5 yr height (cm)") +
-        xlab(climate_var_dif) +
+        xlim(-2.5, 7.5) +
+       scale_color_discrete(labels = c("Homozygous \n reference",
+                                       "Heterozygous", "Homozygous\n non-reference")) +
+        ylab("Relative growth rate") +
+        xlab("Tmax transfer distance") +
         ggtitle(snp) +
-        theme_bw(15)
+        theme_bw(15) + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+                             panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
 
     # Density plots of genotypes
       p2 <- ggplot(dat_snp_trans,
@@ -530,9 +554,9 @@
    # delta_aic = unlist(lapply(gam_list, function(x) x$delta_aic)),
     
     # Predictions of height
-    # height_change_gen_0 = unlist(lapply(gam_list, function(x) x$height_change_gen_0)),
-    # height_change_gen_1 = unlist(lapply(gam_list, function(x) x$height_change_gen_1)),
-    # height_change_gen_2 = unlist(lapply(gam_list, function(x) x$height_change_gen_2)),
+    height_change_gen_0 = unlist(lapply(gam_list, function(x) x$height_change_gen_0)),
+    height_change_gen_1 = unlist(lapply(gam_list, function(x) x$height_change_gen_1)),
+    height_change_gen_2 = unlist(lapply(gam_list, function(x) x$height_change_gen_2)),
     
     # P values for interaction terms
     p_val_int = ifelse(unlist(lapply(gam_list_summary, function(x)
@@ -596,7 +620,19 @@
 #  path_to_summaries <- "./output/model_summaries_run_3134990_tmax_sum_dif_rgr_fREML_discrete_random_genotype/"
 #  path_to_summaries <- "./output/model_summaries_run_3163411_tmax_sum_dif_rgr_fREML_not_discrete_genotypes_factor/"
   
-  path_to_summaries <- "./output/model_summaries_run_3175133_tmax_sum_dif_rgr_fREML_discerete_genotypes_factor/"
+#  path_to_summaries <- "./output/model_summaries_run_3175133_tmax_sum_dif_rgr_fREML_discerete_genotypes_factor/"
+  
+  # path_to_summaries <- "./output/run_3408597_tmax_sum_dif_rgr_fREML_discrete_factor/model_summaries/"
+  # 
+  # path_to_summaries <- "./output/run_3409773_tmax_sum_dif_rgr_fREML_not_discrete_factor/model_summaries/"
+  # 
+  # path_to_summaries <- "./output/run_3412112_tmax_sum_dif_rgr_REML_factor/model_summaries/"
+  # 
+  path_to_summaries <- "./output/run_3416635_tmax_sum_dif_rgr_fREML_discrete/model_summaries/"
+  
+  #path_to_summaries <- "./output/run_3418155_tmax_sum_dif_rgr_REML/model_summaries/"
+  
+  path_to_summaries <- "./output/run_3430720_tmax_sum_dif_rgr_fREML_discrete_v3/model_summaries/"
   
   
   sum_df_raw <- plyr::ldply(list.files(path_to_summaries, full = TRUE), read_csv)
@@ -612,45 +648,35 @@
   snp_col_names[which(!snp_col_names %in% sum_df_raw$snp)]
   
   # Find there indexes if needed to re-run manually or on the cluster
-  
-  
-  
+
   hist(sum_df_raw$p_val_gen_0, breaks = 40)
   hist(sum_df_raw$p_val_gen_1, breaks = 40)
   hist(sum_df_raw$p_val_gen_2, breaks = 40)
   
+  # Site on interpreting p value histograms: http://varianceexplained.org/statistics/interpreting-pvalue-histogram/
+  
+  all_p_vals <- c(sum_df_raw$p_val_gen_0, sum_df_raw$p_val_gen_1, sum_df_raw$p_val_gen_2)
+  sample_sizes <- c(sum_df_raw$n_gen0, sum_df_raw$n_gen1, sum_df_raw$n_gen2)
+  sum(sample_sizes < 100, na.rm = TRUE)
+  
+  hist(all_p_vals[sample_sizes > 100],
+       breaks = 40, col = "forestgreen", main = "", xlab = "p val")
+  
+  hist(all_p_vals[all_p_vals > 0.05],
+       breaks = 40, col = "forestgreen", main = "", xlab = "p val")
+  
+  plot(sample_sizes, all_p_vals, pch = ".")
   
 
 # Sort and arrange data ---------------------------------------------------
 
-  # How many converged?
-  # table(sum_df$converged)
-  # 
-  # # Filter to just those that converged
-  # sum_df <- sum_df %>%
-  #   dplyr::filter(converged)
-  # dim(sum_df)
-  # 
-  
-  ## Filter down to those with just a certain amount of gene copies
-  
-  # gen_copies_thresh = 50
-  # 
-  # sum_df <- sum_df_raw %>%
-  #   filter(n_gen0 > gen_copies_thresh) %>%
-  #   filter(n_gen1 > gen_copies_thresh) %>%
-  #   filter(n_gen2 > gen_copies_thresh)
-  # 
-  # dim(sum_df)
-  
   sum_df <- sum_df_raw
-  
   
   # Figuring out which allele is beneficial
   sum_df <- sum_df %>%
-    mutate(beneficial_gen_0 = ifelse(height_change_gen_0 > 0, 1, 0),
-           beneficial_gen_1 = ifelse(height_change_gen_1 > 0, 1, 0),
-           beneficial_gen_2 = ifelse(height_change_gen_2 > 0, 1, 0)) %>%
+    mutate(beneficial_gen_0 = ifelse(height_change_gen_0 >= 0, 1, 0),
+           beneficial_gen_1 = ifelse(height_change_gen_1 >= 0, 1, 0),
+           beneficial_gen_2 = ifelse(height_change_gen_2 >= 0, 1, 0)) %>%
     mutate(beneficial_any = (beneficial_gen_0 == 1 | 
                                   beneficial_gen_1 == 1 |
                                   beneficial_gen_2 == 1))
@@ -660,9 +686,7 @@
   table(sum_df$beneficial_gen_1)
   table(sum_df$beneficial_gen_2)  
 
-  
-  
-  
+ 
   ## Calculating q values  
       # Vignette - https://bioconductor.org/packages/release/bioc/vignettes/qvalue/inst/doc/qvalue.pdf
   
@@ -674,6 +698,7 @@
  
   # Calculate q values and adjusted p values
       qvals <- qvalue(p = sum_df_long$p_val_gen,
+                     # p = sum_df$p_val_gen_0,
                       fdr.level = 0.05)
       
       pvals_adj <- p.adjust(sum_df_long$p_val_gen, method = "fdr")
@@ -681,6 +706,7 @@
       summary(qvals)
       summary(pvals_adj)
       hist(pvals_adj, breaks = 40)
+      sum(pvals_adj < 0.05, na.rm = TRUE)
       
       
       qvals$pi0 # overall proportion of true null hypotheses
@@ -716,13 +742,15 @@
      
 # Select top snps ---------------------------------------------------------
      
-    gen_copies_thresh <- 50
+    gen_copies_thresh <- 100
+    p_val_thresh <- 0.05
+   # p_val_thresh <- 5e-5
      
      
     sum_df <-  sum_df %>%
-       mutate(top_snp_gen_0 = (p_val_adj_gen_0 < 0.001 & beneficial_gen_0 == 1 & n_gen0 >= gen_copies_thresh)) %>%
-       mutate(top_snp_gen_1 = (p_val_adj_gen_1 < 0.001 & beneficial_gen_1 == 1 & n_gen1 >= gen_copies_thresh)) %>%
-       mutate(top_snp_gen_2 = (p_val_adj_gen_2 < 0.001 & beneficial_gen_2 == 1 & n_gen2 >= gen_copies_thresh))
+       mutate(top_snp_gen_0 = (p_val_adj_gen_0 < p_val_thresh & beneficial_gen_0 == 1 & n_gen0 >= gen_copies_thresh)) %>%
+       mutate(top_snp_gen_1 = (p_val_adj_gen_1 < p_val_thresh & beneficial_gen_1 == 1 & n_gen1 >= gen_copies_thresh)) %>%
+       mutate(top_snp_gen_2 = (p_val_adj_gen_2 < p_val_thresh & beneficial_gen_2 == 1 & n_gen2 >= gen_copies_thresh))
     
     
   # How many for each genotype?
@@ -735,13 +763,11 @@
       filter(top_snp_gen_0 | top_snp_gen_1 | top_snp_gen_2)
     
     nrow(top_snps)
-    
-    
-    
+
     
 # Manhattan plots ---------------------------------------------------------
     
-    library(CMplot)
+   # library(CMplot)
     
     man_df1 <- data.frame(SNP = snp_col_names, 
                           snp_pos)
@@ -750,123 +776,283 @@
     
     man_df$index <- 1:nrow(man_df) ## For x axis plotting
     
-    
     head(man_df)
     
-    ## Assign color for chromosome
-    man_df$color <- man_df$chrom %% 3
-    man_df$color[man_df$color == 0] <- "#a6cee3"
-    man_df$color[man_df$color == 1] <- "#1f78b4"
-    man_df$color[man_df$color == 2] <- "#b2df8a"
+    ## Clean up snps with low copy numbers
+    man_df <- man_df %>%
+      dplyr::mutate(height_change_gen_0 = ifelse(n_gen0 >= gen_copies_thresh, height_change_gen_0, NA),
+                    height_change_gen_1 = ifelse(n_gen1 >= gen_copies_thresh, height_change_gen_1, NA),
+                    height_change_gen_2 = ifelse(n_gen2 >= gen_copies_thresh, height_change_gen_2, NA),
+                    height_change_gen_0 = ifelse(height_change_gen_0 >= 50 | height_change_gen_0 <= -50, NA, height_change_gen_0),
+                    height_change_gen_1 = ifelse(height_change_gen_1 >= 50 | height_change_gen_1 <= -50, NA, height_change_gen_1),
+                    height_change_gen_2 = ifelse(height_change_gen_2 >= 50 | height_change_gen_2 <= -50, NA, height_change_gen_2),
+                    p_val_adj_gen_0_scaled = scales::rescale(p_val_adj_gen_0, to = c(1, 0), from = c(0, 1)),
+                    p_val_adj_gen_1_scaled = scales::rescale(p_val_adj_gen_1, to = c(1, 0), from = c(0, 1)),
+                    p_val_adj_gen_2_scaled = scales::rescale(p_val_adj_gen_2, to = c(1, 0), from = c(0, 1)),
+                    p_val_adj_gen_0_alpha = ifelse(p_val_adj_gen_0 < 0.05, 1, .15),
+                    p_val_adj_gen_1_alpha = ifelse(p_val_adj_gen_1 < 0.05, 1, .15),
+                    p_val_adj_gen_2_alpha = ifelse(p_val_adj_gen_2 < 0.05, 1, .15))
     
-    ## Make beneficial alleles bigger and different color
-    sig_cex <- 1.5
-    sig_color <- "#33a02c"
-    sig_pch <- 21 # Outline sig ones
-    
-    ## Custom plot
-    
-    par(mfrow = c(3, 1))
-    
-    ## Gen 0 
-    plot(x = man_df$index, 
-         y = -log10(man_df$p_val_adj_gen_0), 
-         pch =  20, cex = man_df$cex,
-         xlab = " ", ylab = "-log10(Pvalue)", 
-         las = 1,
-         col = man_df$color, # To alternate colors for pseudo-chromosomes
-         ylim = c(0, 8),
-         bty = "l",
-         xaxt = "n",
-         main = "Genotype 0")
-    
-    ## Overplot significant points
-    
-    gen_0_sub <- man_df %>%
-      filter(top_snp_gen_0 == TRUE)
-    
-    points(x = gen_0_sub$index, 
-           y = -log10(gen_0_sub$p_val_gen_0),
-           pch = 21, col = "black",
-           cex = sig_cex, 
-           bg = sig_color)
-    text(x = gen_0_sub$index,
-         y = -log10(gen_0_sub$p_val_adj_gen_0),
-         label = gen_0_sub$SNP,
-         pos = 3, cex = 1)
+    ## Clean up chromosome names - clear scaffold names
+    man_df <- man_df %>%
+      mutate(chrom = ifelse(grepl("chr", chrom), chrom, ""))
     
     
-    ## Gen 1
-    plot(x = man_df$index, 
-         y = -log10(man_df$p_val_adj_gen_1), 
-         pch =  20, cex = man_df$cex,
-         xlab = "", ylab = "-log10(Pvalue)", 
-         las = 1,
-         col = man_df$color, # To alternate colors for pseudo-chromosomes
-         ylim = c(0, 8),
-         bty = "l",
-         xaxt = "n",
-         main = "Genotype 1")
+    ## GGplot version
     
-    ## Overplot significant points
+    # Setup
+     cex = 3
+     
+    # For labels on x axis 
+       x_axis_breaks <- man_df %>%
+                       dplyr::select(index, chrom) %>%
+                       group_by(chrom) %>%
+                       summarise_all(mean)
+     
+     # For vertical lines showing chromosome sections
+       chrom_breaks <- man_df %>%
+                 dplyr::select(index, chrom) %>%
+                 group_by(chrom) %>%
+                 summarise_all(max)
     
-    gen_1_sub <- man_df %>%
-      filter(top_snp_gen_1 == TRUE)
-    
-    if(nrow(gen_1_sub) > 0){
-      points(x = gen_1_sub$index, 
-             y = -log10(gen_1_sub$p_val_gen_1),
-             pch = 21, col = "black",
-             cex = sig_cex, 
-             bg = sig_color)
-      text(x = gen_1_sub$index,
-           y = -log10(gen_1_sub$p_val_adj_gen_1),
-           label = gen_1_sub$SNP,
-           pos = 3, cex = 1)
-    }
+    # Start plot
+    ggplot(man_df, aes(x = index, y = height_change_gen_0, col = height_change_gen_0, label = SNP)) +
       
-## Gen 2
-  plot(x = man_df$index, 
-       y = -log10(man_df$p_val_adj_gen_2), 
-       pch =  20, cex = man_df$cex,
-       xlab = "", ylab = "-log10(Pvalue)", 
-       las = 1,
-       col = man_df$color, # To alternate colors for pseudo-chromosomes
-       ylim = c(0, 8),
-       bty = "l",
-       xaxt = "n",
-       main = "Genotype 2")
-    
-    ## Overplot significant points
-    
-    gen_2_sub <- man_df %>%
-      filter(top_snp_gen_2 == TRUE)
-    
-    points(x = gen_2_sub$index, 
-           y = -log10(gen_2_sub$p_val_gen_2),
-           pch = 21, col = "black",
-           cex = sig_cex, 
-           bg = sig_color)
-    text(x = gen_2_sub$index,
-         y = -log10(gen_2_sub$p_val_adj_gen_2),
-         label = gen_2_sub$SNP,
-         pos = 3, cex = 1)
-    
-    
-    
-    
-    
-    
+   
+      
+    # Vertical lines
+      geom_vline(xintercept = chrom_breaks$index, col = "grey50", alpha = 0.8) + 
+      
+    # Add points
+      geom_point(pch = 16, alpha = man_df$p_val_adj_gen_0_alpha, size = cex) +
+      geom_point(aes(index, y = height_change_gen_1, col = height_change_gen_1), 
+                 pch = 17, alpha = man_df$p_val_adj_gen_1_alpha, size = cex) +
+      geom_point(aes(index, y = height_change_gen_2, col = height_change_gen_2), 
+                 pch = 16, alpha = man_df$p_val_adj_gen_2_alpha, size = cex) +
+      
+    # Horizontal line
+    geom_hline(yintercept = 0, lty = 2) +
+
+    # # Add snp names
+    #   geom_text_repel(
+    #     aes(index, y = height_change_gen_0),
+    #     data = subset(man_df, height_change_gen_0 > 0 & p_val_adj_gen_0 < 0.05),
+    #     col = "black"
+    #   ) +
+    #   geom_text_repel(
+    #     aes(index, y = height_change_gen_1),
+    #     data = subset(man_df, height_change_gen_1 > 0 & p_val_adj_gen_1 < 0.05),
+    #     col = "black"
+    #   ) +
+    #   geom_text_repel(
+    #     aes(index, y = height_change_gen_2),
+    #     data = subset(man_df, height_change_gen_2 > 0 & p_val_adj_gen_2 < 0.05),
+    #     col = "black"
+    #   ) +
+      
+    # Scale colors
+      scale_colour_viridis_c(option = "D", direction = -1, name = "% Change in RGR \n w/ 4.8°C increase") + 
+  
+    # Theme options
+      ylim(c(-50, 50)) + 
+      scale_x_continuous(expand = c(0.01, 0.01), 
+                         breaks = x_axis_breaks$index,
+                         labels = x_axis_breaks$chrom) + 
+      ylab("") + 
+      xlab("Chromosome") + 
+      theme_bw(15) + 
+      theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
+           # axis.text.x=element_blank(), axis.ticks.x=element_blank()) +
+      NULL
+
     # Save as pdf
-    dev.copy(pdf, paste0("./figs_tables/Figure 4 - manhattan plot interaction term ", 
-                         Sys.Date(), ".pdf"),
-             width = 8, height = 8)
+    dev.copy(png, paste0("./figs_tables/Figure 4 - manhattan plot interaction term wo labels_", 
+                         Sys.Date(), ".png"),
+             width = 12, height = 6, res = 300, units = "in")
     dev.off()
     
     
+    #  ## Assign color for chromosome
+   #  man_df$color <- man_df$chrom %% 3
+   #  man_df$color[man_df$color == 0] <- "#a6cee3"
+   #  man_df$color[man_df$color == 1] <- "#1f78b4"
+   #  man_df$color[man_df$color == 2] <- "#b2df8a"
+   #  
+   # 
+   #  ## Make beneficial alleles bigger and different color
+   #  sig_cex <- 1.5
+   #  sig_color <- "#33a02c"
+   #  sig_pch <- 21 # Outline sig ones
+   #  
+   #  ## YLIM
+   #  ylim <- c(0, 10)
+   #  
+   #  
+   #  ## Testing out overplotting
+   #  
+   #  ## GGplot version
+   #  
+   #  ggplot(man_df, aes(x = index, y = -log10(man_df$p_val_gen_0), col = height_change_gen_0)) + 
+   #    geom_point(pch = 16) +
+   #    geom_point(aes(index, y = -log10(man_df$p_val_gen_1), col = height_change_gen_1), pch = 15) + 
+   #    geom_point(aes(index, y = -log10(man_df$p_val_gen_2), col = height_change_gen_2), pch = 16) + 
+   #    scale_colour_viridis_c() + #, values = scales::rescale(man_df$height_change_gen_0)) +
+   #    ylim(ylim) + ylab("-log10(Pvalue)") +
+   #    theme_bw(15) +
+   #    NULL
+   #  
+   #  cex = 1
+   #  
+   #  ## Genotype 0 
+   #  plot(x = man_df$index,
+   #       y = -log10(man_df$p_val_gen_0),
+   #       pch = 16,
+   #       cex = cex,
+   #       xlab = " ", ylab = "-log10(Pvalue)", 
+   #       las = 1,
+   #       col = man_df$color, # To alternate colors for pseudo-chromosomes
+   #       ylim = ylim,
+   #       bty = "l",
+   #       xaxt = "n")
+   # 
+   #  ## Genotype 1
+   #  points(x = man_df$index,
+   #         y = -log10(man_df$p_val_gen_1),
+   #         pch = 15,
+   #         cex = cex,
+   #         col = man_df$color)
+   #  
+   #  ## Genotype 2
+   #  points(x = man_df$index,
+   #         y = -log10(man_df$p_val_gen_2),
+   #         pch = 17,
+   #         cex = cex,
+   #         col = man_df$color)
+   #  
+   # ## Highlight beneficial genotypes
+   #  man_df %>%
+   #    filter(top_snp_gen_0 == TRUE) %>%
+   #  with(points(x = index, 
+   #         y = -log10(p_val_gen_0),
+   #         pch = 16, col = "black",
+   #         cex = sig_cex, 
+   #         bg = sig_color))
+   #  
+   #  man_df %>%
+   #    filter(top_snp_gen_1 == TRUE) %>%
+   #    with(points(x = index, 
+   #                y = -log10(p_val_gen_1),
+   #                pch = 15, col = "black",
+   #                cex = sig_cex, 
+   #                bg = sig_color))
+   #  
+   #  man_df %>%
+   #    filter(top_snp_gen_2 == TRUE) %>%
+   #    with(points(x = index, 
+   #                y = -log10(p_val_gen_2),
+   #                pch = 17, col = "black",
+   #                cex = sig_cex, 
+   #                bg = sig_color))
     
-    
-    
+# 
+#     ## Custom plot
+#     
+#     par(mfrow = c(3, 1))
+#     
+#     ## Gen 0 
+#     plot(x = man_df$index, 
+#          y = -log10(man_df$p_val_adj_gen_0), 
+#          pch =  20, cex = man_df$cex,
+#          xlab = " ", ylab = "-log10(Pvalue)", 
+#          las = 1,
+#          col = man_df$color, # To alternate colors for pseudo-chromosomes
+#          ylim = ylim,
+#          bty = "l",
+#          xaxt = "n",
+#          main = "Genotype 0")
+#     
+#     
+#     ## Overplot significant points
+# 
+#     gen_0_sub <- man_df %>%
+#       filter(top_snp_gen_0 == TRUE)
+#     
+#     points(x = gen_0_sub$index, 
+#            y = -log10(gen_0_sub$p_val_adj_gen_0),
+#            pch = 21, col = "black",
+#            cex = sig_cex, 
+#            bg = sig_color)
+#     text(x = gen_0_sub$index,
+#          y = -log10(gen_0_sub$p_val_adj_gen_0),
+#          label = gen_0_sub$SNP,
+#          pos = 3, cex = 1)
+#     
+#     
+#     ## Gen 1
+#     plot(x = man_df$index, 
+#          y = -log10(man_df$p_val_adj_gen_1), 
+#          pch =  20, cex = man_df$cex,
+#          xlab = "", ylab = "-log10(Pvalue)", 
+#          las = 1,
+#          col = man_df$color, # To alternate colors for pseudo-chromosomes
+#          ylim = ylim,
+#          bty = "l",
+#          xaxt = "n",
+#          main = "Genotype 1")
+#     
+#     ## Overplot significant points
+#     
+#     gen_1_sub <- man_df %>%
+#       filter(top_snp_gen_1 == TRUE)
+#     
+#     if(nrow(gen_1_sub) > 0){
+#       points(x = gen_1_sub$index, 
+#              y = -log10(gen_1_sub$p_val_adj_gen_1),
+#              pch = 21, col = "black",
+#              cex = sig_cex, 
+#              bg = sig_color)
+#       text(x = gen_1_sub$index,
+#            y = -log10(gen_1_sub$p_val_adj_gen_1),
+#            label = gen_1_sub$SNP,
+#            pos = 3, cex = 1)
+#     }
+#       
+# ## Gen 2
+#   plot(x = man_df$index, 
+#        y = -log10(man_df$p_val_adj_gen_2), 
+#        pch =  20, cex = man_df$cex,
+#        xlab = "", ylab = "-log10(Pvalue)", 
+#        las = 1,
+#        col = man_df$color, # To alternate colors for pseudo-chromosomes
+#        ylim = ylim,
+#        bty = "l",
+#        xaxt = "n",
+#        main = "Genotype 2")
+#     
+#     ## Overplot significant points
+#     
+#     gen_2_sub <- man_df %>%
+#       filter(top_snp_gen_2 == TRUE)
+#     
+#     points(x = gen_2_sub$index, 
+#            y = -log10(gen_2_sub$p_val_adj_gen_2),
+#            pch = 21, col = "black",
+#            cex = sig_cex, 
+#            bg = sig_color)
+#     text(x = gen_2_sub$index,
+#          y = -log10(gen_2_sub$p_val_adj_gen_2),
+#          label = gen_2_sub$SNP,
+#          pos = 3, cex = 1)
+#   
+#     
+#     # Save as pdf
+#     dev.copy(pdf, paste0("./figs_tables/Figure 4 - manhattan plot interaction term", 
+#                          Sys.Date(), ".pdf"),
+#              width = 8, height = 8)
+#     dev.off()
+#     
+ 
     # SNP density plot
     # CMplot(man_df, plot.type = "d",
     #        col=c("darkgreen", "yellow", "red"),
@@ -960,15 +1146,7 @@
       
     }
 
-  
-  
-  
-  
- 
-  
 
-  
-   
 # Random forest on just beneficial alleles ------------------------
    
    library(randomForest)
@@ -981,7 +1159,7 @@
    dim(gf_factor)
    
    ## Count number of positives - where allele is found
-   pos_thresh <- 15
+   pos_thresh <- 25
    
    # Remove SNPs below threshold
      # For presences
@@ -1009,9 +1187,7 @@
    #   gf_factor[, col] <- as.factor(sample(0:1, nrow(gf_factor), replace = TRUE))
    # }
    # summary(gf_factor)
-   
- 
-   
+
    ## Set up rasters
      library(raster)
    
@@ -1113,11 +1289,11 @@
                            "bioclim_04",
                            "bioclim_15",
                            "bioclim_18",
-                           "bioclim_19",
+                       #    "bioclim_19", # R = 0.79 with aet; R = 0.84 with bioclim_18
                            "elevation",
-                           "latitude",
-                           "longitude",
-                           "random")
+                           "latitude")
+                         #  "longitude", # R = -0.84 with latitude
+                         #  "random")
      
      pairs.panels(gen_dat_bene[, climate_vars_rf])
      
@@ -1131,7 +1307,7 @@
      start_flag = FALSE
      pp_df <- NULL
      
-     reps = 10
+     reps = 1
      
      n_snps_to_sample <- sum(top_snps$snp %in% colnames(gf_factor)) # Sample same number of SNPs as top snps in random forest
  
@@ -1180,21 +1356,6 @@
          # Convert to factor
          y <- factor(y)
          
-         # # Run random forest model
-         # rf <- randomForest(y = y[not_NAs], # Don't include NAs
-         #                      x = X[not_NAs, ], 
-         #                      importance = TRUE,
-         #                      nodesize = 10,
-         #                    sampsize = c(min(n0, n1), min(n0, n1)),
-         #                   # sampsize = c(50, min(n0, n1)),
-         #                      #  replace = FALSE,
-         #                   #   classwt = c(.5, .5),
-         #               #   strata = y[not_NAs],
-         #                      ntree = 1000)
-         # 
-         # 
-         # rf
-         
         # Set up dataframe for random forest
          dat_rf <- cbind(y = y[not_NAs], X[not_NAs, ])
          
@@ -1204,7 +1365,8 @@
                             data = dat_rf,
                         #   min.node.size = 10,
                            ntree = 1000,
-                           class.weights = c(min(n0, n1), min(n0, n1)),
+                       #    class.weights = c(min(n0, n1), min(n0, n1)),
+                        class.weights =  c(10, 10),
                            num.threads = 6)
          boruta_rf
          
@@ -1218,15 +1380,15 @@
                                 data = dat_rf,
                                 importance = TRUE,
                              #   nodesize = 10,
-                                sampsize = c(min(n0, n1), min(n0, n1)),
-                                # sampsize = c(50, min(n0, n1)),
+                             #   sampsize = c(min(n0, n1), min(n0, n1)),
+                             sampsize = c(10, 10),
                                 #  replace = FALSE,
-                                #   classwt = c(.5, .5),
                                 #   strata = y[not_NAs],
                                 ntree = 1000)
              
              
              rf
+             
          } else {
            rf <- NA
          }
@@ -1235,8 +1397,10 @@
          # plotImpHistory(test)
          
          # print(importance(rf))
-         #  cat("OOB error rate: ", mean(rf$err.rate[, 1]), "\n")
-        # cat("Class1 error rate: ", rf$confusion[2,3], "\n")
+          # cat("OOB error rate: ", mean(rf$err.rate[, 1]), "\n")
+          # cat("Class1 error rate: ", rf$confusion[2,3], "\n")
+         
+         print(rf)
          
          
          # ROC plot
@@ -1303,6 +1467,8 @@
                                       rep = rep,
                                       var = climate_var,
                                       prob = pp_out[, 2],
+                                      prob_centered = pp_out[, 2] - mean(pp_out[, 2]),
+                                      prob_scaled = scale(pp_out[, 2]),
                                       x_val = pp_out[, 1],
                                       stringsAsFactors = FALSE)
 
@@ -1355,6 +1521,7 @@
     
   } # End mode loop
      
+     
    ## Importance
      
      importance_boruta_raw <- importance_boruta
@@ -1395,27 +1562,17 @@
                   ungroup() %>%
                  dplyr::select(-snp) %>%
                  group_by(mode, climate_var) %>%
-                  summarise_all(funs(mean, lwr, upr))  %>% # Calculate means and upr and lower quantiles
+                summarise_all(funs(mean, lwr, upr))  %>% # Calculate means and upr and lower quantiles
                  left_join(., importance_boruta_df_top, by = c("climate_var"))
      
-     ## Average across reps??
-     importance_boruta_means <- 
-       importance_boruta %>%
-       group_by(mode, rep, climate_var) %>%  ## Average across reps by snp
-       summarise_all(mean) %>%
-       ungroup() %>%
-       dplyr::select(-snp) %>%
-       group_by(mode, climate_var) %>%
-       summarise_all(funs(mean, lwr, upr))  %>% # Calculate means and upr and lower quantiles
-       left_join(., importance_boruta_df_top, by = c("climate_var"))
-     
-     
      # Make ggplot
-     ggplot(importance_boruta_means, aes(order, meanImp_mean, fill = mode)) + 
+     importance_boruta_means %>%
+     dplyr::filter(mode == "top_snps") %>%
+     ggplot(., aes(order, meanImp_mean, fill = mode)) + 
       geom_bar(stat = "identity", col = "black", 
                position = position_dodge2(reverse = TRUE)) + 
-       geom_errorbar(aes(ymin = meanImp_lwr, ymax = meanImp_upr),
-                     position = position_dodge2(reverse = TRUE)) + 
+       # geom_errorbar(aes(ymin = meanImp_lwr, ymax = meanImp_upr),
+       #               position = position_dodge2(reverse = TRUE)) + 
        theme_bw(15) + 
        ggtitle("Variable importance") + 
        #   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
@@ -1427,7 +1584,9 @@
        theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
      
      ## Significance
-     ggplot(importance_boruta_means, aes(order, decision_mean, fill = mode)) + 
+     importance_boruta_means %>%
+       dplyr::filter(mode == "top_snps") %>%
+     ggplot(., aes(order, decision_mean, fill = mode)) + 
        geom_bar(stat = "identity", col = "black", position = position_dodge2(reverse = TRUE)) + 
        geom_errorbar(aes(ymin = decision_lwr, ymax = decision_upr),
                      position = position_dodge2(reverse = TRUE)) +
@@ -1460,6 +1619,7 @@
   ## Plot raster
      levelplot(top_snps_stack, margin = FALSE,
                main = "Probability of finding beneficial genotype",
+               maxpixels = 1e6,
                par.settings =  rasterTheme(region = brewer.pal('PiYG', n = 9))) +
        latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
        latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.75)) + 
@@ -1479,11 +1639,12 @@
      
      
     # Raster plot of Random SNPs
-     levelplot(random_snps_stack, margin = FALSE,
-               main = "Random Snps") + 
-       latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
-       #    latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.75)) + 
-       latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 2.75))
+    levelplot(random_snps_stack, margin = FALSE,
+              main = "Probability of random genotype",
+              par.settings =  rasterTheme(region = brewer.pal('PiYG', n = 9))) +
+      latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
+      latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.75)) + 
+      latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 2.75))
      
     
      
@@ -1507,18 +1668,23 @@
        latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black"))
      
   
-   # Plot partial dependence plots of TMax
+ # Plot partial dependence plots of TMax
      
+     head(pp_df)
      dim(pp_df)
-
-    
+     
+     
   pp_df %>%
+    dplyr::filter(mode == "top_snps") %>%
     group_by(mode, snp, var, x_val) %>% # Average across reps
     summarise_all(mean) %>%
    ggplot(., 
-          aes(x = x_val, y = prob,
-                       group = snp, col = mode, alpha = .75)) + 
-     geom_line(lwd = .25) + 
+          aes(x = x_val,
+            #  y = prob,
+              y = prob_centered,
+            #  y = prob_scaled,
+              group = snp, col = mode), alpha = 0.75) + 
+ #    geom_line(lwd = .25) + 
     theme_bw(15) + 
     # theme(legend.position="none") +
      geom_smooth(aes(group = mode), lwd = 1.5) +
@@ -2022,37 +2188,48 @@
 
 # Simulate data to test out interaction effects in gams -------------------
 
-  dat <- expand.grid(cat = c(1,2,3, 4),
+  dat <- expand.grid(cat = c(1,2,3,4,5),
                      x = seq(-3, 3, by = .1))
   dat$cat <- factor(dat$cat)
+  
+  y_intercept <- 100
     
     
-  dat$y <- -.5 + -.25*dat$x + -.25*dat$x^2 + rnorm(nrow(dat), sd = .5)
+  dat$y <- -.5 + -.25*dat$x + -.25*dat$x^2 + rnorm(nrow(dat), sd = .5) + y_intercept
   
   # dat$y[dat$cat == 2] <- -.5 + -.25*dat$x[dat$cat == 2] + .25*dat$x[dat$cat == 2]^2 + rnorm(nrow(dat[dat$cat == 2,]), sd = .5)
   
   # Make cat 1 upside down
  # dat$y[dat$cat == 1] <- -.5 + -.25*dat$x[dat$cat == 1] + .25*dat$x[dat$cat == 1]^2 + rnorm(nrow(dat[dat$cat == 1,]), sd = .5)
-  dat$y[dat$cat == 2] <- -.5 + -.25*dat$x[dat$cat == 2] + .25*dat$x[dat$cat == 2]^2 + rnorm(nrow(dat[dat$cat == 2,]), sd = .5)
+  dat$y[dat$cat == 2] <- -.5 + -.25*dat$x[dat$cat == 2] + .25*dat$x[dat$cat == 2]^2 + rnorm(nrow(dat[dat$cat == 2,]), sd = .5) + y_intercept
   
   # Make cat 2 a straight line
  #  dat$y[dat$cat == 2] <- rnorm(nrow(dat[dat$cat == 2,]), sd = .5)
   # dat$y[dat$cat == 3] <- rnorm(nrow(dat[dat$cat == 3,]), sd = .5)
+   dat$y[dat$cat == 3] <- rnorm(nrow(dat[dat$cat == 3,]), sd = .05) + y_intercept
+  # dat$y[dat$cat == 5] <- rnorm(nrow(dat[dat$cat == 5,]), sd = .5) + y_intercept
   # 
   ggplot(dat, aes(x, y, col = cat, fill = cat)) + geom_point() + 
     theme_bw() + geom_smooth()
   
   
   # Run model
- # gam1 <- gam(y ~ s(x) + cat + s(x, by = cat), data = dat)
-  
   gam1 <- bam(y ~ s(x, bs = "cr") + cat + s(x, by = cat, bs = "cr"), 
-              method = "fREML", discrete = F,
+              method = "fREML", discrete = TRUE,
+              data = dat)
+  
+  gam2 <- bam(y ~ s(x, bs = "cr") +cat, 
+              method = "fREML", discrete = TRUE,
               data = dat)
 
-  summary(gam1) 
+  summary(gam1)
   
-  visreg(gam1, xvar = "x", by = "cat")
+  anova(gam2, gam1, test = "F")
+  
+  anova(gam1)
+  anova.gam(gam1, test = "Cp")
+  
+  ?visreg(gam1, xvar = "x", by = "cat")
   
   gam1$coefficients
   
@@ -2061,4 +2238,8 @@
   
   # Discrete is not reliable - p values changea lot among simulations
   # m = 1 doesn't seem to do much with 4 categories
+  
+  # P-values are usually reliable if the smoothing parameters are known, or the model is unpenalized. If smoothing parameters have been estimated then the p-values are typically somewhat too low under the null. This occurs because the uncertainty associated with the smoothing parameters is neglected in the calculations of the distributions under the null, which tends to lead to underdispersion in these distributions, and in turn to p-value estimates that are too low. (In simulations where the null is correct, I have seen p-values that are as low as half of what they should be.) Note however that tests can have low power if the estimated rank of the test statistic is much higher than the EDF, so that p-values can also be too low in some cases.
+  
+  # If it is important to have p-values that are as accurate as possible, then, at least in the single model case, it is probably advisable to perform tests using unpenalized smooths (i.e. s(...,fx=TRUE)) with the basis dimension, k, left at what would have been used with penalization. Such tests are not as powerful, of course, but the p-values are more accurate under the null. Whether or not extra accuracy is required will usually depend on whether or not hypothesis testing is a key objective of the analysis.
 
