@@ -106,9 +106,10 @@ back_transform <- function(x, var, means, sds){
   # With all 5,000+ seedlings
   gam_all <- bam(formula = form,
                  data = dat_all_scaled,
-              #   discrete = TRUE, 
+                 discrete = TRUE, 
                  nthreads = 8,
-                 method = "fREML", family = "gaussian", 
+                 method = "fREML", 
+                 family = "gaussian",
                  control = list(trace = FALSE))
   
   summary(gam_all)
@@ -118,7 +119,10 @@ back_transform <- function(x, var, means, sds){
   test_fit$pred <- gam_all$fitted.values
   
 
-  ggplot(test_fit, aes(x = pred, y = rgr, bg = section_block)) + geom_point(alpha = 0.75, pch = 21) + theme_bw(15) +
+  ggplot(test_fit, aes(y = pred, x = rgr, col = section_block)) + 
+    geom_point(alpha = 0.75, pch = 19) + 
+    theme_bw(15) +
+    xlab("Observed RGR") + ylab("Predicted RGR") +
     geom_abline(slope = 1, intercept = 0, lwd = 1.5, col = "forestgreen")
   
   visreg(gam_all, partial = TRUE, ylab = "5 yr height (cm)")
