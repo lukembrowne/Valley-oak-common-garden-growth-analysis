@@ -136,7 +136,7 @@
 
  # Prediction frame with a XXXX degree increase
     
-  degree_increase = 4.88  
+  degree_increase = 4.8
     
   # Set up each climate variable individually
   pred <-  expand.grid(height_2014 = 0,
@@ -208,19 +208,19 @@
   task_id = 5; interval = 5
   
   
-# # Loop through snps by index based on task id
-#   for(snp_index in task_id:(task_id + interval - 1)){
-# 
-#     # To avoid going past number of snps
-#     if(snp_index > length(snp_col_names)){
-#       next
-#     }
-# 
-#     # Choose snp
-#     snp <- snp_col_names[snp_index]
-  
- ### LOOPING THROUGH TOP SNPS   
-   for(snp in top_snps$snp){  
+# Loop through snps by index based on task id
+  for(snp_index in task_id:(task_id + interval - 1)){
+
+    # To avoid going past number of snps
+    if(snp_index > length(snp_col_names)){
+      next
+    }
+
+    # Choose snp
+    snp <- snp_col_names[snp_index]
+
+ # ### LOOPING THROUGH TOP SNPS   
+ #   for(snp in top_snps$snp){  
     
       # For timing loops
       start_time <- Sys.time()
@@ -239,10 +239,7 @@
    # dat_snp[, snp] <- as.factor(pull(dat_snp, snp))
     dat_snp_unscaled[, snp] <- as.factor(pull(dat_snp_unscaled, snp))
     
-  ## Randomize RGR data
-  #  dat_snp_unscaled$rgr <- sample(dat_snp_unscaled$rgr)
-
-    # Formula for fixed effects
+     # Formula for fixed effects
     # Stack overflow on adding m = 1 to by= smooths - https://stats.stackexchange.com/questions/32730/how-to-include-an-interaction-term-in-gam
 
     
@@ -259,13 +256,9 @@
     
     ## Add MEMs
   #  fixed_effects_int <- paste0(fixed_effects_int,  "+ s(mem1, bs =\"cr\") + s(mem2, bs =\"cr\") + s(mem3, bs =\"cr\") + s(mem4, bs =\"cr\")")
-                                       
-
-    ## 0 is super significant snp_3_97069461
-    ## THe classic: snp_7_693540540
     
-    ## Randomize genotype
-    dat_snp[, snp] <- dat_snp[sample(1:nrow(dat_snp)) , snp]
+  ## Randomize RGR data
+   # dat_snp_unscaled$rgr <- sample(dat_snp_unscaled$rgr)
 
     start <- Sys.time()
    # Gam with interaction effect
@@ -275,12 +268,13 @@
                   nthreads = 8,
                 method = "fREML",
              #   method = "ML",
-                  family = "gaussian",
+                  family = "tw",
                   control = list(trace = FALSE))
     
     Sys.time() - start
 
-    # summary(gam_snp_int)
+    print(summary(gam_snp_int))
+    
     # 
     # visreg(gam_snp_int, xvar = climate_var_dif, by = snp,
     #       overlay = TRUE, partial = FALSE, rug = FALSE)
@@ -439,7 +433,7 @@
                     alpha = 0.25, show.legend = FALSE)  +
         geom_vline(aes(xintercept = 0), lty = 2) +
         geom_vline(xintercept = 1.1) + 
-        geom_vline(xintercept = 4.88, lwd = 1.5) +
+        geom_vline(xintercept = 4.8, lwd = 1.5) +
         geom_line(aes(x = tmax_sum_dif_unscaled, y = pred, col = factor(genotype)), lwd = 1.5) +
         
         labs(col = "Genotype") +
@@ -472,16 +466,28 @@
       for(genotype in c(0,1,2)){
         
         if(!genotype %in% as.numeric(as.character(pred_sub$genotype))){
+          gam_snp_int[paste0("height_4.8_gen_", genotype)] <- NA
+          gam_snp_int[paste0("height_0_gen_", genotype)] <- NA
           gam_snp_int[paste0("height_change_gen_", genotype)] <- NA
           next
         }
         
         pred_sub_temp <- pred_sub[pred_sub$genotype == genotype, ]
         
-        height_change <- (pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 4.88][1] - 
-                            pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 0][1]) / pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 4.88][1] * 100 
+        # Calculate predicted height
+        height_4.8 <- pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 4.8][1]
+        height_0 <- pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 0][1]
         
+        
+        height_change <- (height_4.8 - height_0) / height_0 * 100
+           
+        # Save values into model list
+        gam_snp_int[paste0("height_4.8_gen_", genotype)] <- height_4.8
+        gam_snp_int[paste0("height_0_gen_", genotype)] <- height_0
         gam_snp_int[paste0("height_change_gen_", genotype)] <- height_change
+        
+        # Save which accession was used in prediction
+        gam_snp_int["accession_pred"] <- as.character(pred_sub$accession[1])
         
       }
 
@@ -527,6 +533,9 @@
     # Snp name
     snp = names(gam_list),
     
+    # Accession used for prediction
+    acc_pred = unlist(lapply(gam_list, function(x) x$accession_pred)),
+    
     # Sample size
     n = unlist(lapply(gam_list_summary, function(x) x$n)),
     
@@ -553,10 +562,20 @@
     # Delta AIC with model without interaction
    # delta_aic = unlist(lapply(gam_list, function(x) x$delta_aic)),
     
-    # Predictions of height
+    # Predictions of change in height
     height_change_gen_0 = unlist(lapply(gam_list, function(x) x$height_change_gen_0)),
     height_change_gen_1 = unlist(lapply(gam_list, function(x) x$height_change_gen_1)),
     height_change_gen_2 = unlist(lapply(gam_list, function(x) x$height_change_gen_2)),
+  
+    # Predictions of absolute height
+    height_4.8_gen_0 = unlist(lapply(gam_list, function(x) x$height_4.8_gen_0)),
+    height_4.8_gen_1 = unlist(lapply(gam_list, function(x) x$height_4.8_gen_1)),
+    height_4.8_gen_2 = unlist(lapply(gam_list, function(x) x$height_4.8_gen_2)),
+  
+    # Predictions of absolute height
+    height_0_gen_0 = unlist(lapply(gam_list, function(x) x$height_0_gen_0)),
+    height_0_gen_1 = unlist(lapply(gam_list, function(x) x$height_0_gen_1)),
+    height_0_gen_2 = unlist(lapply(gam_list, function(x) x$height_0_gen_2)),
     
     # P values for interaction terms
     p_val_int = ifelse(unlist(lapply(gam_list_summary, function(x)
@@ -633,6 +652,8 @@
   #path_to_summaries <- "./output/run_3418155_tmax_sum_dif_rgr_REML/model_summaries/"
   
   path_to_summaries <- "./output/run_3430720_tmax_sum_dif_rgr_fREML_discrete_v3/model_summaries/"
+  
+  path_to_summaries <- "./output/run_3437087_tmax_sum_dif_rgr_fREML_discrete_v3_rgrrandomized/model_summaries/"
   
   
   sum_df_raw <- plyr::ldply(list.files(path_to_summaries, full = TRUE), read_csv)
@@ -2188,7 +2209,7 @@
 
 # Simulate data to test out interaction effects in gams -------------------
 
-  dat <- expand.grid(cat = c(1,2,3,4,5),
+  dat <- expand.grid(cat = c(1,2,3),
                      x = seq(-3, 3, by = .1))
   dat$cat <- factor(dat$cat)
   
@@ -2213,6 +2234,13 @@
     theme_bw() + geom_smooth()
   
   
+  ## Quadratic model
+  lm1 <- lm(y ~ x + I(x^2) + cat + x * cat + I(x^2)*cat, data = dat)
+  summary(lm1)
+  visreg(lm1, xvar = "x", by = "cat")
+  
+  
+  
   # Run model
   gam1 <- bam(y ~ s(x, bs = "cr") + cat + s(x, by = cat, bs = "cr"), 
               method = "fREML", discrete = TRUE,
@@ -2221,7 +2249,7 @@
   gam2 <- bam(y ~ s(x, bs = "cr") +cat, 
               method = "fREML", discrete = TRUE,
               data = dat)
-
+  
   summary(gam1)
   
   anova(gam2, gam1, test = "F")

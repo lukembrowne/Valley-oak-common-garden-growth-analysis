@@ -100,7 +100,7 @@ back_transform <- function(x, var, means, sds){
 
 
 # Set formula for gam
-  form <- formula(paste0("rgr ~ section_block + s(height_2014, bs =\"cr\") + s(", var, " , bs = \"cr\") + s(accession, bs = \"re\")"))
+  form <- formula(paste0("rgr ~ section_block + s(height_2014, bs =\"cr\") + s(", var, " , bs = \"cr\", k = 20) + s(accession, bs = \"re\")"))
   
   
   # With all 5,000+ seedlings
@@ -109,25 +109,25 @@ back_transform <- function(x, var, means, sds){
                  discrete = TRUE, 
                  nthreads = 8,
                  method = "fREML", 
-                 family = "gaussian",
-                 control = list(trace = FALSE))
+             #  family = "gaussian",
+               family = "tw",
+               control = list(trace = FALSE))
   
   summary(gam_all)
-
+  
   # Plot overall model fit
   test_fit <- dat_all_scaled
   test_fit$pred <- gam_all$fitted.values
   
-
   ggplot(test_fit, aes(y = pred, x = rgr, col = section_block)) + 
     geom_point(alpha = 0.75, pch = 19) + 
     theme_bw(15) +
     xlab("Observed RGR") + ylab("Predicted RGR") +
     geom_abline(slope = 1, intercept = 0, lwd = 1.5, col = "forestgreen")
   
-  visreg(gam_all, partial = TRUE, ylab = "5 yr height (cm)")
+  visreg(gam_all, partial = TRUE, ylab = "RGR")
   
-  visreg(gam_all, partial = FALSE, ylab = "5 yr height (cm)")
+  visreg(gam_all, partial = FALSE, ylab = "RGR")
   
   gam.check(gam_all)
   
@@ -169,7 +169,7 @@ back_transform <- function(x, var, means, sds){
    # ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
     ylab("Relative growth rate") +
     xlab("Tmax transfer distance") +
-   # ylim(c(110, 200)) +
+    ylim(c(.25, .4)) +
     theme_bw(15) + 
     theme(panel.border = element_blank(), panel.grid.major = element_blank(),
           panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
@@ -195,8 +195,8 @@ back_transform <- function(x, var, means, sds){
   
   newdata
   
-  newdata$pred <- predict(gam_all, newdata = newdata, se.fit = TRUE)$fit
-  newdata$se <- predict(gam_all, newdata = newdata, se.fit = TRUE)$se.fit
+  newdata$pred <- predict(gam_all, newdata = newdata, se.fit = TRUE, type = "response")$fit
+  newdata$se <- predict(gam_all, newdata = newdata, se.fit = TRUE, type = "response")$se.fit
   
   newdata$lwr <- newdata$pred - newdata$se * 1.96
   newdata$upr <- newdata$pred + newdata$se * 1.96

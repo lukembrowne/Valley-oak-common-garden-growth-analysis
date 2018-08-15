@@ -359,8 +359,11 @@
       #                    height_2015, height_2017) )
       
     #  Change to NA outlier values in relative growth rate
-      dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.005, na.rm = TRUE) |
-                    dat_all$rgr >= quantile(dat_all$rgr, 0.995, na.rm = TRUE)] <- NA
+      # dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.005, na.rm = TRUE) |
+      #               dat_all$rgr >= quantile(dat_all$rgr, 0.995, na.rm = TRUE)] <- NA
+      
+    # Exclude individuals with a negative growth rate
+      dat_all <- dplyr::filter(dat_all, rgr >= 0)
 
 
       ## Filter out individuals without an estimated RGR
