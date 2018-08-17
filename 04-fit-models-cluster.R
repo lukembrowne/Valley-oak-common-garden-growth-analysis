@@ -206,21 +206,24 @@
   
   
   task_id = 5; interval = 5
+  save_outlier_preds <- FALSE
+  outlier_preds <- NULL
   
   
-# Loop through snps by index based on task id
-  for(snp_index in task_id:(task_id + interval - 1)){
+# # Loop through snps by index based on task id
+#   for(snp_index in task_id:(task_id + interval - 1)){
+# 
+#     # To avoid going past number of snps
+#     if(snp_index > length(snp_col_names)){
+#       next
+#     }
+# 
+#     # Choose snp
+#     snp <- snp_col_names[snp_index]
 
-    # To avoid going past number of snps
-    if(snp_index > length(snp_col_names)){
-      next
-    }
-
-    # Choose snp
-    snp <- snp_col_names[snp_index]
-
- # ### LOOPING THROUGH TOP SNPS   
- #   for(snp in top_snps$snp){  
+ ### LOOPING THROUGH TOP SNPS
+   for(snp in c(top_snps_long$snp[1:10], mid_snps_long$snp[1:10], bottom_snps_long$snp[1:10])){
+     save_outlier_preds <- TRUE # Save output of the top SNPs for plotting together
     
       # For timing loops
       start_time <- Sys.time()
@@ -252,7 +255,7 @@
     fixed_effects_int <- paste0(paste0("rgr ~ section_block + ", snp, "+ s(height_2014, bs=\"cr\") +  s(", climate_var_dif,", bs=\"cr\") + s(", climate_var_dif,", by = ", snp, ", bs=\"cr\")"))
     
     ## Add gen pcs and interactions
-   # fixed_effects_int <- paste0(fixed_effects_int, paste0(paste0("+ s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC1_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC2_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC3_gen, bs=\"cr\")")))
+    fixed_effects_int <- paste0(fixed_effects_int, paste0(paste0("+ s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC1_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC2_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC3_gen, bs=\"cr\")")))
     
     ## Add MEMs
   #  fixed_effects_int <- paste0(fixed_effects_int,  "+ s(mem1, bs =\"cr\") + s(mem2, bs =\"cr\") + s(mem3, bs =\"cr\") + s(mem4, bs =\"cr\")")
@@ -423,43 +426,83 @@
       dplyr::filter(get(snp) %in% c(0, 1, 2))
     
     
-    # Climate transfer functions by genotype
-      p1 <-  
-        pred_sub %>%
-      #  dplyr::filter(genotype !=  "1") %>%
-        ggplot(.) +
-        geom_ribbon(aes(tmax_sum_dif_unscaled, ymin = pred - 1.96 * se, 
-                        ymax = pred + 1.96 * se, fill = factor(genotype)),
-                    alpha = 0.25, show.legend = FALSE)  +
-        geom_vline(aes(xintercept = 0), lty = 2) +
-        geom_vline(xintercept = 1.1) + 
-        geom_vline(xintercept = 4.8, lwd = 1.5) +
-        geom_line(aes(x = tmax_sum_dif_unscaled, y = pred, col = factor(genotype)), lwd = 1.5) +
+    # # Climate transfer functions by genotype
+    #   p1 <-  
+    #     pred_sub %>%
+    #   #  dplyr::filter(genotype !=  "1") %>%
+    #     ggplot(.) +
+    #     geom_ribbon(aes(tmax_sum_dif_unscaled, ymin = pred - 1.96 * se, 
+    #                     ymax = pred + 1.96 * se, fill = factor(genotype)),
+    #                 alpha = 0.25, show.legend = FALSE)  +
+    #     geom_vline(aes(xintercept = 0), lty = 2) +
+    #     geom_vline(xintercept = 1.1) + 
+    #     geom_vline(xintercept = 4.8, lwd = 1.5) +
+    #     geom_line(aes(x = tmax_sum_dif_unscaled, y = pred, col = factor(genotype)), lwd = 1.5) +
+    #     
+    #     labs(col = "Genotype") +
+    #     xlim(-2.5, 7.5) +
+    #    scale_color_discrete(labels = c("Homozygous \n reference",
+    #                                    "Heterozygous", "Homozygous\n non-reference")) +
+    #     ylab("Relative growth rate") +
+    #     xlab("Tmax transfer distance") +
+    #     ggtitle(snp) +
+    #     theme_bw(15) + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+    #                          panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+    # 
+    # # Density plots of genotypes
+    #   p2 <- ggplot(dat_snp_trans,
+    #                aes(x = get(climate_var_dif), fill = factor(get(snp)))) +
+    #     geom_histogram(binwidth = .5, col = "grey10") +
+    #     geom_vline(aes(xintercept = 0), lty = 2) +
+    #     labs(fill = "Genotype") +
+    #     xlab(climate_var_dif) +
+    #     ggtitle(snp) +
+    #     theme_bw(15)
+    # 
+    # # Plot to PDF
+    #   pdf(paste0("./output/model_visualizations/", snp,"_gg.pdf"), width = 15, height = 5)
+    #    print(p1 + p2)
+    #   dev.off()
+    #   
+  ## Save top and bottom predictions
+      if(save_outlier_preds){
         
-        labs(col = "Genotype") +
-        xlim(-2.5, 7.5) +
-       scale_color_discrete(labels = c("Homozygous \n reference",
-                                       "Heterozygous", "Homozygous\n non-reference")) +
-        ylab("Relative growth rate") +
-        xlab("Tmax transfer distance") +
-        ggtitle(snp) +
-        theme_bw(15) + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
-                             panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+        type <- NA
+        gen <- NA
+        
+        ## Figure out if top or bottom snp
+        if(snp %in% top_snps_long$snp){
+          type <- "top"
+          gen <- as.numeric(top_snps_long$genotype[top_snps_long$snp == snp])
+        } else if(snp %in% bottom_snps_long$snp){
+          type <- "bottom"
+          gen <- as.numeric(bottom_snps_long$genotype[bottom_snps_long$snp == snp])
+        } else if(snp %in% mid_snps_long$snp){
+          type <- "mid"
+          gen <- as.numeric(mid_snps_long$genotype[mid_snps_long$snp == snp])
+        }
+        
+       #  error check
+        if(is.na(type) | is.na(gen)){
+          stop("type or genotype is NA and it shouldn't be")
+        }
 
-    # Density plots of genotypes
-      p2 <- ggplot(dat_snp_trans,
-                   aes(x = get(climate_var_dif), fill = factor(get(snp)))) +
-        geom_histogram(binwidth = .5, col = "grey10") +
-        geom_vline(aes(xintercept = 0), lty = 2) +
-        labs(fill = "Genotype") +
-        xlab(climate_var_dif) +
-        ggtitle(snp) +
-        theme_bw(15)
+       outlier_preds_temp <-  pred_sub %>% 
+          dplyr::filter(get(snp) == gen) %>%
+          mutate_if(is.factor, as.character) %>%
+          mutate(snp = snp) %>%
+          mutate(type = type) %>%
+          dplyr::select(snp, type, tmax_sum_dif_unscaled, pred, se)
+        
+        if(!exists("outlier_preds")){
+          outlier_preds <- outlier_preds_temp
+        } else {
+          outlier_preds <- rbind(outlier_preds, outlier_preds_temp)
+        }
 
-    # Plot to PDF
-      pdf(paste0("./output/model_visualizations/", snp,"_gg.pdf"), width = 15, height = 5)
-       print(p1 + p2)
-      dev.off()
+      } # End save outlier_preds
+      
+      
 
     
   # Make prediction for XXXX degree increase in temperature
@@ -518,6 +561,30 @@
   
   
   beep(4)
+  
+  ## Plot overlay of outlier SNPS
+  ggplot(outlier_preds, aes(x = tmax_sum_dif_unscaled, y = pred, group = factor(snp),
+                            col = factor(type))) +
+    
+    geom_line(lwd = 1, alpha = 0.15,
+              show.legend = FALSE) +
+    geom_smooth(aes(x = tmax_sum_dif_unscaled, y = pred, group = factor(type),
+                    col = factor(type))) +
+    geom_vline(aes(xintercept = 0), lty = 2) +
+    geom_vline(xintercept = 1.1) + 
+    geom_vline(xintercept = 4.8, lwd = 1.5) +
+    labs(col = "Genotype") +
+    xlim(-2.5, 7.5) +
+    ylab("Relative growth rate") +
+    xlab("Tmax transfer distance") +
+    theme_bw(15) + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+                         panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+  
+  
+  
+  
+  
+  
   
   
   
@@ -615,45 +682,16 @@
   )
   
   head(gam_mod_summary_df)
+
   
-#  gam_mod_summary_df_m1 <- gam_mod_summary_df
-  
-  plot(gam_mod_summary_df_m1$p_val_gen_0, gam_mod_summary_df$p_val_gen_0)
-  abline(a = 0, b = 1)
-  
-  plot(gam_mod_summary_df_m1$p_val_gen_1, gam_mod_summary_df$p_val_gen_1)
-  abline(a = 0, b = 1)
-  
-  plot(gam_mod_summary_df_m1$p_val_gen_2, gam_mod_summary_df$p_val_gen_2)
-  abline(a = 0, b = 1)
-  
-  
+
   
 
 # Read in cluster run output ----------------------------------------------
 
- # path_to_summaries <- "./output/model_summaries_run_3027735_pc_gen/"  # Controlling for structure
-  #path_to_summaries <- "./output/model_summaries_run_3118140_tmax_sum_dif_rgr_ML/"
- # path_to_summaries <- "./output/model_summaries_run_3130265_tmax_sum_dif_rgr_fREML_discrete/"
- # path_to_summaries <- "./output/model_summaries_run_3131613_tmax_sum_dif_rgr_fREML_not_discrete/"
-#  path_to_summaries <- "./output/model_summaries_run_3134990_tmax_sum_dif_rgr_fREML_discrete_random_genotype/"
-#  path_to_summaries <- "./output/model_summaries_run_3163411_tmax_sum_dif_rgr_fREML_not_discrete_genotypes_factor/"
+  path_to_summaries <- "./output/run_3537913_tmax_sum_dif_rgr_fREML_discrete_v3_tw/model_summaries/"
   
-#  path_to_summaries <- "./output/model_summaries_run_3175133_tmax_sum_dif_rgr_fREML_discerete_genotypes_factor/"
-  
-  # path_to_summaries <- "./output/run_3408597_tmax_sum_dif_rgr_fREML_discrete_factor/model_summaries/"
-  # 
-  # path_to_summaries <- "./output/run_3409773_tmax_sum_dif_rgr_fREML_not_discrete_factor/model_summaries/"
-  # 
-  # path_to_summaries <- "./output/run_3412112_tmax_sum_dif_rgr_REML_factor/model_summaries/"
-  # 
-  path_to_summaries <- "./output/run_3416635_tmax_sum_dif_rgr_fREML_discrete/model_summaries/"
-  
-  #path_to_summaries <- "./output/run_3418155_tmax_sum_dif_rgr_REML/model_summaries/"
-  
-  path_to_summaries <- "./output/run_3430720_tmax_sum_dif_rgr_fREML_discrete_v3/model_summaries/"
-  
-  path_to_summaries <- "./output/run_3437087_tmax_sum_dif_rgr_fREML_discrete_v3_rgrrandomized/model_summaries/"
+  path_to_summaries <- "./output/run_3539884_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc/model_summaries/"
   
   
   sum_df_raw <- plyr::ldply(list.files(path_to_summaries, full = TRUE), read_csv)
@@ -680,478 +718,315 @@
   sample_sizes <- c(sum_df_raw$n_gen0, sum_df_raw$n_gen1, sum_df_raw$n_gen2)
   sum(sample_sizes < 100, na.rm = TRUE)
   
-  hist(all_p_vals[sample_sizes > 100],
-       breaks = 40, col = "forestgreen", main = "", xlab = "p val")
+  # hist(all_p_vals[sample_sizes > 100],
+  #      breaks = 40, col = "forestgreen", main = "", xlab = "p val")
+  # 
+  # hist(all_p_vals[all_p_vals > 0.05],
+  #      breaks = 40, col = "forestgreen", main = "", xlab = "p val")
   
-  hist(all_p_vals[all_p_vals > 0.05],
-       breaks = 40, col = "forestgreen", main = "", xlab = "p val")
-  
-  plot(sample_sizes, all_p_vals, pch = ".")
+  #  plot(sample_sizes, all_p_vals, pch = ".")
   
 
 # Sort and arrange data ---------------------------------------------------
 
-  sum_df <- sum_df_raw
+  sum_df <- sum_df_raw # For backup
   
-  # Figuring out which allele is beneficial
-  sum_df <- sum_df %>%
-    mutate(beneficial_gen_0 = ifelse(height_change_gen_0 >= 0, 1, 0),
-           beneficial_gen_1 = ifelse(height_change_gen_1 >= 0, 1, 0),
-           beneficial_gen_2 = ifelse(height_change_gen_2 >= 0, 1, 0)) %>%
-    mutate(beneficial_any = (beneficial_gen_0 == 1 | 
-                                  beneficial_gen_1 == 1 |
-                                  beneficial_gen_2 == 1))
+  ## Convert to from wide to long format
+  n_gen_long <- sum_df %>%
+    dplyr::select(snp, n_gen0, n_gen1, n_gen2, acc_pred, n) %>%
+    gather(key = "genotype", value = "n_gen", -snp, -acc_pred, -n) %>%
+    mutate(genotype = gsub("n_gen", "", genotype))
   
-  table(sum_df$beneficial_any)
-  table(sum_df$beneficial_gen_0)
-  table(sum_df$beneficial_gen_1)
-  table(sum_df$beneficial_gen_2)  
+  head(n_gen_long)
+  
+  p_val_long <- sum_df %>%
+      dplyr::select(snp, p_val_gen_0, p_val_gen_1, p_val_gen_2) %>%
+      gather(key = "genotype", value = "p_val", -snp) %>%
+      mutate(genotype = gsub("p_val_gen_", "", genotype))
+  
+    head(p_val_long)
+  
+  height_change_long <- sum_df %>%
+    dplyr::select(snp, height_change_gen_0, height_change_gen_1, height_change_gen_2) %>%
+    gather(key = "genotype", value = "height_change", -snp) %>%
+    mutate(genotype = gsub("height_change_gen_", "", genotype))
+  
+  head(height_change_long)
+  
+  height_4.8_long <- sum_df %>%
+    dplyr::select(snp, height_4.8_gen_0, height_4.8_gen_1, height_4.8_gen_2) %>%
+    gather(key = "genotype", value = "height_4.8", -snp) %>%
+    mutate(genotype = gsub("height_4.8_gen_", "", genotype))
+  
+  head(height_4.8_long)
+  
+  height_0_long <- sum_df %>%
+    dplyr::select(snp, height_0_gen_0, height_0_gen_1, height_0_gen_2) %>%
+    gather(key = "genotype", value = "height_0", -snp) %>%
+    mutate(genotype = gsub("height_0_gen_", "", genotype))
+  
+  head(height_0_long)
+  
+## Join all together
+  sum_df_long <- left_join(n_gen_long, p_val_long) %>%
+    left_join(. , height_change_long) %>%
+    left_join(., height_4.8_long) %>%
+    left_join(., height_0_long)
+  
+  head(sum_df_long)
+  
+  
+# Filter out based on number of gene copies
+  
+  gen_copies_thresh <- 100
+  
+  sum_df_long <- sum_df_long %>%
+    dplyr::filter(n_gen >= gen_copies_thresh)
+  
+  
+# Calculate height change based on average at 0 transfer
+  
+  sum_df_long <- sum_df_long %>%
+    mutate(height_change_0base = (height_4.8 - mean(height_0)) / mean(height_0) * 100)
+  
+ # plot(sum_df_long$height_change_0base, sum_df_long$height_change)
+  
 
- 
-  ## Calculating q values  
-      # Vignette - https://bioconductor.org/packages/release/bioc/vignettes/qvalue/inst/doc/qvalue.pdf
+# Correct p and q values
+  # Vignette - https://bioconductor.org/packages/release/bioc/vignettes/qvalue/inst/doc/qvalue.pdf
   
-  
-  ## Convert to long format
-  sum_df_long <- sum_df %>%
-    dplyr::select(snp, p_val_gen_0, p_val_gen_1, p_val_gen_2) %>%
-    gather(key = "genotype", value = "p_val_gen", -snp)
- 
   # Calculate q values and adjusted p values
-      qvals <- qvalue(p = sum_df_long$p_val_gen,
-                     # p = sum_df$p_val_gen_0,
-                      fdr.level = 0.05)
-      
-      pvals_adj <- p.adjust(sum_df_long$p_val_gen, method = "fdr")
-      
-      summary(qvals)
-      summary(pvals_adj)
-      hist(pvals_adj, breaks = 40)
-      sum(pvals_adj < 0.05, na.rm = TRUE)
-      
-      
-      qvals$pi0 # overall proportion of true null hypotheses
-      table(qvals$significant)
-
-     # hist(qvals)
-      
-      # Assign back into DF
-      sum_df_long <- sum_df_long %>%
-        mutate(q_val = qvals$qvalues) %>%
-        mutate(p_val_adj = pvals_adj)
-      
-
-  ## Split into two DFs - one for q vals, one for p val adj    
-      
-    ##  Q vals
-     sum_df   <-  sum_df_long %>%
-                      mutate(genotype = gsub(pattern = "p_val", 
-                                             replacement = "q_val",genotype)) %>%
-                      dplyr::select(-p_val_gen, -p_val_adj) %>%
-                      spread(key = genotype, value = q_val) %>%
-                      left_join(sum_df, .)
-
-     ##  P vals adjusted
-     sum_df   <-  sum_df_long %>%
-       mutate(genotype = gsub(pattern = "p_val", 
-                              replacement = "p_val_adj",genotype)) %>%
-       dplyr::select(-p_val_gen, -q_val) %>%
-       spread(key = genotype, value = p_val_adj) %>%
-       left_join(sum_df, .)
-     
-     
-     
-# Select top snps ---------------------------------------------------------
-     
-    gen_copies_thresh <- 100
-    p_val_thresh <- 0.05
-   # p_val_thresh <- 5e-5
-     
-     
-    sum_df <-  sum_df %>%
-       mutate(top_snp_gen_0 = (p_val_adj_gen_0 < p_val_thresh & beneficial_gen_0 == 1 & n_gen0 >= gen_copies_thresh)) %>%
-       mutate(top_snp_gen_1 = (p_val_adj_gen_1 < p_val_thresh & beneficial_gen_1 == 1 & n_gen1 >= gen_copies_thresh)) %>%
-       mutate(top_snp_gen_2 = (p_val_adj_gen_2 < p_val_thresh & beneficial_gen_2 == 1 & n_gen2 >= gen_copies_thresh))
-    
-    
-  # How many for each genotype?
-    table(sum_df$top_snp_gen_0)
-    table(sum_df$top_snp_gen_1)
-    table(sum_df$top_snp_gen_2)
-    
-  # Make top snps dataframe  
-    top_snps <- sum_df %>%
-      filter(top_snp_gen_0 | top_snp_gen_1 | top_snp_gen_2)
-    
-    nrow(top_snps)
-
-    
-# Manhattan plots ---------------------------------------------------------
-    
-   # library(CMplot)
-    
-    man_df1 <- data.frame(SNP = snp_col_names, 
-                          snp_pos)
-    
-    man_df <- left_join(man_df1, sum_df, by = c("SNP" = "snp"))
-    
-    man_df$index <- 1:nrow(man_df) ## For x axis plotting
-    
-    head(man_df)
-    
-    ## Clean up snps with low copy numbers
-    man_df <- man_df %>%
-      dplyr::mutate(height_change_gen_0 = ifelse(n_gen0 >= gen_copies_thresh, height_change_gen_0, NA),
-                    height_change_gen_1 = ifelse(n_gen1 >= gen_copies_thresh, height_change_gen_1, NA),
-                    height_change_gen_2 = ifelse(n_gen2 >= gen_copies_thresh, height_change_gen_2, NA),
-                    height_change_gen_0 = ifelse(height_change_gen_0 >= 50 | height_change_gen_0 <= -50, NA, height_change_gen_0),
-                    height_change_gen_1 = ifelse(height_change_gen_1 >= 50 | height_change_gen_1 <= -50, NA, height_change_gen_1),
-                    height_change_gen_2 = ifelse(height_change_gen_2 >= 50 | height_change_gen_2 <= -50, NA, height_change_gen_2),
-                    p_val_adj_gen_0_scaled = scales::rescale(p_val_adj_gen_0, to = c(1, 0), from = c(0, 1)),
-                    p_val_adj_gen_1_scaled = scales::rescale(p_val_adj_gen_1, to = c(1, 0), from = c(0, 1)),
-                    p_val_adj_gen_2_scaled = scales::rescale(p_val_adj_gen_2, to = c(1, 0), from = c(0, 1)),
-                    p_val_adj_gen_0_alpha = ifelse(p_val_adj_gen_0 < 0.05, 1, .15),
-                    p_val_adj_gen_1_alpha = ifelse(p_val_adj_gen_1 < 0.05, 1, .15),
-                    p_val_adj_gen_2_alpha = ifelse(p_val_adj_gen_2 < 0.05, 1, .15))
-    
-    ## Clean up chromosome names - clear scaffold names
-    man_df <- man_df %>%
-      mutate(chrom = ifelse(grepl("chr", chrom), chrom, ""))
-    
-    
-    ## GGplot version
-    
-    # Setup
-     cex = 3
-     
-    # For labels on x axis 
-       x_axis_breaks <- man_df %>%
-                       dplyr::select(index, chrom) %>%
-                       group_by(chrom) %>%
-                       summarise_all(mean)
-     
-     # For vertical lines showing chromosome sections
-       chrom_breaks <- man_df %>%
-                 dplyr::select(index, chrom) %>%
-                 group_by(chrom) %>%
-                 summarise_all(max)
-    
-    # Start plot
-    ggplot(man_df, aes(x = index, y = height_change_gen_0, col = height_change_gen_0, label = SNP)) +
-      
-   
-      
-    # Vertical lines
-      geom_vline(xintercept = chrom_breaks$index, col = "grey50", alpha = 0.8) + 
-      
-    # Add points
-      geom_point(pch = 16, alpha = man_df$p_val_adj_gen_0_alpha, size = cex) +
-      geom_point(aes(index, y = height_change_gen_1, col = height_change_gen_1), 
-                 pch = 17, alpha = man_df$p_val_adj_gen_1_alpha, size = cex) +
-      geom_point(aes(index, y = height_change_gen_2, col = height_change_gen_2), 
-                 pch = 16, alpha = man_df$p_val_adj_gen_2_alpha, size = cex) +
-      
-    # Horizontal line
-    geom_hline(yintercept = 0, lty = 2) +
-
-    # # Add snp names
-    #   geom_text_repel(
-    #     aes(index, y = height_change_gen_0),
-    #     data = subset(man_df, height_change_gen_0 > 0 & p_val_adj_gen_0 < 0.05),
-    #     col = "black"
-    #   ) +
-    #   geom_text_repel(
-    #     aes(index, y = height_change_gen_1),
-    #     data = subset(man_df, height_change_gen_1 > 0 & p_val_adj_gen_1 < 0.05),
-    #     col = "black"
-    #   ) +
-    #   geom_text_repel(
-    #     aes(index, y = height_change_gen_2),
-    #     data = subset(man_df, height_change_gen_2 > 0 & p_val_adj_gen_2 < 0.05),
-    #     col = "black"
-    #   ) +
-      
-    # Scale colors
-      scale_colour_viridis_c(option = "D", direction = -1, name = "% Change in RGR \n w/ 4.8°C increase") + 
+  qvals <- qvalue(p = sum_df_long$p_val,
+                  fdr.level = 0.05)
   
-    # Theme options
-      ylim(c(-50, 50)) + 
-      scale_x_continuous(expand = c(0.01, 0.01), 
-                         breaks = x_axis_breaks$index,
-                         labels = x_axis_breaks$chrom) + 
-      ylab("") + 
-      xlab("Chromosome") + 
-      theme_bw(15) + 
-      theme(panel.border = element_blank(), panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
-           # axis.text.x=element_blank(), axis.ticks.x=element_blank()) +
-      NULL
+  pvals_adj <- p.adjust(sum_df_long$p_val, method = "fdr")
+  
+  summary(qvals)
+  summary(pvals_adj)
+  hist(pvals_adj, breaks = 40)
 
-    # Save as pdf
-    dev.copy(png, paste0("./figs_tables/Figure 4 - manhattan plot interaction term wo labels_", 
-                         Sys.Date(), ".png"),
-             width = 12, height = 6, res = 300, units = "in")
-    dev.off()
-    
-    
-    #  ## Assign color for chromosome
-   #  man_df$color <- man_df$chrom %% 3
-   #  man_df$color[man_df$color == 0] <- "#a6cee3"
-   #  man_df$color[man_df$color == 1] <- "#1f78b4"
-   #  man_df$color[man_df$color == 2] <- "#b2df8a"
-   #  
-   # 
-   #  ## Make beneficial alleles bigger and different color
-   #  sig_cex <- 1.5
-   #  sig_color <- "#33a02c"
-   #  sig_pch <- 21 # Outline sig ones
-   #  
-   #  ## YLIM
-   #  ylim <- c(0, 10)
-   #  
-   #  
-   #  ## Testing out overplotting
-   #  
-   #  ## GGplot version
-   #  
-   #  ggplot(man_df, aes(x = index, y = -log10(man_df$p_val_gen_0), col = height_change_gen_0)) + 
-   #    geom_point(pch = 16) +
-   #    geom_point(aes(index, y = -log10(man_df$p_val_gen_1), col = height_change_gen_1), pch = 15) + 
-   #    geom_point(aes(index, y = -log10(man_df$p_val_gen_2), col = height_change_gen_2), pch = 16) + 
-   #    scale_colour_viridis_c() + #, values = scales::rescale(man_df$height_change_gen_0)) +
-   #    ylim(ylim) + ylab("-log10(Pvalue)") +
-   #    theme_bw(15) +
-   #    NULL
-   #  
-   #  cex = 1
-   #  
-   #  ## Genotype 0 
-   #  plot(x = man_df$index,
-   #       y = -log10(man_df$p_val_gen_0),
-   #       pch = 16,
-   #       cex = cex,
-   #       xlab = " ", ylab = "-log10(Pvalue)", 
-   #       las = 1,
-   #       col = man_df$color, # To alternate colors for pseudo-chromosomes
-   #       ylim = ylim,
-   #       bty = "l",
-   #       xaxt = "n")
-   # 
-   #  ## Genotype 1
-   #  points(x = man_df$index,
-   #         y = -log10(man_df$p_val_gen_1),
-   #         pch = 15,
-   #         cex = cex,
-   #         col = man_df$color)
-   #  
-   #  ## Genotype 2
-   #  points(x = man_df$index,
-   #         y = -log10(man_df$p_val_gen_2),
-   #         pch = 17,
-   #         cex = cex,
-   #         col = man_df$color)
-   #  
-   # ## Highlight beneficial genotypes
-   #  man_df %>%
-   #    filter(top_snp_gen_0 == TRUE) %>%
-   #  with(points(x = index, 
-   #         y = -log10(p_val_gen_0),
-   #         pch = 16, col = "black",
-   #         cex = sig_cex, 
-   #         bg = sig_color))
-   #  
-   #  man_df %>%
-   #    filter(top_snp_gen_1 == TRUE) %>%
-   #    with(points(x = index, 
-   #                y = -log10(p_val_gen_1),
-   #                pch = 15, col = "black",
-   #                cex = sig_cex, 
-   #                bg = sig_color))
-   #  
-   #  man_df %>%
-   #    filter(top_snp_gen_2 == TRUE) %>%
-   #    with(points(x = index, 
-   #                y = -log10(p_val_gen_2),
-   #                pch = 17, col = "black",
-   #                cex = sig_cex, 
-   #                bg = sig_color))
-    
-# 
-#     ## Custom plot
-#     
-#     par(mfrow = c(3, 1))
-#     
-#     ## Gen 0 
-#     plot(x = man_df$index, 
-#          y = -log10(man_df$p_val_adj_gen_0), 
-#          pch =  20, cex = man_df$cex,
-#          xlab = " ", ylab = "-log10(Pvalue)", 
-#          las = 1,
-#          col = man_df$color, # To alternate colors for pseudo-chromosomes
-#          ylim = ylim,
-#          bty = "l",
-#          xaxt = "n",
-#          main = "Genotype 0")
-#     
-#     
-#     ## Overplot significant points
-# 
-#     gen_0_sub <- man_df %>%
-#       filter(top_snp_gen_0 == TRUE)
-#     
-#     points(x = gen_0_sub$index, 
-#            y = -log10(gen_0_sub$p_val_adj_gen_0),
-#            pch = 21, col = "black",
-#            cex = sig_cex, 
-#            bg = sig_color)
-#     text(x = gen_0_sub$index,
-#          y = -log10(gen_0_sub$p_val_adj_gen_0),
-#          label = gen_0_sub$SNP,
-#          pos = 3, cex = 1)
-#     
-#     
-#     ## Gen 1
-#     plot(x = man_df$index, 
-#          y = -log10(man_df$p_val_adj_gen_1), 
-#          pch =  20, cex = man_df$cex,
-#          xlab = "", ylab = "-log10(Pvalue)", 
-#          las = 1,
-#          col = man_df$color, # To alternate colors for pseudo-chromosomes
-#          ylim = ylim,
-#          bty = "l",
-#          xaxt = "n",
-#          main = "Genotype 1")
-#     
-#     ## Overplot significant points
-#     
-#     gen_1_sub <- man_df %>%
-#       filter(top_snp_gen_1 == TRUE)
-#     
-#     if(nrow(gen_1_sub) > 0){
-#       points(x = gen_1_sub$index, 
-#              y = -log10(gen_1_sub$p_val_adj_gen_1),
-#              pch = 21, col = "black",
-#              cex = sig_cex, 
-#              bg = sig_color)
-#       text(x = gen_1_sub$index,
-#            y = -log10(gen_1_sub$p_val_adj_gen_1),
-#            label = gen_1_sub$SNP,
-#            pos = 3, cex = 1)
-#     }
-#       
-# ## Gen 2
-#   plot(x = man_df$index, 
-#        y = -log10(man_df$p_val_adj_gen_2), 
-#        pch =  20, cex = man_df$cex,
-#        xlab = "", ylab = "-log10(Pvalue)", 
-#        las = 1,
-#        col = man_df$color, # To alternate colors for pseudo-chromosomes
-#        ylim = ylim,
-#        bty = "l",
-#        xaxt = "n",
-#        main = "Genotype 2")
-#     
-#     ## Overplot significant points
-#     
-#     gen_2_sub <- man_df %>%
-#       filter(top_snp_gen_2 == TRUE)
-#     
-#     points(x = gen_2_sub$index, 
-#            y = -log10(gen_2_sub$p_val_adj_gen_2),
-#            pch = 21, col = "black",
-#            cex = sig_cex, 
-#            bg = sig_color)
-#     text(x = gen_2_sub$index,
-#          y = -log10(gen_2_sub$p_val_adj_gen_2),
-#          label = gen_2_sub$SNP,
-#          pos = 3, cex = 1)
-#   
-#     
-#     # Save as pdf
-#     dev.copy(pdf, paste0("./figs_tables/Figure 4 - manhattan plot interaction term", 
-#                          Sys.Date(), ".pdf"),
-#              width = 8, height = 8)
-#     dev.off()
-#     
+  qvals$pi0 # overall proportion of true null hypotheses
+  table(qvals$significant)
+  
+  # hist(qvals)
+  
+  # Assign back into DF
+  sum_df_long <- sum_df_long %>%
+    mutate(q_val = qvals$qvalues) %>%
+    mutate(p_val_adj = pvals_adj)
+  
+  head(sum_df_long)
+  
+  
+  
+## Identify top and bottom XXX% of SNPs
+  
+  percent_thresh <- 0.005
+  
+ top_snps_long <-  sum_df_long %>%
+    dplyr::filter(p_val_adj <= 0.05) %>%
+    dplyr::arrange(desc(height_change_0base)) %>%
+    head(round(nrow(sum_df) * percent_thresh))
  
-    # SNP density plot
-    # CMplot(man_df, plot.type = "d",
-    #        col=c("darkgreen", "yellow", "red"),
-    #        file.output = FALSE)
-    # 
-    # ## Manhattan plot with SNP density  
-    # dev.off()
-    # CMplot(man_df, plot.type=c("m"), LOG10=TRUE, threshold=1e-3,
-    #        bin.size=1e6,
-    #        chr.den.col=c("darkgreen", "yellow", "red"), file.output = FALSE)
-    # 
-    # ## QQplot  
-    # dev.off()
-    # CMplot(man_df, plot.type="q", box=TRUE,file.output = FALSE)
-    # 
-    # # With Q values  
-    # man_df <- left_join(man_df1, sum_df[, c("snp", "q_val")], by = c("SNP" = "snp"))
-    # dev.off()
-    # CMplot(man_df, plot.type=c("m"), LOG10=TRUE, threshold= 0.05,
-    #        bin.size=1e6, ylim = c(0, 2),
-    #        chr.den.col=c("darkgreen", "yellow", "red"), file.output = FALSE)
-    # 
-    # 
-    
-    
-    
+ top_snps_long$top_snp = TRUE # Make a column for T / F of top snp
+ 
+ head(top_snps_long)
+ 
+ bottom_snps_long <- sum_df_long %>%
+   dplyr::filter(p_val_adj <= 0.05) %>%
+   dplyr::arrange(height_change_0base) %>%
+   head(round(nrow(sum_df) * percent_thresh))
+ 
+ bottom_snps_long$bottom_snp = TRUE
+ 
+ head(bottom_snps_long)
+ 
+ # Also make a comparable dataframe of 'random snps'
+ mid_snps_long <- sum_df_long %>%
+   dplyr::filter(p_val_adj <= 0.05) %>%
+   dplyr::filter(!snp %in% c(top_snps_long$snp, bottom_snps_long$snp)) %>%
+   sample_n(round(nrow(sum_df) * percent_thresh))
+ 
+ head(mid_snps_long)
+ summary(mid_snps_long$height_change_0base)
+
+ 
+## Join back to main DF
+ 
+ sum_df_long <- left_join(sum_df_long, dplyr::select(top_snps_long, snp, genotype, top_snp)) %>%
+                left_join(., dplyr::select(bottom_snps_long, snp, genotype, bottom_snp)) %>%
+                mutate(top_snp = replace_na(top_snp, FALSE),
+                       bottom_snp = replace_na(bottom_snp, FALSE))
+ 
+ head(sum_df_long)
+ 
+
+ 
+ 
+ 
+# Manhattan plots ---------------------------------------------------------
+ 
+ # library(CMplot)
+ 
+ man_df1 <- data.frame(SNP = snp_col_names, 
+                       snp_pos)
+ 
+ man_df1$index <- 1:nrow(man_df1) ## For x axis plotting
+ 
+ man_df <- left_join(man_df1, sum_df_long, by = c("SNP" = "snp"))
+
+ head(man_df)
+ 
+ # Set alpha for p values
+ man_df$p_val_adj_alpha <- ifelse(man_df$p_val_adj < 0.05, 1, .15)
+ 
+ # Set up shapes
+ man_df <- man_df %>%
+   mutate(pch = ifelse(genotype == 0 | genotype == 2, 19, 17)) # Circles for homozygotes, trianges for hets
+ 
+ man_df <- man_df %>%
+   mutate(pch = ifelse((genotype == 0 & (top_snp | bottom_snp)) | 
+                         (genotype == 2 & ( top_snp | bottom_snp)), 21, pch)) # Outlined shapes
+ 
+ man_df <- man_df %>%
+   mutate(pch = ifelse((genotype == 1 & (top_snp | bottom_snp)), 24, pch)) # Outlined shapes
+ 
+ table(man_df$pch)
+ 
+ ## Clean up chromosome names - clear scaffold names
+ man_df <- man_df %>%
+   mutate(chrom = ifelse(grepl("chr", chrom), chrom, ""))
+ 
+ 
+ ## GGplot version
+ 
+ # Setup
+ cex = 3
+ 
+ # For labels on x axis 
+ x_axis_breaks <- man_df %>%
+   dplyr::select(index, chrom) %>%
+   group_by(chrom) %>%
+   summarise_all(mean)
+ 
+ # For vertical lines showing chromosome sections
+ chrom_breaks <- man_df %>%
+   dplyr::select(index, chrom) %>%
+   group_by(chrom) %>%
+   summarise_all(max)
+ 
+ # Start plot
+ ggplot(man_df, aes(x = index, y = height_change_0base,
+                    col = height_change_0base, label = SNP)) +
+
+   # Vertical lines
+   geom_vline(xintercept = chrom_breaks$index, col = "grey50", alpha = 0.8) + 
+   
+   # Add points
+   geom_point(pch = man_df$pch, 
+             # col = "black",
+              alpha = man_df$p_val_adj_alpha, 
+              size = cex) +
+   
+   # Overplot top and bottom SNPS
+   geom_point(data = man_df[man_df$top_snp | man_df$bottom_snp, ],
+              aes(x = index, y = height_change_0base, bg = height_change_0base),
+              col = "black",
+              pch = man_df[man_df$top_snp | man_df$bottom_snp, ]$pch,
+              size = cex) +
+   
+   # Horizontal line
+   geom_hline(yintercept = 0, lty = 2) +
+   
+   # # Add snp names
+   #   geom_text_repel(
+   #     aes(index, y = height_change_gen_0),
+   #     data = subset(man_df, height_change_gen_0 > 0 & p_val_adj_gen_0 < 0.05),
+   #     col = "black"
+   #   ) +
+   #   geom_text_repel(
+   #     aes(index, y = height_change_gen_1),
+   #     data = subset(man_df, height_change_gen_1 > 0 & p_val_adj_gen_1 < 0.05),
+   #     col = "black"
+ #   ) +
+ #   geom_text_repel(
+ #     aes(index, y = height_change_gen_2),
+ #     data = subset(man_df, height_change_gen_2 > 0 & p_val_adj_gen_2 < 0.05),
+ #     col = "black"
+ #   ) +
+ 
+ # Scale colors
+ scale_colour_viridis_c(option = "D", direction = -1, name = "% Change in RGR \n w/ 4.8°C increase") + 
+ scale_fill_viridis_c(option = "D", direction = -1, name = "% Change in RGR \n w/ 4.8°C increase") + 
+   
+   # Theme options
+  # ylim(c(-50, 50)) + 
+   scale_x_continuous(expand = c(0.01, 0.01), 
+                      breaks = x_axis_breaks$index,
+                      labels = x_axis_breaks$chrom) + 
+   scale_y_continuous(breaks = seq(-25, 25, 5)) + 
+   ylab("") + 
+   xlab("Chromosome") + 
+   theme_bw(15) + 
+   theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+         panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
+   # axis.text.x=element_blank(), axis.ticks.x=element_blank()) +
+   NULL
+ 
+ # Save as pdf
+ dev.copy(png, paste0("./figs_tables/Figure 4 - manhattan plot interaction term wo labels_", 
+                      Sys.Date(), ".png"),
+          width = 12, height = 6, res = 300, units = "in")
+ dev.off() 
+  
+ 
+ 
 
 # Convert top SNPs genotypes to precense absence --------------------------
 
-    gen_dat_bene <- gen_dat_clim_all # Using all GBS samples
+ gen_dat_bene <- gen_dat_clim_all
+ 
+ 
+  for(snp in top_snps_long$snp){
     
-    for(snp in top_snps$snp){
-      
-      sub <- sum_df[sum_df$snp == snp, ]
-      
-      ben0 <- sub$beneficial_gen_0 == 1 # Check if genotype is beneficial or not
-      ben1 <- sub$beneficial_gen_1 == 1
-      ben2 <- sub$beneficial_gen_2 == 1
-      
-     gen_dat_bene[, snp] <-  apply(gen_dat_clim_all[, snp], 1, function(x) {
-        if(is.na(x)){ NA
-        } else if(x == 0 & is.na(ben0)){ NA
-        } else if(x == 0 & ben0){ 1
-        } else if(x == 1 & is.na(ben1)){ NA
-        } else if(x == 1 & ben1){ 1
-        } else if(x == 2 & is.na(ben2)){ NA
-        } else if(x == 2 & ben2){ 1
-        } else {  0
-        }
-      }) # End apply
-     
-    } # End SNP loop
+    # Subset out good genotype
+    ben_gen <- as.numeric(top_snps_long$genotype[top_snps_long$snp == snp])
     
-    summary(gen_dat_bene[, top_snps$snp])
+    if(length(ben_gen) > 1) {
+      stop("length of ben gen shouldn't be more than 1!!")
+    }
     
-    
-  ## For rest of SNPs, convert non-reference alleles to 1, reference alleles to 0 for comparison
-    for(snp in snp_col_names[!snp_col_names %in% top_snps$snp]){
+    # Replace genotype
+    gen_dat_bene[, snp] <- apply(gen_dat_clim_all[, snp], 1, function(x) {
+                if(is.na(x)){ NA
+                } else if(x == ben_gen){ 1
+                } else {  0
+                }
+              }) # End apply
+ 
+  }
+ 
+  dim(gen_dat_bene)
+ 
+ 
+ ## For rest of SNPs, convert non-reference alleles to 1, reference alleles to 0 for comparison
+ for(snp in snp_col_names[!snp_col_names %in% top_snps_long$snp]){
+   
+   gen_dat_bene[, snp] <-  apply(gen_dat_clim_all[, snp], 1, function(x) {
+     if(is.na(x)){ NA
+     } else if(x == 0){ 0
+     } else if(x == 1){ 1
+     } else if(x == 2){ 1
+     } else {  0
+     }
+   }) # End apply
+   
+ } # End SNP loop
 
-      gen_dat_bene[, snp] <-  apply(gen_dat_clim_all[, snp], 1, function(x) {
-        if(is.na(x)){ NA
-        } else if(x == 0){ 0
-        } else if(x == 1){ 1
-        } else if(x == 2){ 1
-        } else {  0
-        }
-      }) # End apply
-      
-    } # End SNP loop
-    
-    dim(gen_dat_bene)
-    
-    summary(gen_dat_bene[, snp_col_names[!snp_col_names %in% top_snps$snp][1:50]])
-    
-    
-    
-    
-  
+     
+ 
+ 
+
   ## SCP code to copy over model plots
     for(snp in paste0("snp_", top_snps$snp)[1:15]){
     #  system(paste0("scp lukembro@dtn2.hoffman2.idre.ucla.edu:/u/flashscratch/l/lukembro/qlobata_growth/run_291_tmax_sum_dif/model_plots/", snp, "_gg.pdf ./output/model_visualizations/"))
@@ -1180,7 +1055,7 @@
    dim(gf_factor)
    
    ## Count number of positives - where allele is found
-   pos_thresh <- 25
+   pos_thresh <- 15
    
    # Remove SNPs below threshold
      # For presences
@@ -1200,7 +1075,7 @@
      
      
      ## How many top SNPs pass this threshold?
-     sum(top_snps$snp %in% colnames(gf_factor))
+     sum(top_snps_long$snp %in% colnames(gf_factor))
    
    
    # TO RANDOMIZE GENOTYPES
@@ -1797,6 +1672,76 @@
    
    
 
+     
+
+# Look to see if better performing individuals have more copies of --------
+
+     fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\")"))
+     
+     ## Add gen pcs and interactions
+     # fixed_effects_int <- paste0(fixed_effects_int, paste0(paste0("+ s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC1_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC2_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC3_gen, bs=\"cr\")")))
+     
+     ## Add MEMs
+     #  fixed_effects_int <- paste0(fixed_effects_int,  "+ s(mem1, bs =\"cr\") + s(mem2, bs =\"cr\") + s(mem3, bs =\"cr\") + s(mem4, bs =\"cr\")")
+     
+     ## Randomize RGR data
+     # dat_snp_unscaled$rgr <- sample(dat_snp_unscaled$rgr)
+     
+     start <- Sys.time()
+     # Gam with interaction effect
+     gam_snp = bam(formula = make_formula(fixed_effects, random_effects),
+                       data = dat_snp_unscaled,
+                       discrete = TRUE, # Discrete makes the right curve up and leads to low p values!!
+                       nthreads = 8,
+                       method = "fREML",
+                       #   method = "ML",
+                       family = "tw",
+                       control = list(trace = FALSE))
+     
+     summary(gam_snp)
+     
+     
+     # Join gen_data_bene with dat_snp data
+     
+     dat_snp_bene <- dat_snp_unscaled %>%
+       dplyr::select(accession, accession_progeny, tmax_sum_dif) %>%
+       dplyr::mutate(accession = as.numeric(as.character(accession))) %>%
+       left_join(., gen_dat_bene, by = c("accession" = "accession")) %>%
+       dplyr::select(accession, accession_progeny, tmax_sum_dif, snp_col_names) %>%
+       dplyr::mutate(rgr = gam_snp$fitted.values,
+                     rgr_resids = resid(gam_snp))
+    
+     dat_snp_bene <- dat_snp_bene %>%
+             mutate(n_top_snps = rowSums(dplyr::select(., top_snps$snp), na.rm = TRUE))
+     
+     hist(dat_snp_bene$n_top_snps)
+     
+     plot(dat_snp_bene$n_top_snps, gam_snp$fitted.values)
+     
+     summary(gam(dat_snp_bene$rgr ~ dat_snp_bene$n_top_snps))
+     
+     dat_snp_bene %>%
+       dplyr::filter(tmax_sum_dif > -.5) %>%
+     ggplot(., aes(n_top_snps, rgr)) +
+       geom_point() + geom_smooth() + theme_bw(15)
+     
+     
+     summary(gam(rgr_resids ~ n_top_snps,
+                 data = dat_snp_bene[dat_snp_bene$tmax_sum_dif > 1,]))
+     
+     dat_snp_bene %>%
+       dplyr::filter(tmax_sum_dif > 1) %>%
+     ggplot(., aes(n_top_snps, rgr_resids)) +
+       geom_point() + geom_smooth() + theme_bw(15)
+      
+       
+    
+     
+     
+        
+     
+     
+     
 
   
 
