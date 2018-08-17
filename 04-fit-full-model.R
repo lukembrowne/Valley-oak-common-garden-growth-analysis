@@ -100,7 +100,7 @@ back_transform <- function(x, var, means, sds){
 
 
 # Set formula for gam
-  form <- formula(paste0("rgr ~ section_block + s(height_2014, bs =\"cr\") + s(", var, " , bs = \"cr\", k = 20) + s(accession, bs = \"re\")"))
+  form <- formula(paste0("rgr ~ section_block + s(height_2014, bs =\"cr\") + s(", var, " , bs = \"cr\") + s(accession, bs = \"re\")"))
   
   
   # With all 5,000+ seedlings
@@ -115,7 +115,7 @@ back_transform <- function(x, var, means, sds){
   
   summary(gam_all)
   
-  # Plot overall model fit
+   # Plot overall model fit
   test_fit <- dat_all_scaled
   test_fit$pred <- gam_all$fitted.values
   
@@ -179,6 +179,41 @@ back_transform <- function(x, var, means, sds){
   gg
   
   
+  
+  ### Calculating derivatives
+  
+  ## now evaluate derivatives of smooths with associated standard 
+  ## errors, by finite differencing...
+  x.mesh <- seq(-2, 1.5,length=200) ## where to evaluate derivatives
+  newd <-  data.frame(section_block = v$fit$section_block[1],
+                                height_2014 = v$fit$height_2014[1],
+                                accession = v$fit$accession[1],
+                                tmax_sum_dif = x.mesh)
+  X0 <- predict(gam_all,newd,type="lpmatrix") 
+  
+  eps <- 1e-7 ## finite difference interval
+  x.mesh <- x.mesh + eps ## shift the evaluation mesh
+  newd <-  data.frame(section_block = v$fit$section_block[1],
+                      height_2014 = v$fit$height_2014[1],
+                      accession = v$fit$accession[1],
+                      tmax_sum_dif = x.mesh)
+  X1 <- predict(gam_all,newd,type="lpmatrix")
+  
+  Xp <- (X1-X0)/eps ## maps coefficients to (fd approx.) derivatives
+  colnames(Xp)      ## can check which cols relate to which smooth
+  
+#  par(mfrow=c(2,2))
+  for (i in 3) {  ## plot derivatives and corresponding CIs
+    Xi <- Xp*0 
+    Xi[,(i-1)*9+1:9+1] <- Xp[,(i-1)*9+1:9+1] ## Xi%*%coef(b) = smooth deriv i
+    df <- Xi%*%coef(gam_all)              ## ith smooth derivative 
+    df.sd <- rowSums(Xi%*%gam_all$Vp*Xi)^.5 ## cheap diag(Xi%*%b$Vp%*%t(Xi))^.5
+    plot(x.mesh,df,type="l",ylim=range(c(df+2*df.sd,df-2*df.sd)))
+    lines(x.mesh,df+2*df.sd,lty=2);lines(x.mesh,df-2*df.sd,lty=2)
+    abline(a = 0, b = 0, lty = 1, lwd = 2)
+  }
+  
+
 # Predicting changes in height based on degree increase -------------------
 
   # Set degree increases to compare for no change - medium & high emissions
@@ -315,7 +350,8 @@ back_transform <- function(x, var, means, sds){
     future_null_height <- predict(future_null,
                                   model = gam_all,
                                   const = newdata_rast,
-                                  progress = "text")
+                                  progress = "text",
+                                  type = "response")
     
     future_null_height
     summary(future_null_height)
@@ -336,7 +372,8 @@ back_transform <- function(x, var, means, sds){
     rast_temp_height <- predict(rast_temp,
                         model = gam_all,
                         const = newdata_rast,
-                        progress = "text")
+                        progress = "text",
+                        type = "response")
     
     ## Calculate % change in height
     rast_temp_height <- (rast_temp_height - future_null_height) / future_null_height * 100
@@ -355,7 +392,7 @@ back_transform <- function(x, var, means, sds){
     # writeRaster(x = future_stack_height_change,
     #             filename = paste0("./output/future_stack_height_change_", Sys.Date(), ".tif"),
     #             progress = "text")
-    # 
+
     
   ## Average across low and high emissions scenarios
     future_stack_height_change_85 <- mean(future_stack_height_change[[c("CCSM4_rcp85", 
@@ -402,7 +439,7 @@ back_transform <- function(x, var, means, sds){
     
   
   ## Options for levelplot
-    pixel_num = 1e6 ## Can make resolution better by making this 1e6 
+    pixel_num = 1e5 ## Can make resolution better by making this 1e6 
     
     myTheme <- rasterTheme(region = brewer.pal('RdYlBu', n = 9))
     
@@ -435,7 +472,7 @@ back_transform <- function(x, var, means, sds){
     
     ## Plots of changes in height - RCP 85
     
-    breaks_85 <- seq(-8, -4, by = 0.2)
+    breaks_85 <- seq(-4, -2, by = 0.2)
     
     future_stack_height_change_26_85_limits[[2]][future_stack_height_change_26_85_limits[[2]] < min(breaks_85)] <- min(breaks_85)
     future_stack_height_change_26_85_limits[[2]][future_stack_height_change_26_85_limits[[2]] > max(breaks_85)] <- max(breaks_85)
@@ -444,20 +481,17 @@ back_transform <- function(x, var, means, sds){
               margin = FALSE,
               maxpixels = pixel_num,
               par.settings = myTheme, 
-              at = breaks_85,
+           #   at = breaks_85,
               main = "Rising emissions (RCP 8.5)") + 
       latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
-        latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.75)) + 
+   #     latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.75)) + 
       latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 2.75))
     
     dev.copy(png, paste0("./figs_tables/Figure 3 - RCP85", Sys.Date(), ".png"),
              res = 300, units = "in", width = 6, height = 6)
     dev.off()
     
-    
- 
-    
-     
+  
   
   ## Height change in historical range
     height_change_historic_range <- raster::extract(future_stack_height_change_26_85,
