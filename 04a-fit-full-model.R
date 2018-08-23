@@ -115,6 +115,8 @@ back_transform <- function(x, var, means, sds){
   
   summary(gam_all)
   
+  test = summary(gam_all)
+  
    # Plot overall model fit
   test_fit <- dat_all_scaled
   test_fit$pred <- gam_all$fitted.values
