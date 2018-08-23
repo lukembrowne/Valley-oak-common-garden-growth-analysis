@@ -14,7 +14,7 @@
   library(patchwork) # Installed on home directory
 
 # Load data
- load("../gam_cluster_2018-08-03.Rdata")
+ load("../gam_cluster_2018-08-15.Rdata")
 
 
 # Save functions
@@ -72,8 +72,6 @@
      dat_snp_unscaled[, snp] <- as.factor(pull(dat_snp_unscaled, snp))
 
 
-     ## Randomize RGR data
-     dat_snp_unscaled$rgr <- sample(dat_snp_unscaled$rgr)
 
     
 
@@ -87,11 +85,13 @@
    fixed_effects_int <- paste0(paste0("rgr ~ section_block + ", snp, "+ s(height_2014, bs=\"cr\") +  s(", climate_var_dif,", bs=\"cr\") + s(", climate_var_dif,", by = ", snp, ", bs=\"cr\")")) 
     
     ## Add gen pcs and interactions
-  # fixed_effects_int <- paste0(fixed_effects_int, paste0(paste0("+ s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC1_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC2_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC3_gen, bs=\"cr\")")))
+   fixed_effects_int <- paste0(fixed_effects_int, paste0(paste0("+ s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC1_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC2_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC3_gen, bs=\"cr\")")))
     
     ## Add MEMs
   #  fixed_effects_int <- paste0(fixed_effects_int,  "+ s(mem1, bs =\"cr\") + s(mem2, bs =\"cr\") + s(mem3, bs =\"cr\") + s(mem4, bs =\"cr\")")
 
+   ## Randomize RGR data
+    # dat_snp_unscaled$rgr <- sample(dat_snp_unscaled$rgr)
 
   # Gam with interaction effect
     gam_snp_int = bam(formula = make_formula(fixed_effects_int, random_effects),
@@ -100,7 +100,7 @@
                   nthreads = 8,
                   method = "fREML", 
                 #  method = "ML",
-                  family = "gaussian")
+                  family = "tw")
 
     print(summary(gam_snp_int))
 
@@ -119,6 +119,49 @@
     #    cat("Model STILL not converged...\n")
     #  }
    # }
+
+
+ ## Calculate decrease in deviance with SNP data  
+    
+    # Fit model with no SNP data but with PCs
+      form_no_snp <- formula(paste0("rgr ~ section_block + s(height_2014, bs =\"cr\") + s(", climate_var_dif, " , bs = \"cr\") + s(accession, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC1_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC2_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC3_gen, bs=\"cr\")"))
+      
+      gam_no_snp = bam(formula = form_no_snp,
+                        data = dat_snp_unscaled[!is.na(pull(dat_snp_unscaled, snp)), ],
+                        discrete = TRUE,
+                        nthreads = 8,
+                        method = "fREML",
+                        #   method = "ML",
+                        family = "tw",
+                        control = list(trace = FALSE))
+      
+    #  summary(gam_no_snp)
+      
+    # Adding random variable  
+    form_random <-formula(paste0(paste0("rgr ~ section_block + random + s(height_2014, bs=\"cr\") +  s(", climate_var_dif,", bs=\"cr\") + + s(accession, bs = \"re\") + s(", climate_var_dif,", by = random , bs=\"cr\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC1_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC2_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC3_gen, bs=\"cr\")")))
+    
+    gam_random = bam(formula = form_random,
+                     data = dat_snp_unscaled[!is.na(pull(dat_snp_unscaled, snp)), ],
+                     discrete = TRUE,
+                     nthreads = 8,
+                     method = "fREML",
+                     #   method = "ML",
+                     family = "tw",
+                     control = list(trace = FALSE))
+    
+   # summary(gam_random)
+    
+  # Save deviance differences and Rsquared into model
+    gam_snp_int_summary <- summary(gam_snp_int)
+    gam_no_snp_summary  <- summary(gam_no_snp)
+    gam_random_summary  <- summary(gam_random)
+    
+    gam_snp_int$dev_dif <- gam_snp_int_summary$dev - gam_no_snp_summary$dev
+    gam_snp_int$dev_dif_random <-  gam_random_summary$dev - gam_no_snp_summary$dev
+    
+    gam_snp_int$rsq_dif <- gam_snp_int_summary$r.sq - gam_no_snp_summary$r.sq
+    gam_snp_int$rsq_dif_random <- gam_random_summary$r.sq - gam_no_snp_summary$r.sq
+    
     
 
  ## Save sample size per genotype
@@ -231,20 +274,32 @@
 
 
    # Make prediction for XXXX degree increase in temperature
-    for(genotype in c(0,1,2)){
-      
-      if(!genotype %in% as.numeric(as.character(pred_sub$genotype))){
-        gam_snp_int[paste0("height_change_gen_", genotype)] <- NA
-        next
-      }
-      
-      pred_sub_temp <- pred_sub[pred_sub$genotype == genotype, ]
-      
-      height_change <- (pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 4.88][1] - 
-                          pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 0][1]) / pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 4.88][1] * 100 
-      
-      gam_snp_int[paste0("height_change_gen_", genotype)] <- height_change
-      
+      for(genotype in c(0,1,2)){
+        
+         if(!genotype %in% as.numeric(as.character(pred_sub$genotype))){
+          gam_snp_int[paste0("height_4.8_gen_", genotype)] <- NA
+          gam_snp_int[paste0("height_0_gen_", genotype)] <- NA
+          gam_snp_int[paste0("height_change_gen_", genotype)] <- NA
+          next
+        }
+        
+        pred_sub_temp <- pred_sub[pred_sub$genotype == genotype, ]
+        
+        # Calculate predicted height
+        height_4.8 <- pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 4.8][1]
+        height_0 <- pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 0][1]
+        
+        
+        height_change <- (height_4.8 - height_0) / height_0 * 100
+           
+        # Save values into model list
+        gam_snp_int[paste0("height_4.8_gen_", genotype)] <- height_4.8
+        gam_snp_int[paste0("height_0_gen_", genotype)] <- height_0
+        gam_snp_int[paste0("height_change_gen_", genotype)] <- height_change
+        
+        # Save which accession was used in prediction
+        gam_snp_int["accession_pred"] <- as.character(pred_sub$accession[1])
+        
       }
 
 
@@ -289,6 +344,9 @@
     
     # Snp name
     snp = names(gam_list),
+
+    # Accession used for prediction
+    acc_pred = unlist(lapply(gam_list, function(x) x$accession_pred)),
     
     # Sample size
     n = unlist(lapply(gam_list_summary, function(x) x$n)),
@@ -299,24 +357,39 @@
     n_gen2 = unlist(lapply(gam_list, function(x) x$n_gen2)),
 
     # Converged?
-   # converged = unlist(lapply(gam_list, function(x) x$mgcv.conv)),
-    
+    converged = unlist(lapply(gam_list, function(x) x$mgcv.conv)),
+
     # Deviance explained
     dev_explained = unlist(lapply(gam_list_summary, function(x) x$dev.expl)),
+  
+    # Difference in deviance
+    dev_dif = unlist(lapply(gam_list, function(x) x$dev_dif)),
+    dev_dif_random = unlist(lapply(gam_list, function(x) x$dev_dif_random)),
     
     # Rsquared adjusted
-    r_sq_adj = unlist(lapply(gam_list_summary, function(x) x$r.sq)),
+    rsq_adj = unlist(lapply(gam_list_summary, function(x) x$r.sq)),
+  
+    # Difference in r squared
+    rsq_dif = unlist(lapply(gam_list, function(x) x$rsq_dif)),
+    rsq_dif_random = unlist(lapply(gam_list, function(x) x$rsq_dif_random)),
     
     # Estimated degrees of freedom
   #  edf = unlist(lapply(gam_list, function(x) sum(x$edf))),
     
-    # AIC
-   # aic = unlist(lapply(gam_list, function(x) x$aic)),
-    
-    # Predictions of height
+    # Predictions of change height
     height_change_gen_0 = unlist(lapply(gam_list, function(x) x$height_change_gen_0)),
     height_change_gen_1 = unlist(lapply(gam_list, function(x) x$height_change_gen_1)),
     height_change_gen_2 = unlist(lapply(gam_list, function(x) x$height_change_gen_2)),
+
+    # Predictions of absolute height
+    height_4.8_gen_0 = unlist(lapply(gam_list, function(x) x$height_4.8_gen_0)),
+    height_4.8_gen_1 = unlist(lapply(gam_list, function(x) x$height_4.8_gen_1)),
+    height_4.8_gen_2 = unlist(lapply(gam_list, function(x) x$height_4.8_gen_2)),
+  
+    # Predictions of absolute height
+    height_0_gen_0 = unlist(lapply(gam_list, function(x) x$height_0_gen_0)),
+    height_0_gen_1 = unlist(lapply(gam_list, function(x) x$height_0_gen_1)),
+    height_0_gen_2 = unlist(lapply(gam_list, function(x) x$height_0_gen_2)),
 
     # P values for interaction terms
     p_val_int = ifelse(unlist(lapply(gam_list_summary, function(x)

@@ -30,15 +30,15 @@
 #$ -r n
 #
 #  Job array indexes
-#$ -t 1-17415:100
-#-t 1-17415:100
+#$ -t 1-17415:50
+#-t 1-17415:50
 # 17415 Snps after iterative filtering
 
 # Set variable that will be passed to R script
 # Interval needs to match what is set in Job array indexes
 
-set run_label="rgr_fREML_discrete_v3"
-set interval=100
+set run_label="rgr_fREML_discrete_v3_tw_genpc_devdif"
+set interval=50
 set climate_var_dif='tmax_sum_dif'
 
 
