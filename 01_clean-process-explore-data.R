@@ -6,8 +6,8 @@
 
 # Choose model type -------------------------------------------------------
 
-#  response_variable = "height"
-   response_variable = "rgr"
+  #  response_variable = "height"
+    response_variable = "rgr"
   # response_variable = "survival"
 
 
