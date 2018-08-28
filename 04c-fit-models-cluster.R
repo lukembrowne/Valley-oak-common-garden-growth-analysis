@@ -28,21 +28,21 @@
   save_outlier_preds <- FALSE
   outlier_preds <- NULL
 
-# # Loop through snps by index based on task id
-  for(snp_index in task_id:(task_id + interval - 1)){
+# # # Loop through snps by index based on task id
+#   for(snp_index in task_id:(task_id + interval - 1)){
+# 
+#     # To avoid going past number of snps
+#     if(snp_index > length(snp_col_names)){
+#       next
+#     }
+# 
+#     # Choose snp
+#     snp <- snp_col_names[snp_index]
 
-    # To avoid going past number of snps
-    if(snp_index > length(snp_col_names)){
-      next
-    }
+ ## LOOPING THROUGH TOP SNPS
+ for(snp in c(top_snps_long$snp, mid_snps_long$snp, bottom_snps_long$snp)){
+   save_outlier_preds <- TRUE # Save output of the top SNPs for plotting together
 
-    # Choose snp
-    snp <- snp_col_names[snp_index]
-
- ### LOOPING THROUGH TOP SNPS
-   # for(snp in c(top_snps_long$snp, mid_snps_long$snp, bottom_snps_long$snp)){
-   #   save_outlier_preds <- TRUE # Save output of the top SNPs for plotting together
-   #  
       # For timing loops
       start_time <- Sys.time()
     
@@ -99,44 +99,44 @@
     
   ## Calculate decrease in deviance with SNP data  
     
-    # Fit model with no SNP data but with PCs
-      form_no_snp <- formula(paste0("rgr ~ section_block + s(height_2014, bs =\"cr\") + s(", climate_var_dif, " , bs = \"cr\") + s(accession, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC1_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC2_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC3_gen, bs=\"cr\")"))
-      
-      gam_no_snp = bam(formula = form_no_snp,
-                        data = dat_snp_unscaled[!is.na(pull(dat_snp_unscaled, snp)), ],
-                        discrete = TRUE,
-                        nthreads = 8,
-                        method = "fREML",
-                        #   method = "ML",
-                        family = "tw",
-                        control = list(trace = FALSE))
+    # # Fit model with no SNP data but with PCs
+    #   form_no_snp <- formula(paste0("rgr ~ section_block + s(height_2014, bs =\"cr\") + s(", climate_var_dif, " , bs = \"cr\") + s(accession, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC1_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC2_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC3_gen, bs=\"cr\")"))
+    #   
+    #   gam_no_snp = bam(formula = form_no_snp,
+    #                     data = dat_snp_unscaled[!is.na(pull(dat_snp_unscaled, snp)), ],
+    #                     discrete = TRUE,
+    #                     nthreads = 8,
+    #                     method = "fREML",
+    #                     #   method = "ML",
+    #                     family = "tw",
+    #                     control = list(trace = FALSE))
       
     #  summary(gam_no_snp)
       
-    # Adding random variable  
-    form_random <-formula(paste0(paste0("rgr ~ section_block + random + s(height_2014, bs=\"cr\") +  s(", climate_var_dif,", bs=\"cr\") + + s(accession, bs = \"re\") + s(", climate_var_dif,", by = random , bs=\"cr\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC1_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC2_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC3_gen, bs=\"cr\")")))
-    
-    gam_random = bam(formula = form_random,
-                     data = dat_snp_unscaled[!is.na(pull(dat_snp_unscaled, snp)), ],
-                     discrete = TRUE,
-                     nthreads = 8,
-                     method = "fREML",
-                     #   method = "ML",
-                     family = "tw",
-                     control = list(trace = FALSE))
+    # # Adding random variable  
+    # form_random <-formula(paste0(paste0("rgr ~ section_block + random + s(height_2014, bs=\"cr\") +  s(", climate_var_dif,", bs=\"cr\") + + s(accession, bs = \"re\") + s(", climate_var_dif,", by = random , bs=\"cr\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC1_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC2_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC3_gen, bs=\"cr\")")))
+    # 
+    # gam_random = bam(formula = form_random,
+    #                  data = dat_snp_unscaled[!is.na(pull(dat_snp_unscaled, snp)), ],
+    #                  discrete = TRUE,
+    #                  nthreads = 8,
+    #                  method = "fREML",
+    #                  #   method = "ML",
+    #                  family = "tw",
+    #                  control = list(trace = FALSE))
     
    # summary(gam_random)
     
   # Save deviance differences and Rsquared into model
-    gam_snp_int_summary <- summary(gam_snp_int)
-    gam_no_snp_summary  <- summary(gam_no_snp)
-    gam_random_summary  <- summary(gam_random)
-    
-    gam_snp_int$dev_dif <- gam_snp_int_summary$dev - gam_no_snp_summary$dev
-    gam_snp_int$dev_dif_random <-  gam_random_summary$dev - gam_no_snp_summary$dev
-    
-    gam_snp_int$rsq_dif <- gam_snp_int_summary$r.sq - gam_no_snp_summary$r.sq
-    gam_snp_int$rsq_dif_random <- gam_random_summary$r.sq - gam_no_snp_summary$r.sq
+    # gam_snp_int_summary <- summary(gam_snp_int)
+    # gam_no_snp_summary  <- summary(gam_no_snp)
+    # gam_random_summary  <- summary(gam_random)
+    # 
+    # gam_snp_int$dev_dif <- gam_snp_int_summary$dev - gam_no_snp_summary$dev
+    # gam_snp_int$dev_dif_random <-  gam_random_summary$dev - gam_no_snp_summary$dev
+    # 
+    # gam_snp_int$rsq_dif <- gam_snp_int_summary$r.sq - gam_no_snp_summary$r.sq
+    # gam_snp_int$rsq_dif_random <- gam_random_summary$r.sq - gam_no_snp_summary$r.sq
     
 
     ## Save sample size per genotype
@@ -396,22 +396,39 @@
     
   
   ## Plot overlay of outlier SNPS
-  ggplot(outlier_preds, aes(x = tmax_sum_dif_unscaled, y = pred, group = factor(snp),
+  ggplot(outlier_preds, aes(x = tmax_sum_dif_unscaled, y = pred,
+                            group = factor(snp),
                             col = factor(type))) +
-    geom_vline(aes(xintercept = 0), lty = 2) +
-    geom_vline(xintercept = 1.1) + 
-    geom_vline(xintercept = 4.8, lwd = 1.5) +
-    geom_line(lwd = 1, alpha = 0.1,
-              show.legend = FALSE) +
-    geom_smooth(aes(x = tmax_sum_dif_unscaled, y = pred, group = factor(type)), se = FALSE) +
+    geom_vline(aes(xintercept = 0), lty = 2, size = .15) +
+    geom_vline(xintercept = 1.1, size = .15) + 
+    geom_vline(xintercept = 4.8, size = .25) +
+    geom_line(alpha = 0.1,
+              show.legend = FALSE, size = .15) +
+    geom_smooth(aes(x = tmax_sum_dif_unscaled, 
+                    y = pred, group = factor(type)), 
+                    se = FALSE, size = .5) +
    
     labs(col = "Genotype") +
-    xlim(-2.5, 7.5) +
+   # xlim(-2.5, 7.5) +
     ylab("Relative growth rate") +
     xlab("Tmax transfer distance") +
-    theme_bw(15) + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
-                         panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+    theme_bw(10) + 
+    scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
+ #   scale_color_manual(values = c("orangered", "grey50", "deepskyblue")) +
+    scale_color_manual(values = c("#FF6633", "grey50", "#6699CC")) + 
+    theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+                         panel.grid.minor = element_blank(), 
+          axis.line = element_line(colour = "black"),
+          legend.position = "none")
   
+  
+  # Save to file
+    ggsave(filename = paste0("./figs_tables/Figure 3 - outlier responses ", 
+                             Sys.Date(), ".pdf"),
+           units = "cm",
+           height = 6, width = 8,
+           useDingbats = FALSE )
+    
   
   
   
