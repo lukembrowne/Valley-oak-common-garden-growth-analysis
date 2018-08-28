@@ -51,6 +51,12 @@
                             proj4string = CRS("+proj=longlat +datum=WGS84"))
   plot(gbs_moms)
   
+  
+  # All gbs samples
+  gbs_moms_all <- SpatialPoints(climate_gbs_mom[, c("longitude", "latitude")],
+                            proj4string = CRS("+proj=longlat +datum=WGS84"))
+  plot(gbs_moms_all)
+  
   # Sites of common gardens
   garden_sites <- SpatialPoints(garden_climate[, c("longitude", "latitude")],
                                 proj4string = CRS("+proj=longlat +datum=WGS84"))
@@ -65,17 +71,18 @@
      hsTheme <- modifyList(GrTheme(), list(regions=list(alpha= .15)))
      tmaxTheme <- modifyList(BuRdTheme(), list(regions=list(alpha=1)))
     
-    p = levelplot(tmax_rast_cropped, 
+     
+  ## First plot showing garden moms   
+    p1 = levelplot(tmax_rast_cropped, 
                   contour = FALSE, 
                   margin = FALSE, 
                   par.settings = tmaxTheme, 
                   maxpixels = pixel_num, 
                   colorkey = TRUE, 
-                  main = "Maximum temperature summer",
-                  bty = "l")  +
+                  main = "Maximum temperature summer")  +
       levelplot(hill,  margin = FALSE, par.settings=hsTheme) +
       latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
-      latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 2.75)) +
+      latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 2)) +
       latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.75)) + 
       latticeExtra::layer(sp.points(all_moms, pch = 21, cex = 1,
                                     fill = "forestgreen", col = "grey10", alpha = .75)) +
@@ -84,12 +91,56 @@
       latticeExtra::layer(sp.points(garden_sites, pch = 22, cex = 2, 
                                     col = "grey10", fill = "orange")) 
     
-    print(p)
+    print(p1)
     
-    png(paste0("./figs_tables/Figure1_sample_map_", Sys.Date(), ".png"), res = 300,
+    png(paste0("./figs_tables/Figure 1_sample_map_garden_moms ", Sys.Date(), ".png"), res = 300,
         height = 2400, width = 1600)
-    print(p)
+    print(p1)
     dev.off()
+    
+    ## Smaller version for the legend
+    png(paste0("./figs_tables/Figure 1_sample_map_garden_moms for legend", Sys.Date(), ".png"), res = 300,
+        height = 800, width = 1600)
+    print(p1)
+    dev.off()
+    
+    
+  ## Second plot showing GBS samples
+    
+    
+    p2 = levelplot(tmax_rast_cropped, 
+                   contour = FALSE, 
+                   margin = FALSE, 
+                   par.settings = tmaxTheme, 
+                   maxpixels = pixel_num, 
+                   colorkey = TRUE, 
+                   main = "")  +
+      levelplot(hill,  margin = FALSE, par.settings=hsTheme) +
+      latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
+      latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 2)) +
+      latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.75)) + 
+      latticeExtra::layer(sp.points(gbs_moms_all, pch = 21, cex = 1,
+                                    fill = "mediumpurple1", col = "grey10", alpha = .75))
+    
+    print(p2)
+    
+    png(paste0("./figs_tables/Figure 1_sample_map_gbs_moms ", Sys.Date(), ".png"), res = 300,
+        height = 2400, width = 1600)
+    print(p2)
+    dev.off()
+    
+    ## Smaller version for the legend
+    png(paste0("./figs_tables/Figure 1_sample_map_gbs_moms for legend", Sys.Date(), ".png"), res = 300,
+        height = 800, width = 1600)
+    print(p2)
+    dev.off()
+    
+    
+    
+    
+    
+    
+    
     
     
     ## Histogram of temp transfer distances
