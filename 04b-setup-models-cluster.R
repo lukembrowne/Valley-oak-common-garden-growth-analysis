@@ -22,6 +22,8 @@
   library(pdp)
   library(ggrepel)
   
+ 
+  
   # function to transform from raw to scaled variables
     forward_transform <- function(x, var, means, sds){
       ( x - means[var]) / sds[var]
@@ -75,6 +77,43 @@
    # biplot(pca_gen)
     summary(pca_gen)
   #  screeplot(pca_gen, bstick = TRUE)
+    
+    
+  ### Figure S2 - Plotting results of PCA for supplementary material
+      # 
+      # par(mfrow = c(2,1))
+      #   
+      # # Pc1 vs pc2  
+      #   plot(pca_gen$x[, 1], pca_gen$x[, 2], 
+      #        las = 1, 
+      #        xlab = paste0("PC1: ", summary(pca_gen)$importance[2, 1], "% variance explained"),
+      #        ylab = paste0("PC2: ", summary(pca_gen)$importance[2, 2], "% variance explained"),
+      #        pch = 19, 
+      #        type = "n")
+      #   text(pca_gen$x[, 1], pca_gen$x[, 2],
+      #        labels = gen_dat_clim$id, cex = .5)
+      #   mtext(text = "(a)", side = 3, adj = -.1, padj = -1, cex = 1.25)
+      #   
+      #   
+      #   # Pc1 vs pc3
+      #   plot(pca_gen$x[, 1], pca_gen$x[, 3], 
+      #        las = 1, 
+      #        xlab = paste0("PC1: ", summary(pca_gen)$importance[2, 1], "% variance explained"),
+      #        ylab = paste0("PC3: ", summary(pca_gen)$importance[2, 3], "% variance explained"),
+      #        pch = 19,
+      #        type = "n")
+      #   text(pca_gen$x[, 1], pca_gen$x[, 3],
+      #        labels = gen_dat_clim$id, cex = .5)
+      #   mtext(text = "(b)", side = 3, adj = -.1, padj = -1, cex = 1.25)
+      #   
+      #   dev.copy(png, filename = paste0("./figs_tables/Figure S2 - PCA plot_", 
+      #                                   Sys.Date(), ".png"),
+      #            res = 300, width = 1800, height =2400)
+      #   dev.off()
+      # 
+
+    
+    
     
     pcs <- as.data.frame(pca_gen$x[, 1:10])
     colnames(pcs) <- paste0(colnames(pcs), "_gen")
