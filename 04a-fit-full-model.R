@@ -140,6 +140,39 @@ back_transform <- function(x, var, means, sds){
     # anova(gam_all)
     # sink()
   
+  
+## Figure S1 - Comparing residual plots to Guassian for Supplementary material
+  # gam_all_gaussian <- bam(formula = form,
+  #                data = dat_all_scaled,
+  #                discrete = TRUE, 
+  #                nthreads = 8,
+  #                method = "fREML", 
+  #                  family = "gaussian",
+  #               # family = "tw",
+  #                control = list(trace = FALSE))
+  # 
+  # summary(gam_all_gaussian)
+  # 
+  # 
+  # par(mfrow = c(1, 2))
+  # plot(predict(gam_all, scale = "response"), residuals(gam_all),
+  #      xlab = "Linear predictor", ylab = "Residuals", pch = 19,cex = .5, las = 1,
+  #      main = "Tweedie error distribution")
+  # mtext("(a)", side = 3, line = 1, adj = -0.25, cex = 1.75)
+  # plot(predict(gam_all_gaussian), residuals(gam_all_gaussian),
+  #      xlab = "Linear predictor", ylab = "Residuals", pch = 19,cex = .5, las = 1,
+  #      main = "Gaussian error distribution")
+  # mtext("(b)", side = 3, line = 1, adj = -.25, cex = 1.75)
+  # 
+  # 
+  # dev.copy(png, filename = paste0("./figs_tables/Figure S1 - residual plots_", 
+  #                      Sys.Date(), ".png"),
+  #          res = 300, width = 2400, height = 1200)
+  # dev.off()
+  # 
+  # 
+  
+  
 
 #### Prediction plot of changes in height with tmax transfer  
   
@@ -157,8 +190,13 @@ back_transform <- function(x, var, means, sds){
                                       var = "tmax_sum_dif",
                                       means = scaled_var_means_all,
                                       sds = scaled_var_sds_all))
-  ## Main GGPLOT
-  gg <- 
+ 
+    
+    
+    
+## Figure 2 - Plot of decrease in Main GGPLOT ####
+ 
+   gg <- 
     ggplot(v$fit, aes(x = tmax_sum_dif, y = rgr)) +
     geom_ribbon(data = v$fit, aes(ymin = visregLwr, ymax = visregUpr), 
                 fill = "grey80", alpha = 0.75) +
@@ -181,40 +219,45 @@ back_transform <- function(x, var, means, sds){
   gg
   
   
+  ## SAVE TO PDF AND EDIT IN KEYNOTE, etc
+  # ggsave(filename = paste0("./figs_tables/Figure 2 - transfer function ", Sys.Date(), ".pdf"),
+  #        gg)
   
-  ### Calculating derivatives
   
-  ## now evaluate derivatives of smooths with associated standard 
-  ## errors, by finite differencing...
-  x.mesh <- seq(-2, 1.5,length=200) ## where to evaluate derivatives
-  newd <-  data.frame(section_block = v$fit$section_block[1],
-                                height_2014 = v$fit$height_2014[1],
-                                accession = v$fit$accession[1],
-                                tmax_sum_dif = x.mesh)
-  X0 <- predict(gam_all,newd,type="lpmatrix") 
   
-  eps <- 1e-7 ## finite difference interval
-  x.mesh <- x.mesh + eps ## shift the evaluation mesh
-  newd <-  data.frame(section_block = v$fit$section_block[1],
-                      height_2014 = v$fit$height_2014[1],
-                      accession = v$fit$accession[1],
-                      tmax_sum_dif = x.mesh)
-  X1 <- predict(gam_all,newd,type="lpmatrix")
-  
-  Xp <- (X1-X0)/eps ## maps coefficients to (fd approx.) derivatives
-  colnames(Xp)      ## can check which cols relate to which smooth
-  
-#  par(mfrow=c(2,2))
-  for (i in 3) {  ## plot derivatives and corresponding CIs
-    Xi <- Xp*0 
-    Xi[,(i-1)*9+1:9+1] <- Xp[,(i-1)*9+1:9+1] ## Xi%*%coef(b) = smooth deriv i
-    df <- Xi%*%coef(gam_all)              ## ith smooth derivative 
-    df.sd <- rowSums(Xi%*%gam_all$Vp*Xi)^.5 ## cheap diag(Xi%*%b$Vp%*%t(Xi))^.5
-    plot(x.mesh,df,type="l",ylim=range(c(df+2*df.sd,df-2*df.sd)))
-    lines(x.mesh,df+2*df.sd,lty=2);lines(x.mesh,df-2*df.sd,lty=2)
-    abline(a = 0, b = 0, lty = 1, lwd = 2)
-  }
-  
+  ### Calculating derivatives - TESTING
+   
+    #   ## now evaluate derivatives of smooths with associated standard 
+    #   ## errors, by finite differencing...
+    #   x.mesh <- seq(-2, 1.5,length=200) ## where to evaluate derivatives
+    #   newd <-  data.frame(section_block = v$fit$section_block[1],
+    #                                 height_2014 = v$fit$height_2014[1],
+    #                                 accession = v$fit$accession[1],
+    #                                 tmax_sum_dif = x.mesh)
+    #   X0 <- predict(gam_all,newd,type="lpmatrix") 
+    #   
+    #   eps <- 1e-7 ## finite difference interval
+    #   x.mesh <- x.mesh + eps ## shift the evaluation mesh
+    #   newd <-  data.frame(section_block = v$fit$section_block[1],
+    #                       height_2014 = v$fit$height_2014[1],
+    #                       accession = v$fit$accession[1],
+    #                       tmax_sum_dif = x.mesh)
+    #   X1 <- predict(gam_all,newd,type="lpmatrix")
+    #   
+    #   Xp <- (X1-X0)/eps ## maps coefficients to (fd approx.) derivatives
+    #   colnames(Xp)      ## can check which cols relate to which smooth
+    #   
+    # #  par(mfrow=c(2,2))
+    #   for (i in 3) {  ## plot derivatives and corresponding CIs
+    #     Xi <- Xp*0 
+    #     Xi[,(i-1)*9+1:9+1] <- Xp[,(i-1)*9+1:9+1] ## Xi%*%coef(b) = smooth deriv i
+    #     df <- Xi%*%coef(gam_all)              ## ith smooth derivative 
+    #     df.sd <- rowSums(Xi%*%gam_all$Vp*Xi)^.5 ## cheap diag(Xi%*%b$Vp%*%t(Xi))^.5
+    #     plot(x.mesh,df,type="l",ylim=range(c(df+2*df.sd,df-2*df.sd)))
+    #     lines(x.mesh,df+2*df.sd,lty=2);lines(x.mesh,df-2*df.sd,lty=2)
+    #     abline(a = 0, b = 0, lty = 1, lwd = 2)
+    #   }
+    #   
 
 # Predicting changes in height based on degree increase -------------------
 
@@ -329,6 +372,21 @@ back_transform <- function(x, var, means, sds){
   future_stack_tmax_dif <- future_stack - tmax_rast
   names(future_stack_tmax_dif) <- names(future_stack) # Reassign names
   
+  
+  ## Plotting out values of predicted increases in temperature
+  
+  levelplot(mean(future_stack_tmax_dif[[c("GISS_rcp26", 
+                                         "MRI_rcp26",
+                                         "MIROC5_rcp26")]]), margin = FALSE)
+  
+  levelplot(mean(future_stack_tmax_dif[[c("CCSM4_rcp85", 
+                                     "CNRM_rcp85",
+                                     "Fgoals_rcp85",
+                                     "IPSL_rcp85",
+                                     "MIROC_rcp85")]]), margin = FALSE)
+  
+  
+  
   # Scale values
   future_stack_tmax_dif_scaled <- (future_stack_tmax_dif - scaled_var_means_all["tmax_sum_dif"]) /
     scaled_var_sds_all["tmax_sum_dif"]
@@ -440,26 +498,27 @@ back_transform <- function(x, var, means, sds){
     quantile(future_stack_height_change_26_85, probs = c(0.01, 0.99))
     
   
+  ## Figure 2 - spatial predictions ####
   ## Options for levelplot
     pixel_num = 1e5 ## Can make resolution better by making this 1e6 
     
     myTheme <- rasterTheme(region = brewer.pal('RdYlBu', n = 9))
     
-    future_stack_height_change_26_85_limits <- future_stack_height_change_26_85
+  #  future_stack_height_change_26_85_limits <- future_stack_height_change_26_85
  
    
    
    ## Convert lowest and highest values
-   breaks_26 <- seq(-4.5, -1, by = 0.2)
+    breaks_26 <- seq(-3.5, -0, by = 0.1)
    
-   future_stack_height_change_26_85_limits[[1]][future_stack_height_change_26_85_limits[[1]] < min(breaks_26)] <- min(breaks_26)
-   future_stack_height_change_26_85_limits[[1]][future_stack_height_change_26_85_limits[[1]] > max(breaks_26)] <- max(breaks_26)
+   # future_stack_height_change_26_85_limits[[1]][future_stack_height_change_26_85_limits[[1]] < min(breaks_26)] <- min(breaks_26)
+   # future_stack_height_change_26_85_limits[[1]][future_stack_height_change_26_85_limits[[1]] > max(breaks_26)] <- max(breaks_26)
    
   
   ## Plots of changes in height - RCP 26
-    levelplot(future_stack_height_change_26_85_limits[[1]],
+    levelplot(future_stack_height_change_26_85[[1]],
               margin = FALSE,
-              maxpixels = pixel_num,
+              maxpixels = 1000000,
               par.settings = myTheme, 
               at = breaks_26,
               main = "Optimistic (RCP 2.6)") + 
@@ -467,34 +526,50 @@ back_transform <- function(x, var, means, sds){
 #    latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.75)) + 
     latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 2.75))
     
-    dev.copy(png, paste0("./figs_tables/Figure 3 - RCP26", Sys.Date(), ".png"),
+    dev.copy(png, paste0("./figs_tables/Figure 2 - RCP26 ", Sys.Date(), ".png"),
              res = 300, units = "in", width = 6, height = 6)
     dev.off()
     
     
     ## Plots of changes in height - RCP 85
     
-    breaks_85 <- seq(-4, -2, by = 0.2)
-    
-    future_stack_height_change_26_85_limits[[2]][future_stack_height_change_26_85_limits[[2]] < min(breaks_85)] <- min(breaks_85)
-    future_stack_height_change_26_85_limits[[2]][future_stack_height_change_26_85_limits[[2]] > max(breaks_85)] <- max(breaks_85)
+     breaks_85 <- seq(-3.55, -3, by = 0.01)
+    # 
+    # future_stack_height_change_26_85_limits[[2]][future_stack_height_change_26_85_limits[[2]] < min(breaks_85)] <- min(breaks_85)
+    # future_stack_height_change_26_85_limits[[2]][future_stack_height_change_26_85_limits[[2]] > max(breaks_85)] <- max(breaks_85)
     
     levelplot(future_stack_height_change_26_85[[2]],
               margin = FALSE,
-              maxpixels = pixel_num,
+            #  maxpixels = pixel_num,
+              
+              maxpixels = 1000000,
               par.settings = myTheme, 
-           #   at = breaks_85,
+              at = breaks_85,
               main = "Rising emissions (RCP 8.5)") + 
       latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
-   #     latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.75)) + 
+      latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.75)) + 
       latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 2.75))
     
-    dev.copy(png, paste0("./figs_tables/Figure 3 - RCP85", Sys.Date(), ".png"),
+    # Main plot
+    dev.copy(png, paste0("./figs_tables/Figure 2 - RCP85 ", Sys.Date(), ".png"),
              res = 300, units = "in", width = 6, height = 6)
     dev.off()
     
+    # For legend
+    dev.copy(png, paste0("./figs_tables/Figure 2 - RCP85 for legend ", Sys.Date(), ".png"),
+             res = 300, units = "in", width = 6, height = 3)
+    dev.off()
+    
+    
   
   
+    
+    
+    
+    
+    
+    
+    
   ## Height change in historical range
     height_change_historic_range <- raster::extract(future_stack_height_change_26_85,
                                                     y = lobata_range_rough, df = TRUE)

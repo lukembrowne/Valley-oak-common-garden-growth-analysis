@@ -7,7 +7,7 @@
 # Read in cluster run output ----------------------------------------------
 
   # Good run
-  path_to_summaries <- "./output/run_3539884_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc/model_summaries/"
+  path_to_summaries <- "./output/run_3615743_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif/model_summaries/"
   
   ## Randomized phenotypes
     path_to_summaries <- "./output/run_3573817_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_rgrrand_1/model_summaries/" # 0 sig snps
@@ -26,21 +26,29 @@
   
   
   ## Missing snps
+  # Find if there indexes if needed to re-run manually or on the cluster
   which(!snp_col_names %in% sum_df_raw$snp)
   snp_col_names[which(!snp_col_names %in% sum_df_raw$snp)]
   
-  # Find there indexes if needed to re-run manually or on the cluster
-
-  hist(sum_df_raw$p_val_gen_0, breaks = 40)
-  hist(sum_df_raw$p_val_gen_1, breaks = 40)
-  hist(sum_df_raw$p_val_gen_2, breaks = 40)
+  # For backup
+  sum_df <- sum_df_raw
   
-  # Site on interpreting p value histograms: http://varianceexplained.org/statistics/interpreting-pvalue-histogram/
+
+  # Filter out models that did not converge
+  table(sum_df_raw$converged)
+  
+# Looking at deviance explained  
+  hist(sum_df_raw$dev_dif); summary(sum_df_raw$dev_dif)
+  hist(sum_df_raw$dev_dif_random); summary(sum_df_raw$dev_dif_random)
+  
+  hist(sum_df_raw$rsq_dif); summary(sum_df_raw$rsq_dif)
+  hist(sum_df_raw$rsq_dif_random); summary(sum_df_raw$rsq_dif_random)
+  
   
 
 # Sort and arrange data ---------------------------------------------------
 
-  sum_df <- sum_df_raw # For backup
+  
   
   ## Convert to from wide to long format
   n_gen_long <- sum_df %>%
@@ -156,21 +164,33 @@
  mid_snps_long <- sum_df_long %>%
    dplyr::filter(p_val_adj <= 0.05) %>%
    dplyr::filter(!snp %in% c(top_snps_long$snp, bottom_snps_long$snp)) %>%
+   # Make sure number of genotype copies is comparable
+   dplyr::filter(n_gen <= quantile(c(top_snps_long$n_gen, bottom_snps_long$n_gen),
+                                   0.9)) %>% 
+   dplyr::filter(n_gen >= gen_copies_thresh) %>%
    sample_n(round(nrow(sum_df) * percent_thresh))
  
- head(mid_snps_long)
- summary(mid_snps_long$height_change_0base)
-
- 
-## Join back to main DF
- 
- sum_df_long <- left_join(sum_df_long, dplyr::select(top_snps_long, snp, genotype, top_snp)) %>%
-                left_join(., dplyr::select(bottom_snps_long, snp, genotype, bottom_snp)) %>%
-                mutate(top_snp = replace_na(top_snp, FALSE),
-                       bottom_snp = replace_na(bottom_snp, FALSE))
- 
- head(sum_df_long)
- 
+   head(mid_snps_long)
+   summary(mid_snps_long$height_change_0base)
+  
+   
+  hist(mid_snps_long$n_gen, breaks = 50, col = "black", xlim = c(0, 1000), ylim = c(0, 10))
+  hist(top_snps_long$n_gen, breaks = 50, col = "blue", add = TRUE)
+  hist(bottom_snps_long$n_gen, breaks = 50, col = "red", add = TRUE)
+  
+  summary(top_snps_long$n_gen)
+  summary(mid_snps_long$n_gen)
+  summary(bottom_snps_long$n_gen)
+  
+  ## Join back to main DF
+   
+   sum_df_long <- left_join(sum_df_long, dplyr::select(top_snps_long, snp, genotype, top_snp)) %>%
+                  left_join(., dplyr::select(bottom_snps_long, snp, genotype, bottom_snp)) %>%
+                  mutate(top_snp = replace_na(top_snp, FALSE),
+                         bottom_snp = replace_na(bottom_snp, FALSE))
+   
+   head(sum_df_long)
+   
 
  
  
@@ -193,7 +213,7 @@
  
  # Set up shapes
  man_df <- man_df %>%
-   mutate(pch = ifelse(genotype == 0 | genotype == 2, 19, 17)) # Circles for homozygotes, trianges for hets
+   mutate(pch = ifelse(genotype == 0 | genotype == 2, 16, 17)) # Circles for homozygotes, trianges for hets
  
  man_df <- man_df %>%
    mutate(pch = ifelse((genotype == 0 & (top_snp | bottom_snp)) | 
@@ -209,10 +229,10 @@
    mutate(chrom = ifelse(grepl("chr", chrom), chrom, ""))
  
  
- ## GGplot version
+ ## Figure 3 - Manhattan plot ####
  
  # Setup
- cex = 3
+ cex = 1
  
  # For labels on x axis 
  x_axis_breaks <- man_df %>%
@@ -231,7 +251,10 @@
                     col = height_change_0base, label = SNP)) +
 
    # Vertical lines
-   geom_vline(xintercept = chrom_breaks$index, col = "grey50", alpha = 0.8) + 
+   geom_vline(xintercept = chrom_breaks$index, col = "grey50", alpha = 0.8, size = .2) + 
+   
+   # Horizontal line
+   geom_hline(yintercept = 0, lty = 2, size = .5) +
    
    # Add points
    geom_point(pch = man_df$pch, 
@@ -244,10 +267,9 @@
               aes(x = index, y = height_change_0base, bg = height_change_0base),
               col = "black",
               pch = man_df[man_df$top_snp | man_df$bottom_snp, ]$pch,
-              size = cex) +
+              size = cex + .5) +
    
-   # Horizontal line
-   geom_hline(yintercept = 0, lty = 2) +
+   
    
    # # Add snp names
    #   geom_text_repel(
@@ -267,29 +289,39 @@
  #   ) +
  
  # Scale colors
- scale_colour_viridis_c(option = "D", direction = -1, name = "% Change in RGR \n w/ 4.8°C increase") + 
- scale_fill_viridis_c(option = "D", direction = -1, name = "% Change in RGR \n w/ 4.8°C increase") + 
+ # scale_colour_viridis_c(option = "D", direction = -1, name = "% Change in RGR \n w/ 4.8°C increase") + 
+ # scale_fill_viridis_c(option = "D", direction = -1, 
+ #                      name = "% Change in RGR \n w/ 4.8°C increase",
+ #                      guide = FALSE) + 
+ 
+ scale_colour_distiller(type = "seq", palette = "RdYlBu", 
+                        direction = 1, 
+                        aesthetics = c("color", "fill"),
+                        name = "% Change in RGR \n w/ 4.8°C increase") + 
    
    # Theme options
-  # ylim(c(-50, 50)) + 
    scale_x_continuous(expand = c(0.01, 0.01), 
                       breaks = x_axis_breaks$index,
                       labels = x_axis_breaks$chrom) + 
-   scale_y_continuous(breaks = seq(-25, 25, 5)) + 
+   scale_y_continuous(breaks = seq(-35, 25, 5)) + 
    ylab("") + 
    xlab("Chromosome") + 
-   theme_bw(15) + 
+   theme_bw(8) + 
    theme(panel.border = element_blank(), panel.grid.major = element_blank(),
-         panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
+         panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
+        # legend.position = "none") +
+           )+
    # axis.text.x=element_blank(), axis.ticks.x=element_blank()) +
    NULL
  
- # Save as pdf
- dev.copy(png, paste0("./figs_tables/Figure 4 - manhattan plot interaction term wo labels_", 
+ # Save as file
+ ggsave(paste0("./figs_tables/Figure 3 - manhattan plot interaction term wo labels_", 
                       Sys.Date(), ".png"),
-          width = 12, height = 6, res = 300, units = "in")
- dev.off() 
-  
+          width = 20, height = 6, units = "cm", dpi = 300)
+ 
+ 
+ 
+ 
  
  
 
@@ -375,6 +407,35 @@
     
   } # End SNP loop
   
+  
+  
+  ## For middle snps "random snps"
+  gen_dat_mid <- gen_dat_clim_all
+  
+  for(snp in mid_snps_long$snp){
+    
+    # Subset out good genotype
+    ben_gen <- as.numeric(mid_snps_long$genotype[mid_snps_long$snp == snp])
+    
+    if(length(ben_gen) > 1) {
+      stop("length of ben gen shouldn't be more than 1!!")
+    }
+    
+    # Replace genotype
+    gen_dat_mid[, snp] <- apply(gen_dat_clim_all[, snp], 1, function(x) {
+      if(is.na(x)){ NA
+      } else if(x == ben_gen){ 1
+      } else {  0
+      }
+    }) # End apply
+    
+  }
+  
+  dim(gen_dat_mid)
+
+  
+  
+  
      
  
  
@@ -398,17 +459,24 @@
 # Random forest on just beneficial alleles ------------------------
    
    library(randomForest)
-   library(AUC)
-   library(Boruta) # For variable importance?
+   #library(AUC)
+  # library(Boruta) # For variable importance?
    library(raster)
+   library(pdp)
   
   ## Count number of positives - where allele is found
-  pos_thresh <- 15
+  pos_thresh <- 1
    
 
   ## For TOP SNPS
      rf_top <- gen_dat_bene[ , snp_col_names]
      dim(rf_top)
+     
+     ## Count positives
+     pos <-  apply(rf_top[ ,top_snps_long$snp], 2, function(x) sum(x == 1, na.rm = TRUE) )
+     summary(pos)
+     hist(pos, breaks =20)
+     
      
      # Remove SNPs below threshold
        # For presences
@@ -430,6 +498,13 @@
    ## For BOTTOM SNPS
        rf_bottom <- gen_dat_bottom[ , snp_col_names]
        dim(rf_bottom)
+       
+       
+       ## Count positives
+       pos <-  apply(rf_top[ , bottom_snps_long$snp], 2, function(x) sum(x == 1, na.rm = TRUE) )
+       summary(pos)
+       hist(pos, breaks =20)
+       
        
      # Remove SNPs below threshold
        # For presences
@@ -475,7 +550,7 @@
      
     # Function to downscale and project raster 
      process_raster <- function(rast){
-       rast <- aggregate(rast, fact = 20) # Make smaller by averaging across cells
+       rast <- aggregate(rast, fact = 5) # Make smaller by averaging across cells
        rast_latlon <- projectRaster(rast, crs = CRS("+proj=longlat +datum=WGS84"))
        plot(rast_latlon)
        return(rast_latlon)
@@ -492,6 +567,10 @@
      
    # Match up resolution and extent of DEM to climate rasters
      dem <- resample(dem, tmax_rast) 
+     bioclim_04 <- resample(bioclim_04, tmax_rast) 
+     bioclim_15 <- resample(bioclim_15, tmax_rast) 
+     bioclim_18 <- resample(bioclim_18, tmax_rast) 
+     bioclim_19 <- resample(bioclim_19, tmax_rast) 
      
      compareRaster(tmax_rast, dem) # Make sure rasters are equal
    
@@ -510,7 +589,7 @@
                               bioclim_18 = raster::extract(bioclim_18, 1:ncell(bioclim_18)),
                               bioclim_19 = raster::extract(bioclim_19, 1:ncell(bioclim_19)),
                               random = rnorm(1:ncell(dem)))
-     rf_rast_df
+    # rf_rast_df
      
      dim(rf_rast_df)
      
@@ -535,8 +614,8 @@
                            "bioclim_18",
                        #    "bioclim_19", # R = 0.79 with aet; R = 0.84 with bioclim_18
                            "elevation",
-                           "latitude")
-                         #  "longitude", # R = -0.84 with latitude
+                           "latitude", 
+                           "longitude") # R = -0.84 with latitude
                          #  "random")
      
      pairs.panels(gen_dat_bene[, climate_vars_rf])
@@ -552,14 +631,14 @@
      start_flag = FALSE
      pp_df <- NULL # Initialize
      
-     reps = 1
+     reps = 10
      
      # Sample same number of SNPs as top snps in random forest
      n_snps_to_sample <- sum(top_snps_long$snp %in% colnames(rf_top)) 
  
      
 ## Begin Random forest loop         
-  for(mode in c("top_snps", "bottom_snps", "random_snps")){   #"random_snps" , random_env
+  for(mode in c("top_snps", "bottom_snps", "random_snps")){   # , random_env
     
     # Start rep loop
     for(rep in 1:reps){  
@@ -575,7 +654,8 @@
       
       
       # If random_snps, choose same number of top snps, but snps that aren't top or bottom snps
-      if(mode == "random_snps") {
+      # But only do it on the first rep so that we remeasure the same 'random snps' each rep
+      if(mode == "random_snps" & rep == 1) {
         snps <- sample(x = colnames(rf_top)[!colnames(rf_top) %in% c(top_snps_long$snp,
                                                                        bottom_snps_long$snp)],
                                           size = n_snps_to_sample)
@@ -624,41 +704,16 @@
          
         # Set up dataframe for random forest
          dat_rf <- cbind(y = y[not_NAs], X[not_NAs, ])
-         
-         
-        # Run Boruta random forest 
-         boruta_rf = Boruta(y ~ ., 
+ 
+         # Run random forest
+         rf <- randomForest::randomForest(y ~.,
                             data = dat_rf,
-                        #   min.node.size = 10,
-                           ntree = 1000,
-                       #    class.weights = c(min(n0, n1), min(n0, n1)),
-                        class.weights =  c(10, 10),
-                           num.threads = 6)
-         boruta_rf
-         
-         attStats(boruta_rf)
-         
-         
-         # Run RF with only significant predictors
-         if(any(attStats(boruta_rf)$decision == "Confirmed")){
-         
-             rf <- randomForest(getConfirmedFormula(boruta_rf),
-                                data = dat_rf,
-                                importance = TRUE,
-                             #   nodesize = 10,
-                             #   sampsize = c(min(n0, n1), min(n0, n1)),
-                             sampsize = c(10, 10),
-                                #  replace = FALSE,
-                                #   strata = y[not_NAs],
-                                ntree = 1000)
-             
-             
-             rf
-             
-         } else {
-           rf <- NA
-         }
-         
+                            importance = TRUE,
+                            #   nodesize = 10,
+                               sampsize = c(min(n0, n1), min(n0, n1)),
+                           # sampsize = c(10, 10),
+                            ntree = 1000)
+
          # plot(test)
          # plotImpHistory(test)
          
@@ -689,50 +744,47 @@
          if(start_flag == FALSE){
            
           # # Importance 
-           importance_boruta <- data.frame(mode = mode, rep = rep, snp = snp_name,
-                                           climate_var = rownames(attStats(boruta_rf)),
-                                           meanImp = attStats(boruta_rf)$meanImp,
-                                           decision = attStats(boruta_rf)$decision)
+           # importance_boruta <- data.frame(mode = mode, rep = rep, snp = snp_name,
+           #                                 climate_var = rownames(attStats(boruta_rf)),
+           #                                 meanImp = attStats(boruta_rf)$meanImp,
+           #                                 decision = attStats(boruta_rf)$decision)
+           
+           
+           importance_rf <- data.frame(mode = mode, rep = rep, snp = snp_name,
+                                           climate_var =  rownames(randomForest::importance(rf, scale = FALSE)),
+                                           randomForest::importance(rf, scale = FALSE))
+           
            
             # Error rates
-           if(!is.na(rf)){ # Make sure RF is real
              error_df <- data.frame(mode = mode,
                                       rep = rep, 
                                       snp = snp_name, 
                                       tail(rf$err.rate, 1)) # Last tree error rates
-           }
            
          } else { 
 
            
-          importance_boruta <- rbind(importance_boruta, data.frame(mode = mode, rep = rep, snp = snp_name,
-                                                                   climate_var = rownames(attStats(boruta_rf)),
-                                                                   meanImp = attStats(boruta_rf)$meanImp,
-                                                                   decision = attStats(boruta_rf)$decision))
+          # importance_boruta <- rbind(importance_boruta, data.frame(mode = mode, rep = rep, snp = snp_name,
+          #                                                          climate_var = rownames(attStats(boruta_rf)),
+          #                                                          meanImp = attStats(boruta_rf)$meanImp,
+          #                                                          decision = attStats(boruta_rf)$decision))
           
-          if(!is.na(rf)){ # Make sure RF is real
+          importance_rf <- rbind(importance_rf, data.frame(mode = mode, rep = rep, 
+                                                           snp = snp_name,
+                                    climate_var =  rownames(randomForest::importance(rf, 
+                                                                            scale = FALSE)),
+                                               randomForest::importance(rf, scale = FALSE)))
+          
             error_df <- rbind(error_df, data.frame(mode = mode, 
                                                    rep = rep, 
                                                    snp = snp_name, 
                                                    tail(rf$err.rate, 1)))
-          } else {
-            if(is.na(rf)){
-              error_df <- rbind(error_df, data.frame(mode = mode, 
-                                                     rep = rep, 
-                                                     snp = snp_name, 
-                                                     OOB = NA,
-                                                     "0" = NA,
-                                                     "1" = NA))
-            }
-          }
-         }
+         } # End else for start flag
   
          # Plot partial plot
-         if(!is.na(rf)){
-
           for(climate_var in climate_vars_rf){
            
-             pp_out <- partial(rf, pred.var = climate_var, 
+             pp_out <- pdp::partial(rf, pred.var = climate_var, 
                                plot = FALSE, which.class = 2L,
                                prob = TRUE, smooth = TRUE)
             
@@ -754,7 +806,6 @@
            }
            
           } # End climate vars loop
-         } # End is.na(rf) if 
 
          
          #   
@@ -764,17 +815,9 @@
          ## Predict across a raster and add to stack
   
              # Second column is positives
-         
-         # If no RF with confirmed variables set predictions as NA
-         if(is.na(rf)){
-           
-           rf_rast_df_nona$pred <- NA
-           
-         } else {
-         
+        
              rf_rast_df_nona$pred = predict(rf, rf_rast_df_nona, type = "prob")[, 2]
              
-         }
 
              rf_rast_df_temp <- left_join(rf_rast_df, rf_rast_df_nona[, c("cell_id", "pred")])
 
@@ -802,187 +845,276 @@
      
    ## Importance
      
-     importance_boruta_raw <- importance_boruta
+     importance_rf_raw <- importance_rf
+     pp_df_raw <- pp_df
      
-     head(importance_boruta)
-     dim(importance_boruta)
+     head(importance_rf)
+     dim(importance_rf)
      
-     importance_boruta$decision <- as.character(importance_boruta$decision)
-     importance_boruta$decision[importance_boruta$decision == "Confirmed"] <- 1
-     importance_boruta$decision[importance_boruta$decision == "Tentative"] <- 0
-     importance_boruta$decision[importance_boruta$decision == "Rejected"] <- 0
-     importance_boruta$decision <- as.numeric(importance_boruta$decision)
-     table(importance_boruta$decision)
-     
-    ## Boruta importance 
+     ## Change variable names in importance and partial plots 
+       table(importance_rf$climate_var)
+       
+       importance_rf$climate_var <- as.character(importance_rf$climate_var)
+       
+       importance_rf$climate_var[importance_rf$climate_var == "aet"] <- "Actual Evap."
+       importance_rf$climate_var[importance_rf$climate_var == "bioclim_04"] <- "Temp. seasonality"
+       importance_rf$climate_var[importance_rf$climate_var == "bioclim_15"] <- "Precip. seasonality"
+       importance_rf$climate_var[importance_rf$climate_var == "bioclim_18"] <- "Summer precip."
+       importance_rf$climate_var[importance_rf$climate_var == "latitude"] <- "Latitude"
+       importance_rf$climate_var[importance_rf$climate_var == "longitude"] <- "Longitude"
+       importance_rf$climate_var[importance_rf$climate_var == "tmax_sum"] <- "Tmax"
+       importance_rf$climate_var[importance_rf$climate_var == "tmin_winter"] <- "Tmin"
+       importance_rf$climate_var[importance_rf$climate_var == "elevation"] <- "Elevation"
+       importance_rf$climate_var <- factor(importance_rf$climate_var)
+       
+       table(importance_rf$climate_var)
+       
+       ## Reverse order of snps
+         importance_rf$mode
+         importance_rf$mode <- factor(importance_rf$mode, levels = c("bottom_snps", "top_snps"))
+          importance_rf$mode
+       
+       
+       # Partial plots
+        pp_df$var <- as.character(pp_df$var)
+         pp_df$var[pp_df$var == "aet"] <- "Actual Evap."
+         pp_df$var[pp_df$var == "bioclim_04"] <- "Temp. seasonality"
+         pp_df$var[pp_df$var == "bioclim_15"] <- "Precip. seasonality"
+         pp_df$var[pp_df$var == "bioclim_18"] <- "Summer precip."
+         pp_df$var[pp_df$var == "latitude"] <- "Latitude"
+         pp_df$var[pp_df$var == "longitude"] <- "Longitude"
+         pp_df$var[pp_df$var == "tmax_sum"] <- "Tmax"
+         pp_df$var[pp_df$var == "tmin_winter"] <- "Tmin"
+         pp_df$var[pp_df$var == "elevation"] <- "Elevation"
+         pp_df$var <- factor(pp_df$var)
+         table(pp_df$var)
+         
+         ## Reverse order of snps
+         pp_df$mode
+         pp_df$mode <- factor(pp_df$mode, levels = c("bottom_snps", "top_snps"))
+         pp_df$mode
+       
+    ## rf importance 
      # Find order of most important variables for TOP_SNPS
-     importance_boruta_df_top <- importance_boruta %>%
+     importance_rf_df_top <- importance_rf %>%
        group_by(mode, snp, climate_var ) %>%
-       summarise_all(mean) %>%
+       summarise_all(mean) %>% # Average across reps
+       ungroup() %>%
+       group_by(mode, climate_var) %>%
        dplyr::select(-snp, -rep) %>%
        group_by(mode, climate_var) %>%
-       summarise_all(mean) %>%
-       arrange(mode, meanImp) %>%
+       summarise_all(median) %>%
+       arrange(mode, MeanDecreaseAccuracy) %>%
        filter(mode == "top_snps") %>%
        ungroup() %>%
-       dplyr::select(-meanImp, -decision, -mode, -snp) %>%
-       mutate(order = row_number()) 
+       dplyr::select(-MeanDecreaseAccuracy, -MeanDecreaseGini, -X0, -X1, -mode, -snp) %>%
+       dplyr::mutate(order = row_number()) 
      
      # Make a dataframe with mean importance values
      
      lwr <- function(x) {quantile(x, 0.05)} # To find lower and upper quantiles
      upr <- function(x) {quantile(x, 0.95)}
+     se <- function(x) {sd(x)/sqrt(length(x))}
     
-     importance_boruta_means <- 
-                 importance_boruta %>%
+     importance_rf_means <- 
+                 importance_rf %>%
                  group_by(mode, snp, climate_var) %>%  ## Average across reps by snp
                  summarise_all(mean) %>%
                   ungroup() %>%
                  dplyr::select(-snp) %>%
                  group_by(mode, climate_var) %>%
-                summarise_all(funs(mean, lwr, upr))  %>% # Calculate means and upr and lower quantiles
-                 left_join(., importance_boruta_df_top, by = c("climate_var"))
+                summarise_all(funs(mean, median, lwr, upr, sd, se))  %>% # Calculate means and upr and lower quantiles
+                 left_join(., importance_rf_df_top, by = c("climate_var"))
+    
      
+     
+  ## Figure 4 - rf variable importance    ####
      # Make ggplot
-     importance_boruta_means %>%
-     ggplot(., aes(order, meanImp_mean, fill = mode)) + 
-      geom_bar(stat = "identity", col = "black", 
-               position = position_dodge2(reverse = TRUE)) + 
-       # geom_errorbar(aes(ymin = meanImp_lwr, ymax = meanImp_upr),
-       #               position = position_dodge2(reverse = TRUE)) + 
-       theme_bw(15) + 
-       ggtitle("Variable importance") + 
+     importance_rf %>%
+     group_by(mode, snp, climate_var ) %>%
+       summarise_all(funs(mean, median, sd)) %>% # Average across reps
+       dplyr::filter(mode != "random_snps") %>%
+       dplyr::mutate(climate_var = factor(climate_var,
+                                          levels = importance_rf_df_top$climate_var)) %>%
+     ggplot(., aes(climate_var, MeanDecreaseAccuracy_mean, fill = mode)) + 
+     #  geom_violin(draw_quantiles = c(0.25, 0.5, 0.75)) + 
+      
+       geom_hline(yintercept = 0, lty = 2, size = .25) +
+       geom_point(aes(col = mode),
+                  position = position_jitterdodge(),
+                  size = .55, alpha = .75, pch = 16) +
+       geom_boxplot(outlier.shape = NA, notch = TRUE, alpha = 0.45, size = .1) + 
+       # geom_point(data = importance_rf_means, 
+       #            aes(climate_var, MeanDecreaseAccuracy_mean, fill = mode),
+       #            position = position_dodge2(width = .65),
+       #            size = 3,
+       #            pch = 21) + 
+      
+       # geom_errorbar(aes(ymin = MeanDecreaseAccuracy_mean - MeanDecreaseAccuracy_sd,
+       #                   ymax = MeanDecreaseAccuracy_mean + MeanDecreaseAccuracy_sd),
+       #                    position = position_dodge(width = .5),
+       #               width = 0.1, alpha = 0.5) +
+       theme_bw(10) + 
+     #  ggtitle("Variable importance") + 
        #   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-       ylab("Variable importance") + xlab("") +
-       scale_x_continuous(
-         breaks = importance_boruta_means$order,
-         labels = importance_boruta_means$climate_var, expand = c(0,0)) + 
-       coord_flip() + 
-       theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+       ylab("Mean decrease in accuracy") + xlab("") +
+       scale_x_discrete(limits = rev(levels(mode))) +
+       scale_fill_manual(values = c("orangered", "deepskyblue")) + 
+       scale_color_manual(values = c("orangered", "deepskyblue")) + 
+      coord_flip() + 
+       theme(panel.grid.major = element_blank(), 
+             panel.grid.minor = element_blank(),
+             legend.position = "none") + 
+       NULL
      
-     ## Significance
-     importance_boruta_means %>%
-     ggplot(., aes(order, decision_mean, fill = mode)) + 
-       geom_bar(stat = "identity", col = "black", position = position_dodge2(reverse = TRUE)) + 
-       geom_errorbar(aes(ymin = decision_lwr, ymax = decision_upr),
-                     position = position_dodge2(reverse = TRUE)) +
-       theme_bw(15) + 
-       ggtitle("Variable significance") + 
-       #   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-       ylab("Proportion significant") + xlab("") +
-       scale_x_continuous(
-         breaks = importance_boruta_means$order,
-         labels = importance_boruta_means$climate_var, expand = c(0,0)) + 
-       coord_flip() + 
-       theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+     # Save file
+     ggsave(filename = paste0("./figs_tables/Figure 4 - variable importance ", 
+                              Sys.Date(), ".pdf"),
+          units = "cm",
+          height = 8, width = 8,
+            
+            useDingbats = FALSE )
+
      
  # Looking at rasters
     stack_top
     
-    stack_random_snps
-     
-    ## Take mean of rasters, weighted by class1 error - higher weights to lower error
-    top_snps_stack <- weighted.mean(stack_top,
-                                    w = 1 - error_df$OOB[error_df$mode == "top_snps"])
-    random_snps_stack <- weighted.mean(stack_random_snps,
-                                       w = 1 - error_df$OOB[error_df$mode == "random_snps"])
-    random_env_stack <- weighted.mean(stack_random_env,
-                                      w = 1 - error_df$OOB[error_df$mode == "random_env"])
-
-    top_snps_stack <- mean(stack_top, na.rm = TRUE)
-    bottom_snps_stack <- mean(stack_bottom, na.rm = TRUE)
-    random_snps_stack <- mean(stack_random_snps, na.rm = TRUE)
+    ## Average across reps within each SNP
+    # Using stack apply - give indices of each raster that's a repition of a SNP - should go in order from 1-length(top_snps) and then repeat XX number of reps
+    stack_top_avg = stackApply(stack_top,
+                               indices = rep(1:length(top_snps_long$snp), 
+                                                        times = rep), 
+                               mean, na.rm = TRUE)
     
-  ## Plot raster
+    
+    stack_bottom_avg = stackApply(stack_bottom, 
+                               indices = rep(1:length(bottom_snps_long$snp), 
+                                             times = rep), 
+                               mean, na.rm = TRUE)
+    
+    
+     
+  ## Take mean of rasters, weighted by class1 error - higher weights to lower error
+   #  top_snps_stack <- weighted.mean(stack_top,
+   #                                  w = 1 - error_df$OOB[error_df$mode == "top_snps"])
+   # bottom_snps_stack <- weighted.mean(stack_bottom,
+   #                                  w = 1 - error_df$OOB[error_df$mode == "bottom_snps"])
+   #  random_snps_stack <- weighted.mean(stack_random_snps,
+   #                                     w = 1 - error_df$OOB[error_df$mode == "random_snps"])
+   #  random_env_stack <- weighted.mean(stack_random_env,
+   #                                    w = 1 - error_df$OOB[error_df$mode == "random_env"])
+
+    top_snps_stack <- mean(stack_top_avg, na.rm = TRUE)
+    bottom_snps_stack <- mean(stack_bottom_avg, na.rm = TRUE)
+   # random_snps_stack <- mean(stack_random_snps, na.rm = TRUE)
+    
+    
+  ## Figure 4 - spatial maps of outlier genotypes ####  
+    
+    # Set breaks for color palette
+    color_breaks <-  seq(from = min(c(values(top_snps_stack), values(bottom_snps_stack)),
+                                    na.rm = TRUE),
+                         to = max(c(values(top_snps_stack), values(bottom_snps_stack)),
+                             na.rm = TRUE), 
+                         length.out = 9)
+    
+  ## Plot beneficial raster
      levelplot(top_snps_stack, margin = FALSE,
-               main = "Probability of finding beneficial genotype",
+           #    main = "Probability of finding beneficial genotype",
                maxpixels = 1e6,
-               par.settings =  rasterTheme(region = brewer.pal('PiYG', n = 9))) +
+               par.settings =  rasterTheme(region = brewer.pal('PRGn', n = 9)),
+               at = color_breaks) +
        latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
-    #   latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.75)) + 
-       latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 2.75))
+       latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
+       latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
+     
+     # Save plot
+     dev.copy(png, paste0("./figs_tables/Figure 4 - beneficial alleles map ", Sys.Date(), ".png"),
+              res = 300, units = "cm", width = 16, height = 16)
+     dev.off()
+     
+     
+     
+   # Save a quick PDF version for the legend
+       pdf(paste0("./figs_tables/Figure 4 - beneficial alleles map LEGEND ", Sys.Date(), ".pdf"),
+          width = 4, height = 3)
+         levelplot(top_snps_stack, margin = FALSE,
+                 #  main = "Probability of finding beneficial genotype",
+                   maxpixels = 1e3,
+                   par.settings =  rasterTheme(region = brewer.pal('PRGn', n = 9)),
+                   at = color_breaks)
+       dev.off()
+     
+     
+     
+     ## Maybe make a PDF version that will only have the scale
      
      
      ## Plot raster
      levelplot(bottom_snps_stack, margin = FALSE,
-               main = "Probability of finding bad genotype",
+            #   main = "Probability of finding detrimental genotype",
                maxpixels = 1e6,
-               par.settings =  rasterTheme(region = brewer.pal('PiYG', n = 9))) +
+               par.settings =  rasterTheme(region = brewer.pal('PRGn', n = 9)),
+               at = color_breaks) +
        latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
-   #    latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.75)) + 
-       latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 2.75))
+       latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
+       latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
      
+   # Save plot
+   dev.copy(png, paste0("./figs_tables/Figure 4 - detrimental alleles map ", Sys.Date(), ".png"),
+            res = 300, units = "cm", width = 16, height = 16)
+     dev.off()
    
      
-  # Get values by region
-   # Not 100% sure if extract is doing exactly what we want   
-    prob_by_region <- data.frame(region = lobata_range$REGION,
-                                 prob   = unlist(lapply(raster::extract(top_snps_stack,
-                                                          y = lobata_range), mean)))
-    
-
-    ggplot(prob_by_region, aes(region, prob)) + 
-      geom_bar(stat = "identity", col = "black", fill = "steelblue2") + theme_bw(15)
-     
-     
-    # Raster plot of Random SNPs
-    levelplot(random_snps_stack, margin = FALSE,
-              main = "Probability of random genotype",
-              par.settings =  rasterTheme(region = brewer.pal('PiYG', n = 9))) +
-      latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
-      latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.75)) + 
-      latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 2.75))
-     
-    
-     
-    # Randomize environmental variables
-     levelplot(random_env_stack, margin = FALSE,
-               main = "Randomdomized environmental variables")
-     
-     
-     # Difference between beneficial and random SNPs
-     # Set a 0 point 
-     levelplot(top_snps_stack - random_snps_stack, margin = FALSE, 
-               main = c("Dif bw bene and random SNP")) +
-       latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
-       #    latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.75)) + 
-       latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 2.75))
-     
-     
-     levelplot(top_snps_stack - random_env_stack, margin = FALSE, 
-               main = c("Dif bw bene and random environmental variables")) +
-       latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) +
-       latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black"))
+  # # Get values by region
+  #  # Not 100% sure if extract is doing exactly what we want   
+  #   prob_by_region <- data.frame(region = lobata_range$REGION,
+  #                                prob   = unlist(lapply(raster::extract(top_snps_stack,
+  #                                                         y = lobata_range), mean)))
+  #   
+  # 
+  #   ggplot(prob_by_region, aes(region, prob)) + 
+  #     geom_bar(stat = "identity", col = "black", fill = "steelblue2") + theme_bw(15)
+  #    
      
   
- # Plot partial dependence plots of TMax
-     
-     head(pp_df)
-     dim(pp_df)
-     
-     
+  
+ # Figure 4 - partial dependence plots ####
+
   pp_df %>%
     dplyr::filter(mode != "random_snps") %>%
+    dplyr::mutate(var = factor(var, # Reorder based on importance
+                               levels = rev(importance_rf_df_top$climate_var))) %>%
     group_by(mode, snp, var, x_val) %>% # Average across reps
     summarise_all(mean) %>%
    ggplot(., 
           aes(x = x_val,
               y = prob,
            #   y = prob_centered,
-              y = prob_scaled,
-              group = snp, col = mode), alpha = 0.75) + 
+           #   y = prob_scaled,
+              group = snp, col = mode, fill = mode), alpha = 0.75) + 
   #   geom_line(lwd = .25, alpha = 0.15) + 
-    theme_bw(15) + 
+    ylab("Probablity of occurrence") + xlab("") + 
+    theme_bw(8) + 
     # theme(legend.position="none") +
-     geom_smooth(aes(group = mode), lwd = 1.5) +
-     facet_wrap(~var, scales = "free") +
+    scale_color_manual(values = c("orangered", "deepskyblue")) + 
+     geom_smooth(aes(group = mode), lwd = .75) +
+     facet_wrap(~var, scales = "free_x") +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          legend.position = "none",
+          strip.background = element_rect(color = "white", fill="white"),
+          strip.text.x = element_text(face="bold")) +
      NULL
+  
+  # Save file
+  ggsave(filename = paste0("./figs_tables/Figure 4 - partial plots ", Sys.Date(), ".pdf"),
+         units = "cm",
+         width = 10, height = 8, useDingbats = FALSE)
    
+
    
-   
-   
- 
-   ## Calculate correlation between prob of finding beneficial allele and future climate change
+  ## Calculate correlation between prob of finding beneficial allele and future climate change
    
    # Read in future tmax scenarios
    tmax_CCSM4 <- raster("./data/gis/climate_data/BCM/future/CCSM4_rcp85/tmx2070_2099jja_ave_CCSM4_rcp85_1529358915/tmx2070_2099jja_ave_CCSM4_rcp85_1529358915.tif")
@@ -1061,67 +1193,62 @@
      test
      levelplot(test, margin = FALSE)
    
-   
-
      
-
-# Look to see if better performing individuals have more copies of --------
-
+ # Figure 3 - growth vs copies of alleles ####
+     
      fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\")"))
-     
-     ## Add gen pcs and interactions
-     # fixed_effects_int <- paste0(fixed_effects_int, paste0(paste0("+ s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC1_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC2_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC3_gen, bs=\"cr\")")))
-     
-     ## Add MEMs
-     #  fixed_effects_int <- paste0(fixed_effects_int,  "+ s(mem1, bs =\"cr\") + s(mem2, bs =\"cr\") + s(mem3, bs =\"cr\") + s(mem4, bs =\"cr\")")
-     
-     ## Randomize RGR data
-     # dat_snp_unscaled$rgr <- sample(dat_snp_unscaled$rgr)
-     
+
+
      start <- Sys.time()
      # Gam with interaction effect
      gam_snp = bam(formula = make_formula(fixed_effects, random_effects),
-                       data = dat_snp_unscaled,
-                       discrete = TRUE, 
-                       nthreads = 8,
-                       method = "fREML",
-                       #   method = "ML",
-                       family = "tw",
-                       control = list(trace = FALSE))
+                   data = dat_snp_unscaled,
+                   discrete = TRUE, 
+                   nthreads = 8,
+                   method = "fREML",
+                   #   method = "ML",
+                   family = "tw",
+                   control = list(trace = FALSE))
      
      summary(gam_snp)
      
      
      # Join gen_data_bene with dat_snp data
      
-     dat_snp_bene <- dat_snp_unscaled %>%
+     dat_snp_top <- dat_snp_unscaled %>%
        dplyr::select(accession, accession_progeny, tmax_sum_dif) %>%
        dplyr::mutate(accession = as.numeric(as.character(accession))) %>%
        left_join(., gen_dat_bene, by = c("accession" = "accession")) %>%
        dplyr::select(accession, accession_progeny, tmax_sum_dif, snp_col_names) %>%
        dplyr::mutate(rgr = gam_snp$fitted.values,
                      rgr_resids = resid(gam_snp))
-    
-     dat_snp_bene <- dat_snp_bene %>%
-             mutate(n_top_snps = rowSums(dplyr::select(., top_snps_long$snp), na.rm = TRUE))
+
+     # Calculate number of top snps
+       dat_snp_top <- dat_snp_top %>%
+         mutate(n_top_snps = rowSums(dplyr::select(., top_snps_long$snp), na.rm = TRUE))
+       
+       hist(dat_snp_top$n_top_snps)
+       
+       # Run linear model on only individuals planted in warmer temperatures
+       
+       warm_thresh <- forward_transform(0, # Choose degrees of warming
+                                        "tmax_sum_dif",
+                                        means = scaled_var_means_gbs_only,
+                                        sds = scaled_var_sds_gbs_only)
+       
+       summary(gam(rgr_resids ~ n_top_snps,
+                   data = dat_snp_top[dat_snp_top$tmax_sum_dif > warm_thresh, ]))
+       
+       dat_snp_top %>%
+         dplyr::filter(tmax_sum_dif > warm_thresh) %>%
+         ggplot(., aes(n_top_snps, rgr_resids)) +
+         geom_point() + geom_smooth() + 
+         ylab("Residuals of RGR") + 
+         xlab("Number of beneficial SNPs") +
+         theme_bw(15)
      
-     hist(dat_snp_bene$n_top_snps)
      
-     plot(dat_snp_bene$n_top_snps, gam_snp$fitted.values)
-     
-     summary(gam(rgr_resids ~ n_top_snps,
-                 data = dat_snp_bene[dat_snp_bene$tmax_sum_dif > -.5,]))
-     
-     dat_snp_bene %>%
-       dplyr::filter(tmax_sum_dif > -.5) %>%
-     ggplot(., aes(n_top_snps, rgr_resids)) +
-       geom_point() + geom_smooth() + 
-       ylab("Residuals of RGR") + 
-       xlab("Number of beneficial SNPs") +
-       theme_bw(15)
-     
-     
-  ## Bottom SNPS
+     ## Bottom SNPS
      
      dat_snp_bottom <- dat_snp_unscaled %>%
        dplyr::select(accession, accession_progeny, tmax_sum_dif) %>%
@@ -1138,24 +1265,134 @@
      
      
      summary(gam(rgr_resids ~ n_bottom_snps,
-                 data = dat_snp_bottom[dat_snp_bottom$tmax_sum_dif > 1,]))
+                 data = dat_snp_bottom[dat_snp_bottom$tmax_sum_dif > warm_thresh, ]))
      
      dat_snp_bottom %>%
-       dplyr::filter(tmax_sum_dif > 1) %>%
+       dplyr::filter(tmax_sum_dif > warm_thresh) %>%
        ggplot(., aes(n_bottom_snps, rgr_resids)) +
        geom_point() + geom_smooth() + theme_bw(15)
      
-      
-       
-    
+     
+     ## Mid SNPS
+     
+     dat_snp_mid <- dat_snp_unscaled %>%
+       dplyr::select(accession, accession_progeny, tmax_sum_dif) %>%
+       dplyr::mutate(accession = as.numeric(as.character(accession))) %>%
+       left_join(., gen_dat_mid, by = c("accession" = "accession")) %>%
+       dplyr::select(accession, accession_progeny, tmax_sum_dif, snp_col_names) %>%
+       dplyr::mutate(rgr = gam_snp$fitted.values,
+                     rgr_resids = resid(gam_snp))
+     
+     dat_snp_mid <- dat_snp_mid %>%
+       mutate(n_mid_snps = rowSums(dplyr::select(., mid_snps_long$snp), na.rm = TRUE))
+     
+     hist(dat_snp_mid$n_mid_snps)
      
      
-        
+     summary(gam(rgr_resids ~ n_mid_snps,
+                 data = dat_snp_mid[dat_snp_mid$tmax_sum_dif > warm_thresh, ]))
      
+     dat_snp_mid %>%
+       dplyr::filter(tmax_sum_dif > warm_thresh) %>%
+       ggplot(., aes(n_mid_snps, rgr_resids)) +
+       geom_point() + geom_smooth() + theme_bw(15) 
      
      
 
-  
+     ## Combine into a plot
+     
+     growth_snps_count <- left_join(dplyr::select(dat_snp_top, accession_progeny, 
+                                                  tmax_sum_dif, 
+                                                  rgr_resids, n_top_snps),
+                                    dplyr::select(dat_snp_bottom, accession_progeny, 
+                                                  tmax_sum_dif, 
+                                                  rgr_resids, n_bottom_snps))
+     
+     growth_snps_count <- left_join(growth_snps_count,
+                                    dplyr::select(dat_snp_mid, accession_progeny, 
+                                                  tmax_sum_dif, 
+                                                  rgr_resids, n_mid_snps))
+     
+     dim(growth_snps_count)
+     head(growth_snps_count)
+     nrow(growth_snps_count) == nrow(dat_snp_top) # Should both be true
+     nrow(growth_snps_count) == nrow(dat_snp_bottom) # Should both be true
+     
+     # Reformat from wide to long
+     growth_snps_count <- growth_snps_count %>%
+       gather(., key = "type", value = "count", 
+              -accession_progeny, -tmax_sum_dif, -rgr_resids) %>%
+       mutate(count2 = factor(count))
+     
+     head(growth_snps_count)
+     
+     
+     
+    ## Combined plot
+     growth_snps_count %>%
+       dplyr::filter(tmax_sum_dif > warm_thresh) %>%
+       ggplot(., aes(count, rgr_resids)) +
+       geom_hline(yintercept = 0, lty = 1, size = .5) +
+      geom_point(aes(x = count, y = rgr_resids,
+              col = type),
+             position = position_jitterdodge(),
+              pch = 16, alpha = 0.25, size = 0.25) +
+       geom_smooth(aes(count, rgr_resids, fill = type, col = type),
+                   method = "lm", size = .5) +
+       theme_bw(10) + 
+       xlab("Count of outlier alleles") + 
+       ylab("Residuals of relative growth rate") +
+       scale_fill_manual(values = c("#FF6633", "grey50", "#6699CC")) + 
+       scale_color_manual(values = c("#FF6633", "grey50", "#6699CC")) + 
+       theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank(), 
+             axis.line = element_line(colour = "black"),
+             legend.position = "none") + 
+       NULL
+     
+     # Save to file
+     ggsave(filename = paste0("./figs_tables/Figure 3 - growth by outlier count ", 
+                              Sys.Date(), ".pdf"),
+            units = "cm",
+            height = 6, width = 8,
+            useDingbats = FALSE )
+     
+     
+     #### Testing 
+     
+     
+     dat_snp_unscaled2 <- left_join(dat_snp_unscaled, dplyr::select(dat_snp_top, 
+                                                                    accession_progeny, 
+                                                                    n_top_snps))
+     
+     fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + n_top_snps + s(tmax_sum_dif, by = n_top_snps, bs=\"cr\")"))
+     
+     
+     # Gam with interaction effect
+     gam_snp = bam(formula = make_formula(fixed_effects, random_effects),
+                   data = dat_snp_unscaled2,
+                   discrete = TRUE, 
+                   nthreads = 8,
+                   method = "fREML",
+                   #   method = "ML",
+                   family = "tw",
+                   control = list(trace = FALSE))
+     
+     summary(gam_snp)
+     
+     visreg(gam_snp, partial = FALSE)
+     
+     visreg(gam_snp, xvar = "tmax_sum_dif", scale = "response",
+            by = "n_top_snps", overlay = TRUE, partial = FALSE,
+            breaks = c(0, 20))
+     
+     
+     
+     
+     
+     
+     
+     
 
 # Gradient forest test ----------------------------------------------------
   
