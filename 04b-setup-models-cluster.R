@@ -79,42 +79,48 @@
   #  screeplot(pca_gen, bstick = TRUE)
     
     
-  ### Figure S2 - Plotting results of PCA for supplementary material
-      # 
+  ### Figure S3 - Plotting results of PCA for supplementary material
+
       # par(mfrow = c(2,1))
-      #   
-      # # Pc1 vs pc2  
-      #   plot(pca_gen$x[, 1], pca_gen$x[, 2], 
-      #        las = 1, 
+      # 
+      # # Scale values for plotting in biplot - from: https://stats.stackexchange.com/questions/66926/what-are-the-four-axes-on-pca-biplot
+      # scores<-pca_gen$x
+      # lam <- pca_gen$sdev[1:3]
+      # n <- NROW(scores)
+      # lam <- lam * sqrt(n)
+      # lam <- lam^1
+      # yy<-t(t(pca_gen$rotation[, 1:3]) * lam)
+      # xx<-t(t(scores[, 1:3])/lam)
+      # 
+      # # Pc1 vs pc2
+      #   plot(xx[, 1], xx[, 2],
+      #        las = 1,
       #        xlab = paste0("PC1: ", summary(pca_gen)$importance[2, 1], "% variance explained"),
       #        ylab = paste0("PC2: ", summary(pca_gen)$importance[2, 2], "% variance explained"),
-      #        pch = 19, 
+      #        pch = 19,
       #        type = "n")
-      #   text(pca_gen$x[, 1], pca_gen$x[, 2],
+      #   text(xx[, 1], xx[, 2],
       #        labels = gen_dat_clim$id, cex = .5)
       #   mtext(text = "(a)", side = 3, adj = -.1, padj = -1, cex = 1.25)
-      #   
-      #   
+      # 
+      # 
       #   # Pc1 vs pc3
-      #   plot(pca_gen$x[, 1], pca_gen$x[, 3], 
-      #        las = 1, 
+      #   plot(xx[, 1], xx[, 3],
+      #        las = 1,
       #        xlab = paste0("PC1: ", summary(pca_gen)$importance[2, 1], "% variance explained"),
       #        ylab = paste0("PC3: ", summary(pca_gen)$importance[2, 3], "% variance explained"),
       #        pch = 19,
       #        type = "n")
-      #   text(pca_gen$x[, 1], pca_gen$x[, 3],
+      #   text(xx[, 1], xx[, 3],
       #        labels = gen_dat_clim$id, cex = .5)
       #   mtext(text = "(b)", side = 3, adj = -.1, padj = -1, cex = 1.25)
-      #   
-      #   dev.copy(png, filename = paste0("./figs_tables/Figure S2 - PCA plot_", 
+      # 
+      #   dev.copy(png, filename = paste0("./figs_tables/Figure S3 - PCA plot_",
       #                                   Sys.Date(), ".png"),
       #            res = 300, width = 1800, height =2400)
       #   dev.off()
-      # 
 
-    
-    
-    
+
     pcs <- as.data.frame(pca_gen$x[, 1:10])
     colnames(pcs) <- paste0(colnames(pcs), "_gen")
     
