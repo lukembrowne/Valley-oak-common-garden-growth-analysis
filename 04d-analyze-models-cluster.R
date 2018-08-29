@@ -3,7 +3,6 @@
 
   source("./04b-setup-models-cluster.R")
 
-
 # Read in cluster run output ----------------------------------------------
 
   # Good run
@@ -161,17 +160,20 @@
  head(bottom_snps_long)
  
  # Also make a comparable dataframe of 'random snps'
- mid_snps_long <- sum_df_long %>%
-   dplyr::filter(p_val_adj <= 0.05) %>%
-   dplyr::filter(!snp %in% c(top_snps_long$snp, bottom_snps_long$snp)) %>%
-   # Make sure number of genotype copies is comparable
-   dplyr::filter(n_gen <= quantile(c(top_snps_long$n_gen, bottom_snps_long$n_gen),
-                                   0.9)) %>% 
-   dplyr::filter(n_gen >= gen_copies_thresh) %>%
-   sample_n(round(nrow(sum_df) * percent_thresh))
  
-   head(mid_snps_long)
-   summary(mid_snps_long$height_change_0base)
+   set.seed(42) # To make sure same SNPs are chosen everytime - reproducible
+   
+   mid_snps_long <- sum_df_long %>%
+     dplyr::filter(p_val_adj <= 0.05) %>%
+     dplyr::filter(!snp %in% c(top_snps_long$snp, bottom_snps_long$snp)) %>%
+     # Make sure number of genotype copies is comparable
+     dplyr::filter(n_gen <= quantile(c(top_snps_long$n_gen, bottom_snps_long$n_gen),
+                                     0.9)) %>% 
+     dplyr::filter(n_gen >= gen_copies_thresh) %>%
+     sample_n(round(nrow(sum_df) * percent_thresh))
+   
+     head(mid_snps_long)
+     summary(mid_snps_long$height_change_0base)
   
    
   hist(mid_snps_long$n_gen, breaks = 50, col = "black", xlim = c(0, 1000), ylim = c(0, 10))
@@ -328,7 +330,7 @@
 # Convert outlier SNPs genotypes to precense absence --------------------------
 
  ## For top snps
- gen_dat_bene <- gen_dat_clim_all
+ gen_dat_top <- gen_dat_clim_all
  
   for(snp in top_snps_long$snp){
     
@@ -340,7 +342,7 @@
     }
     
     # Replace genotype
-    gen_dat_bene[, snp] <- apply(gen_dat_clim_all[, snp], 1, function(x) {
+    gen_dat_top[, snp] <- apply(gen_dat_clim_all[, snp], 1, function(x) {
                 if(is.na(x)){ NA
                 } else if(x == ben_gen){ 1
                 } else {  0
@@ -349,22 +351,8 @@
  
   }
  
-  dim(gen_dat_bene)
- 
- 
- ## For rest of SNPs, convert non-reference alleles to 1, reference alleles to 0 for comparison
- for(snp in snp_col_names[!snp_col_names %in% top_snps_long$snp]){
-   
-   gen_dat_bene[, snp] <-  apply(gen_dat_clim_all[, snp], 1, function(x) {
-     if(is.na(x)){ NA
-     } else if(x == 0){ 0
-     } else if(x == 1){ 1
-     } else if(x == 2){ 1
-     } else {  0
-     }
-   }) # End apply
-   
- } # End SNP loop
+ ## Remove not top snps
+  dim(gen_dat_top)
 
   
   
@@ -392,24 +380,7 @@
   
   dim(gen_dat_bottom)
   
-  
-  ## For rest of SNPs, convert non-reference alleles to 1, reference alleles to 0 for comparison
-  for(snp in snp_col_names[!snp_col_names %in% bottom_snps_long$snp]){
-    
-    gen_dat_bottom[, snp] <-  apply(gen_dat_clim_all[, snp], 1, function(x) {
-      if(is.na(x)){ NA
-      } else if(x == 0){ 0
-      } else if(x == 1){ 1
-      } else if(x == 2){ 1
-      } else {  0
-      }
-    }) # End apply
-    
-  } # End SNP loop
-  
-  
-  
-  ## For middle snps "random snps"
+## For middle snps "random snps"
   gen_dat_mid <- gen_dat_clim_all
   
   for(snp in mid_snps_long$snp){
@@ -435,27 +406,6 @@
 
   
   
-  
-     
- 
- 
-
-  ## SCP code to copy over model plots
-    for(snp in paste0("snp_", top_snps$snp)[1:15]){
-    #  system(paste0("scp lukembro@dtn2.hoffman2.idre.ucla.edu:/u/flashscratch/l/lukembro/qlobata_growth/run_291_tmax_sum_dif/model_plots/", snp, "_gg.pdf ./output/model_visualizations/"))
-      
-     # gg <-  ggplot(dat_snp, aes(tmax_sum_dif, pull(dat_snp, snp))) +
-     #    geom_jitter() +
-     #    ylab(snp) +
-     #    theme_bw() 
-     # 
-     # print(gg)
-     #  
-    #  ggsave(paste0("./output/model_visualizations/",snp, "_scatter.pdf"))
-      
-    }
-
-
 # Random forest on just beneficial alleles ------------------------
    
    library(randomForest)
@@ -469,7 +419,7 @@
    
 
   ## For TOP SNPS
-     rf_top <- gen_dat_bene[ , snp_col_names]
+     rf_top <- gen_dat_top[ , snp_col_names]
      dim(rf_top)
      
      ## Count positives
@@ -521,6 +471,12 @@
        
        ## How many bottom SNPs pass this threshold?
        sum(bottom_snps_long$snp %in% colnames(rf_bottom))     
+       
+       
+    ## For mid snps
+       rf_mid<- gen_dat_mid[ , snp_col_names]
+       dim(rf_mid)
+       
        
 
    # Shape outlines
@@ -615,10 +571,10 @@
                        #    "bioclim_19", # R = 0.79 with aet; R = 0.84 with bioclim_18
                            "elevation",
                            "latitude", 
-                           "longitude") # R = -0.84 with latitude
-                         #  "random")
+                           "longitude", # R = -0.84 with latitude
+                            "random")
      
-     pairs.panels(gen_dat_bene[, climate_vars_rf])
+     pairs.panels(gen_dat_top[, climate_vars_rf])
      
      
 # Initialize variables
@@ -655,10 +611,8 @@
       
       # If random_snps, choose same number of top snps, but snps that aren't top or bottom snps
       # But only do it on the first rep so that we remeasure the same 'random snps' each rep
-      if(mode == "random_snps" & rep == 1) {
-        snps <- sample(x = colnames(rf_top)[!colnames(rf_top) %in% c(top_snps_long$snp,
-                                                                       bottom_snps_long$snp)],
-                                          size = n_snps_to_sample)
+      if(mode == "random_snps") {
+        snps <- mid_snps_long$snp[mid_snps_long$snp %in% colnames(rf_mid)]
       }
 
       # Loop over SNPs
@@ -670,8 +624,8 @@
          
          
          # Get climate and snp data
-         if(mode == "top_snps" | mode == "random_snps"){
-           X = gen_dat_bene[, climate_vars_rf] # Save climate variables
+         if(mode == "top_snps"){
+           X = gen_dat_top[, climate_vars_rf] # Save climate variables
            y = pull(rf_top, snp_name) # Pull out snp values
          }
          
@@ -679,11 +633,16 @@
            X = gen_dat_bottom[, climate_vars_rf] # Save climate variables
            y = pull(rf_bottom, snp_name) # Pull out snp values
          }
+         
+         if(mode == "random_snps"){
+           X = gen_dat_mid[, climate_vars_rf] # Save climate variables
+           y = pull(rf_mid, snp_name) # Pull out snp values
+         }
 
          ## IF mode == random_env permute CLIMATE VARIABLES 
          if(mode == "random_env") {
            for(col in 1:ncol(X)){
-             X[, col] <- X[sample(1:nrow(gen_dat_bene)), col]
+             X[, col] <- X[sample(1:nrow(gen_dat_top)), col]
            }
            
          }
@@ -865,18 +824,21 @@
        importance_rf$climate_var[importance_rf$climate_var == "tmax_sum"] <- "Tmax"
        importance_rf$climate_var[importance_rf$climate_var == "tmin_winter"] <- "Tmin"
        importance_rf$climate_var[importance_rf$climate_var == "elevation"] <- "Elevation"
+       importance_rf$climate_var[importance_rf$climate_var == "random"] <- "Random"
        importance_rf$climate_var <- factor(importance_rf$climate_var)
        
        table(importance_rf$climate_var)
        
        ## Reverse order of snps
          importance_rf$mode
-         importance_rf$mode <- factor(importance_rf$mode, levels = c("bottom_snps", "top_snps"))
-          importance_rf$mode
+         importance_rf$mode <- factor(importance_rf$mode, levels = c("bottom_snps", 
+                                                                     "random_snps",
+                                                                     "top_snps"))
+          table(importance_rf$mode)
        
        
        # Partial plots
-        pp_df$var <- as.character(pp_df$var)
+         pp_df$var <- as.character(pp_df$var)
          pp_df$var[pp_df$var == "aet"] <- "Actual Evap."
          pp_df$var[pp_df$var == "bioclim_04"] <- "Temp. seasonality"
          pp_df$var[pp_df$var == "bioclim_15"] <- "Precip. seasonality"
@@ -886,13 +848,16 @@
          pp_df$var[pp_df$var == "tmax_sum"] <- "Tmax"
          pp_df$var[pp_df$var == "tmin_winter"] <- "Tmin"
          pp_df$var[pp_df$var == "elevation"] <- "Elevation"
+         pp_df$var[pp_df$var == "random"] <- "Random"
          pp_df$var <- factor(pp_df$var)
          table(pp_df$var)
          
          ## Reverse order of snps
          pp_df$mode
-         pp_df$mode <- factor(pp_df$mode, levels = c("bottom_snps", "top_snps"))
-         pp_df$mode
+         pp_df$mode <- factor(pp_df$mode, levels = c("bottom_snps", 
+                                                     "random_snps", 
+                                                     "top_snps"))
+        table(pp_df$mode)
        
     ## rf importance 
      # Find order of most important variables for TOP_SNPS
@@ -959,8 +924,8 @@
        #   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
        ylab("Mean decrease in accuracy") + xlab("") +
        scale_x_discrete(limits = rev(levels(mode))) +
-       scale_fill_manual(values = c("orangered", "deepskyblue")) + 
-       scale_color_manual(values = c("orangered", "deepskyblue")) + 
+       scale_fill_manual(values = c("#FF6633","#6699CC")) + 
+       scale_color_manual(values = c("#FF6633","#6699CC")) + 
       coord_flip() + 
        theme(panel.grid.major = element_blank(), 
              panel.grid.minor = element_blank(),
@@ -1097,7 +1062,7 @@
     ylab("Probablity of occurrence") + xlab("") + 
     theme_bw(8) + 
     # theme(legend.position="none") +
-    scale_color_manual(values = c("orangered", "deepskyblue")) + 
+       scale_color_manual(values = c("#FF6633", "#6699CC")) + 
      geom_smooth(aes(group = mode), lwd = .75) +
      facet_wrap(~var, scales = "free_x") +
     theme(panel.grid.major = element_blank(),
@@ -1113,95 +1078,23 @@
          width = 10, height = 8, useDingbats = FALSE)
    
 
-   
-  ## Calculate correlation between prob of finding beneficial allele and future climate change
-   
-   # Read in future tmax scenarios
-   tmax_CCSM4 <- raster("./data/gis/climate_data/BCM/future/CCSM4_rcp85/tmx2070_2099jja_ave_CCSM4_rcp85_1529358915/tmx2070_2099jja_ave_CCSM4_rcp85_1529358915.tif")
-   tmax_CCSM4 <- projectRaster(tmax_CCSM4, crs = CRS("+proj=longlat +datum=WGS84"))
-   tmax_CCSM4 <- resample(tmax_CCSM4, tmax_rast)
-   compareRaster(tmax_CCSM4, tmax_rast)
-   levelplot(tmax_CCSM4, margin = FALSE)
-   
-   
-   tmax_CNRM <- raster("./data/gis/climate_data/BCM/future/CNRM_rcp85/tmx2070_2099jja_ave_CNRM_rcp85_1529358976/tmx2070_2099jja_ave_CNRM_rcp85_1529358976.tif")
-   tmax_CNRM <- projectRaster(tmax_CNRM, crs = CRS("+proj=longlat +datum=WGS84"))
-   tmax_CNRM <- resample(tmax_CNRM, tmax_rast)
-   compareRaster(tmax_CNRM, tmax_rast)
-   levelplot(tmax_CNRM, margin = FALSE)
-   
-   tmax_IPSL <- raster("./data/gis/climate_data/BCM/future/IPSL_rcp85/tmx2070_2099jja_ave_IPSL_rcp85_1529358959/tmx2070_2099jja_ave_IPSL_rcp85_1529358959.tif")
-   tmax_IPSL <- projectRaster(tmax_IPSL, crs = CRS("+proj=longlat +datum=WGS84"))
-   tmax_IPSL <- resample(tmax_IPSL, tmax_rast)
-   compareRaster(tmax_IPSL, tmax_rast)
-   levelplot(tmax_IPSL, margin = FALSE)
-   
-   tmax_MIROC <- raster("./data/gis/climate_data/BCM/future/MIROC_rcp85/tmx2070_2099jja_ave_MIROC_rcp85_1529357403/tmx2070_2099jja_ave_MIROC_rcp85_1529357403.tif")
-   tmax_MIROC <- projectRaster(tmax_MIROC, crs = CRS("+proj=longlat +datum=WGS84"))
-   tmax_MIROC <- resample(tmax_MIROC, tmax_rast)
-   compareRaster(tmax_MIROC, tmax_rast)
-   levelplot(tmax_MIROC, margin = FALSE)
-   
-   # Stack rasters
-    future_stack <- stack(tmax_CCSM4) 
-                          tmax_CNRM,
-                          tmax_IPSL, 
-                          tmax_MIROC)
   
-    levelplot(future_stack, margin = FALSE)
-   
-   # Calculate future differences in temperature
-    future_stack_dif <- future_stack - tmax_rast 
-
-    future_stack_dif <- mean(future_stack_dif)
-    levelplot(future_stack_dif, margin = FALSE)
-    
-    
-    # Correlations in future temp differences and probability of finding allele
-      data.frame(tmax_sum_dif = values(future_stack_dif),
-                 prob_bene = values(top_snps_stack)) %>%
-        ggplot(., aes(tmax_sum_dif, prob_bene)) + geom_point(size = 0.15, alpha = 0.25) +
-        geom_smooth(method = "lm") + theme_bw(15) +
-        geom_smooth(col = "forestgreen") 
-      
-    cor(values(future_stack_dif), values(bene_stack),
-        use = "na.or.complete")
-    
-    
-    # Just lobata range
-      future_stack_dif_range <- mask(future_stack_dif, lobata_range_rough)
-      
-      plot(future_stack_dif_range, bene_stack_range,
-           las = 1, ylab = "Probability of finding beneficial allele",
-           xlab = "Tmax_sum_dif")
-      
-      cor(values(future_stack_dif_range), values(bene_stack_range),
-          use = "na.or.complete")
-      
-    data.frame(tmax_sum_dif = values(future_stack_dif_range),
-                         prob_bene = values(bene_stack_range)) %>%
-      ggplot(., aes(tmax_sum_dif, prob_bene)) + geom_point(size = 0.15, alpha = 0.25) +
-        geom_smooth(method = "lm") + geom_smooth(col = "forestgreen") + theme_bw(15)
   
-      
-      
-      rasterCo  
-   
-      library(spatialEco)
-      
-     test <-  rasterCorrelation(future_stack_dif, bene_stack, s = 7)
-     test
-     levelplot(test, margin = FALSE)
-   
-     
- # Figure 3 - growth vs copies of alleles ####
-     
-     fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\")"))
+  
+  
+  
+  
 
+# --
+
+    
+ # Figure 2 - growth vs copies of alleles ####
+     
+     fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(accession, bs = \"re\")"))
 
      start <- Sys.time()
      # Gam with interaction effect
-     gam_snp = bam(formula = make_formula(fixed_effects, random_effects),
+     gam_snp = bam(formula = formula(fixed_effects),
                    data = dat_snp_unscaled,
                    discrete = TRUE, 
                    nthreads = 8,
@@ -1213,12 +1106,12 @@
      summary(gam_snp)
      
      
-     # Join gen_data_bene with dat_snp data
+     # Join gen_dat_top with dat_snp data
      
      dat_snp_top <- dat_snp_unscaled %>%
        dplyr::select(accession, accession_progeny, tmax_sum_dif) %>%
        dplyr::mutate(accession = as.numeric(as.character(accession))) %>%
-       left_join(., gen_dat_bene, by = c("accession" = "accession")) %>%
+       left_join(., gen_dat_top, by = c("accession" = "accession")) %>%
        dplyr::select(accession, accession_progeny, tmax_sum_dif, snp_col_names) %>%
        dplyr::mutate(rgr = gam_snp$fitted.values,
                      rgr_resids = resid(gam_snp))
@@ -1249,7 +1142,6 @@
      
      
      ## Bottom SNPS
-     
      dat_snp_bottom <- dat_snp_unscaled %>%
        dplyr::select(accession, accession_progeny, tmax_sum_dif) %>%
        dplyr::mutate(accession = as.numeric(as.character(accession))) %>%
@@ -1351,7 +1243,7 @@
        NULL
      
      # Save to file
-     ggsave(filename = paste0("./figs_tables/Figure 3 - growth by outlier count ", 
+     ggsave(filename = paste0("./figs_tables/Figure 2 - growth by outlier count ", 
                               Sys.Date(), ".pdf"),
             units = "cm",
             height = 6, width = 8,
@@ -1365,11 +1257,25 @@
                                                                     accession_progeny, 
                                                                     n_top_snps))
      
-     fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + n_top_snps + s(tmax_sum_dif, by = n_top_snps, bs=\"cr\")"))
+     dat_snp_unscaled2 <- left_join(dat_snp_unscaled2, dplyr::select(dat_snp_bottom,
+                                                                     accession_progeny,
+                                                                     n_bottom_snps))
+     
+    ## Scale number of top and bottom snps 
+     n_top_snps_mean <- mean(dat_snp_unscaled2$n_top_snps)
+     n_top_snps_sd <- sd(dat_snp_unscaled2$n_top_snps)
+     dat_snp_unscaled2$n_top_snps <- (dat_snp_unscaled2$n_top_snps - n_top_snps_mean) / n_top_snps_sd
+     
+     n_bottom_snps_mean <- mean(dat_snp_unscaled2$n_bottom_snps)
+     n_bottom_snps_sd <- sd(dat_snp_unscaled2$n_bottom_snps)
+     dat_snp_unscaled2$n_bottom_snps <- (dat_snp_unscaled2$n_bottom_snps - n_bottom_snps_mean) / n_bottom_snps_sd
+     
+     # Set formula
+     fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(n_top_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_top_snps, bs=\"cr\") + s(n_bottom_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_bottom_snps, bs=\"cr\") + s(accession, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC1_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC2_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC3_gen, bs=\"cr\")"))
      
      
      # Gam with interaction effect
-     gam_snp = bam(formula = make_formula(fixed_effects, random_effects),
+     gam_snp = bam(formula = formula(fixed_effects),
                    data = dat_snp_unscaled2,
                    discrete = TRUE, 
                    nthreads = 8,
@@ -1384,7 +1290,258 @@
      
      visreg(gam_snp, xvar = "tmax_sum_dif", scale = "response",
             by = "n_top_snps", overlay = TRUE, partial = FALSE,
-            breaks = c(0, 20))
+            breaks = c(-2, 5))
+     
+     visreg(gam_snp, xvar = "tmax_sum_dif", scale = "response",
+            by = "n_bottom_snps", overlay = TRUE, partial = FALSE,
+            breaks = c(-2, 5))
+
+ # Make spatial predictions across landscape -------------------------------
+     
+     # Load libraries ----------------------------------------------------------
+     
+     library(raster)
+     library(rasterVis)
+     
+     
+ # Loading in rasters ------------------------------------------------------
+     
+     ## Read in elevation dem and create a hillshade for mapping
+     dem <- raster("./data/gis/dem/ClimateNA_DEM_cropped.tif")
+     
+     slope = raster::terrain(dem, opt='slope')
+     aspect = raster::terrain(dem, opt='aspect')
+     hill = hillShade(slope, aspect, 40, 270)
+     
+     ## Load in california outline
+     cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
+                                   proj4string = CRS("+proj=longlat +datum=WGS84"))
+     
+     lobata_range <- readShapePoly("./data/gis/valley_oak_range/qlobata_refined_grouped.shp",
+                                   proj4string = CRS("+proj=longlat +datum=WGS84"))
+     
+     lobata_range_rough <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
+                                         proj4string = CRS("+proj=longlat +datum=WGS84"))
+     
+     ## Creates vector with list of file paths to all .tif raster files
+     ## Directory path where future climate scenarios are located
+     dir_name <- "./data/gis/climate_data/BCM/future/"
+     raster_files <- list.files(dir_name, full.names = TRUE, recursive = TRUE)
+     raster_files <- raster_files[grep("*[[:digit:]].tif$", raster_files)] # Only those with .tif extension
+     raster_files <- raster_files[grep("jja_ave", raster_files)] # Only tmax sum files
+     
+     raster_files
+     
+     ## Select only 85 scenario
+     raster_files <- raster_files[grep("rcp85", raster_files)]
+     
+     
+     future_stack <- stack()
+     x = 1
+     
+     ## Loop through raster files and add climate values to dat_mom dataframe
+     for(file in raster_files){
+       
+       # Load in raster
+       raster_temp <- raster(file)
+       
+       cat("Working on file:", file, "...\n")
+       
+       # Check to see if extent is different, if it is - change it
+       if(x > 1 & !compareRaster(future_stack, raster_temp, stopiffalse = FALSE)){
+         extent(raster_temp) <- extent(future_stack)
+       }
+       
+       future_stack <- raster::stack(future_stack, raster_temp)
+       x = x + 1
+     }
+     
+     future_stack
+     
+     ## Clean up names
+     names(future_stack) <-  unlist(lapply(strsplit(x = gsub(pattern = "tmx2070_2099jja_ave_", 
+                                                             replacement = "", names(future_stack)),
+                                                    split = "_1"), "[", 1))
+     
+     tmax_rast <- raster("./data/gis/climate_data/BCM/historical/1951-1980/tmx1951_1980jja_ave_HST_1513103038/tmx1951_1980jja_ave_HST_1513103038.tif")
+     
+     
+     # Calculate difference between future and current
+     future_stack_tmax_dif <- future_stack - tmax_rast
+     names(future_stack_tmax_dif) <- names(future_stack) # Reassign name
+
+     # Scale values
+     future_stack_tmax_dif_scaled <- (future_stack_tmax_dif - scaled_var_means_gbs_only["tmax_sum_dif"]) /
+       scaled_var_sds_gbs_only["tmax_sum_dif"]
+     
+     
+     # Make data frame for prediction - one for top and one for bottom
+     newdata_rast_top <- data.frame(section_block = "IFG_1",
+                                height_2014 = 0,
+                                accession = "1",
+                                PC1_gen = 0, PC2_gen = 0, PC3_gen = 0, 
+                                n_top_snps = forward_transform(x = 20,
+                                                               var = 1,
+                                                               means = n_top_snps_mean,
+                                                               sd = n_top_snps_sd),
+                                n_bottom_snps = forward_transform(x = 0,
+                                                                  var = 1,
+                                                                  means = n_bottom_snps_mean,
+                                                                  sd = n_bottom_snps_sd))
+     
+     newdata_rast_bottom <- data.frame(section_block = "IFG_1",
+                                    height_2014 = 0,
+                                    accession = "1",
+                                    PC1_gen = 0, PC2_gen = 0, PC3_gen = 0, 
+                                    n_top_snps = forward_transform(x = 0,
+                                                                   var = 1,
+                                                                   means = n_top_snps_mean,
+                                                                   sd = n_top_snps_sd),
+                                    n_bottom_snps = forward_transform(x = 20,
+                                                                   var = 1,
+                                                                   means = n_bottom_snps_mean,
+                                                                   sd = n_bottom_snps_sd))
+     ## Get null prediction of height with no change in tmax
+     future_null <- tmax_rast
+     names(future_null) <- "tmax_sum_dif"
+     
+     # Need to scale tmax when actual transfer distance is 0
+     future_null[!is.na(future_null)] <- forward_transform(0, var = "tmax_sum_dif",
+                                                           means = scaled_var_means_gbs_only,
+                                                           sds = scaled_var_sds_gbs_only)
+     future_null
+     
+     # Top snps
+     future_null_height_top <- predict(future_null,
+                                   model = gam_snp,
+                                   const = newdata_rast_top,
+                                   progress = "text",
+                                   type = "response")
+     
+     future_null_height_top
+     summary(future_null_height_top)
+     
+     # Bottom snps
+     future_null_height_bottom <- predict(future_null,
+                                       model = gam_snp,
+                                       const = newdata_rast_bottom,
+                                       progress = "text",
+                                       type = "response")
+     
+     future_null_height_bottom
+     summary(future_null_height_bottom)
+   
+     
+     
+     
+     
+     
+     # Initialize stack for height changes
+     future_stack_height_change_top <- future_stack_tmax_dif
+     future_stack_height_change_bottom <- future_stack_tmax_dif
+     future_stack_height_change_topbottom <- future_stack_tmax_dif
+     
+     # Loop over scenarios
+     for(scenario in 1:nlayers(future_stack_tmax_dif)){
+       
+       cat("Working on scenario:", names(future_stack_tmax_dif)[scenario], "... \n")
+       
+       ## Use scaled raster
+       rast_temp <- future_stack_tmax_dif_scaled[[scenario]]
+       names(rast_temp) <- "tmax_sum_dif" # Rename so predict function works
+       
+       rast_temp_height_top <- predict(rast_temp,
+                                   model = gam_snp,
+                                   const = newdata_rast_top,
+                                   progress = "text",
+                                   type = "response")
+       
+       
+       rast_temp_height_bottom <- predict(rast_temp,
+                                       model = gam_snp,
+                                       const = newdata_rast_bottom,
+                                       progress = "text",
+                                       type = "response")
+       
+
+        # Dif bw top and null 
+         rast_temp_height_change_top <- (rast_temp_height_top - future_null_height_top) / future_null_height_top * 100
+         future_stack_height_change_top[[scenario]] <- rast_temp_height_change_top
+         names(future_stack_height_change_top)[scenario] <- names(future_stack_tmax_dif)[scenario] # Reassign name
+         
+         
+       # Dif bw bottom and null 
+         rast_temp_height_change_bottom <- (rast_temp_height_bottom - future_null_height_bottom) / future_null_height_bottom * 100
+         future_stack_height_change_bottom[[scenario]] <- rast_temp_height_change_bottom
+         names(future_stack_height_change_bottom)[scenario] <- names(future_stack_tmax_dif)[scenario] # Reassign name
+         
+         
+         # Dif bw top and bottom
+         rast_temp_height_change_topbottom <- (rast_temp_height_top - rast_temp_height_bottom) / rast_temp_height_bottom * 100
+         future_stack_height_change_topbottom[[scenario]] <- rast_temp_height_change_topbottom
+         names(future_stack_height_change_topbottom)[scenario] <- names(future_stack_tmax_dif)[scenario] # Reassign name
+       
+     } # End scenario loop
+     
+     
+     # Plot summaries across scenarios  
+     # histogram(future_stack_height_difference)
+     # bwplot(future_stack_height_difference)
+
+     
+     ## Average across emissions scenarios
+     future_stack_height_change_topbottom <- mean(future_stack_height_difference[[c("CCSM4_rcp85", 
+                                                                         "CNRM_rcp85",
+                                                                         "Fgoals_rcp85",
+                                                                         "IPSL_rcp85",
+                                                                         "MIROC_rcp85")]], na.rm = TRUE)
+     
+     summary(future_stack_height_change_topbottom )
+     names(future_stack_height_change_topbottom) <- "RCP 8.5"
+     
+     ## Project to latlong
+     future_stack_height_change_topbottom <- projectRaster(future_stack_height_change_topbottom, 
+                                                    crs = CRS("+proj=longlat +datum=WGS84"))
+     
+     
+     ## Crop them
+     future_stack_height_change_topbottom <- mask(future_stack_height_change_topbottom, cali_outline)
+     
+     summary(future_stack_height_change_topbottom)
+     quantile(future_stack_height_change_topbottom, probs = c(0.01, 0.99))
+     
+     
+ ## Figure 2 - spatial predictions ####
+     ## Options for levelplot
+     pixel_num = 1e5 ## Can make resolution better by making this 1e6 
+     
+     ## Plots of changes in height - RCP 85
+     levelplot(future_stack_height_change_topbottom,
+               margin = FALSE,
+               maxpixels = 1000000,
+               par.settings = rasterTheme(region = brewer.pal('RdYlBu', n = 9)),
+               at = seq(40, 70, 1),
+               #  scales=list(draw=FALSE),
+               #  xlab = "", ylab ="",
+               main = "Rising emissions (RCP 8.5)") + 
+       latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
+     #  latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
+       latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
+     
+     # Main plot
+     dev.copy(png, paste0("./figs_tables/Figure 1 - RCP85 ", Sys.Date(), ".png"),
+              res = 300, units = "cm", width = 16, height = 16)
+     dev.off()
+     
+     # For legend
+     dev.copy(pdf, paste0("./figs_tables/Figure 1 - RCP85 for legend ", Sys.Date(), ".pdf"),
+              width = 5, height = 3)
+     dev.off()
+     
+     
+     
+     
+     
      
      
      
@@ -1428,7 +1585,7 @@
   
 
   ## Factors
-  gf_factor <- gen_dat_bene[ ,top_snps$snp]
+  gf_factor <- gen_dat_top[ ,top_snps$snp]
   gf_factor <- gf_factor %>%
                  replace(is.na(.), 0) %>%
                 mutate_all(as.factor) 
@@ -1797,9 +1954,95 @@
     
     
     
+    ## Calculate correlation between prob of finding beneficial allele and future climate change
+    
+    # Read in future tmax scenarios
+    tmax_CCSM4 <- raster("./data/gis/climate_data/BCM/future/CCSM4_rcp85/tmx2070_2099jja_ave_CCSM4_rcp85_1529358915/tmx2070_2099jja_ave_CCSM4_rcp85_1529358915.tif")
+    tmax_CCSM4 <- projectRaster(tmax_CCSM4, crs = CRS("+proj=longlat +datum=WGS84"))
+    tmax_CCSM4 <- resample(tmax_CCSM4, tmax_rast)
+    compareRaster(tmax_CCSM4, tmax_rast)
+    levelplot(tmax_CCSM4, margin = FALSE)
+    
+    
+    tmax_CNRM <- raster("./data/gis/climate_data/BCM/future/CNRM_rcp85/tmx2070_2099jja_ave_CNRM_rcp85_1529358976/tmx2070_2099jja_ave_CNRM_rcp85_1529358976.tif")
+    tmax_CNRM <- projectRaster(tmax_CNRM, crs = CRS("+proj=longlat +datum=WGS84"))
+    tmax_CNRM <- resample(tmax_CNRM, tmax_rast)
+    compareRaster(tmax_CNRM, tmax_rast)
+    levelplot(tmax_CNRM, margin = FALSE)
+    
+    tmax_IPSL <- raster("./data/gis/climate_data/BCM/future/IPSL_rcp85/tmx2070_2099jja_ave_IPSL_rcp85_1529358959/tmx2070_2099jja_ave_IPSL_rcp85_1529358959.tif")
+    tmax_IPSL <- projectRaster(tmax_IPSL, crs = CRS("+proj=longlat +datum=WGS84"))
+    tmax_IPSL <- resample(tmax_IPSL, tmax_rast)
+    compareRaster(tmax_IPSL, tmax_rast)
+    levelplot(tmax_IPSL, margin = FALSE)
+    
+    tmax_MIROC <- raster("./data/gis/climate_data/BCM/future/MIROC_rcp85/tmx2070_2099jja_ave_MIROC_rcp85_1529357403/tmx2070_2099jja_ave_MIROC_rcp85_1529357403.tif")
+    tmax_MIROC <- projectRaster(tmax_MIROC, crs = CRS("+proj=longlat +datum=WGS84"))
+    tmax_MIROC <- resample(tmax_MIROC, tmax_rast)
+    compareRaster(tmax_MIROC, tmax_rast)
+    levelplot(tmax_MIROC, margin = FALSE)
+    
+    # Stack rasters
+    future_stack <- stack(tmax_CCSM4) 
+    tmax_CNRM,
+    tmax_IPSL, 
+    tmax_MIROC)
+
+levelplot(future_stack, margin = FALSE)
+
+# Calculate future differences in temperature
+future_stack_dif <- future_stack - tmax_rast 
+
+future_stack_dif <- mean(future_stack_dif)
+levelplot(future_stack_dif, margin = FALSE)
+
+
+# Correlations in future temp differences and probability of finding allele
+data.frame(tmax_sum_dif = values(future_stack_dif),
+           prob_bene = values(top_snps_stack)) %>%
+  ggplot(., aes(tmax_sum_dif, prob_bene)) + geom_point(size = 0.15, alpha = 0.25) +
+  geom_smooth(method = "lm") + theme_bw(15) +
+  geom_smooth(col = "forestgreen") 
+
+cor(values(future_stack_dif), values(bene_stack),
+    use = "na.or.complete")
+
+
+# Just lobata range
+future_stack_dif_range <- mask(future_stack_dif, lobata_range_rough)
+
+plot(future_stack_dif_range, bene_stack_range,
+     las = 1, ylab = "Probability of finding beneficial allele",
+     xlab = "Tmax_sum_dif")
+
+cor(values(future_stack_dif_range), values(bene_stack_range),
+    use = "na.or.complete")
+
+data.frame(tmax_sum_dif = values(future_stack_dif_range),
+           prob_bene = values(bene_stack_range)) %>%
+  ggplot(., aes(tmax_sum_dif, prob_bene)) + geom_point(size = 0.15, alpha = 0.25) +
+  geom_smooth(method = "lm") + geom_smooth(col = "forestgreen") + theme_bw(15)
+
+
+
+rasterCo  
+
+library(spatialEco)
+
+test <-  rasterCorrelation(future_stack_dif, bene_stack, s = 7)
+test
+levelplot(test, margin = FALSE)
+
+
     
     
     
+    
+
+
+
+
+
 
 # Simulate data to test out interaction effects in gams -------------------
 
@@ -1864,4 +2107,10 @@
   # P-values are usually reliable if the smoothing parameters are known, or the model is unpenalized. If smoothing parameters have been estimated then the p-values are typically somewhat too low under the null. This occurs because the uncertainty associated with the smoothing parameters is neglected in the calculations of the distributions under the null, which tends to lead to underdispersion in these distributions, and in turn to p-value estimates that are too low. (In simulations where the null is correct, I have seen p-values that are as low as half of what they should be.) Note however that tests can have low power if the estimated rank of the test statistic is much higher than the EDF, so that p-values can also be too low in some cases.
   
   # If it is important to have p-values that are as accurate as possible, then, at least in the single model case, it is probably advisable to perform tests using unpenalized smooths (i.e. s(...,fx=TRUE)) with the basis dimension, k, left at what would have been used with penalization. Such tests are not as powerful, of course, but the p-values are more accurate under the null. Whether or not extra accuracy is required will usually depend on whether or not hypothesis testing is a key objective of the analysis.
+  
+  
+  
+  
+  
+  
 
