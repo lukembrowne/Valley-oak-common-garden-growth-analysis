@@ -93,13 +93,13 @@
     
     print(p1)
     
-    png(paste0("./figs_tables/Figure 1_sample_map_garden_moms ", Sys.Date(), ".png"), res = 300,
+    png(paste0("./figs_tables/Figure S1_sample_map_garden_moms ", Sys.Date(), ".png"), res = 300,
         height = 2400, width = 1600)
     print(p1)
     dev.off()
     
     ## Smaller version for the legend
-    png(paste0("./figs_tables/Figure 1_sample_map_garden_moms for legend", Sys.Date(), ".png"), res = 300,
+    png(paste0("./figs_tables/Figure S1_sample_map_garden_moms for legend", Sys.Date(), ".png"), res = 300,
         height = 800, width = 1600)
     print(p1)
     dev.off()
@@ -124,23 +124,17 @@
     
     print(p2)
     
-    png(paste0("./figs_tables/Figure 1_sample_map_gbs_moms ", Sys.Date(), ".png"), res = 300,
+    png(paste0("./figs_tables/Figure S1_sample_map_gbs_moms ", Sys.Date(), ".png"), res = 300,
         height = 2400, width = 1600)
     print(p2)
     dev.off()
     
     ## Smaller version for the legend
-    png(paste0("./figs_tables/Figure 1_sample_map_gbs_moms for legend", Sys.Date(), ".png"), res = 300,
+    png(paste0("./figs_tables/Figure S1_sample_map_gbs_moms for legend", Sys.Date(), ".png"), res = 300,
         height = 800, width = 1600)
     print(p2)
     dev.off()
-    
-    
-    
-    
-    
-    
-    
+  
     
     
     ## Histogram of temp transfer distances
