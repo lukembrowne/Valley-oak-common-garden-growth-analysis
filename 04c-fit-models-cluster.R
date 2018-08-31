@@ -40,7 +40,7 @@
 #     snp <- snp_col_names[snp_index]
 
  ## LOOPING THROUGH TOP SNPS
- for(snp in c(top_snps_long$snp, mid_snps_long$snp, bottom_snps_long$snp)){
+ for(snp in c(top_snps_long$snp, bottom_snps_long$snp, mid_snps_long$snp)){
    save_outlier_preds <- TRUE # Save output of the top SNPs for plotting together
 
       # For timing loops
@@ -93,7 +93,6 @@
                   control = list(trace = FALSE))
 
    # print(summary(gam_snp_int))
-    
     
     
     
@@ -165,11 +164,11 @@
       
   # Visualization plots
     
-    # For snps as factors
-      # pdf(paste0("./output/model_visualizations/", snp,".pdf"), width = 8, height = 5)
-      # visreg(gam_snp_int, xvar = climate_var_dif, 
-      #        by = snp, scale = "response")
-      # dev.off()
+   # For snps as factors
+    # pdf(paste0("./output/model_visualizations/", snp,".pdf"), width = 8, height = 5)
+    # visreg(gam_snp_int, xvar = climate_var_dif, overlay = TRUE, main = snp,
+    #        by = snp, scale = "response")
+    # dev.off()
     
     # For SNPS as continuous
         # pdf(paste0("./output/model_visualizations/", snp,".pdf"), width = 8, height = 5)
@@ -217,7 +216,7 @@
 
    # With partial residuals
     # visreg(gam_snp_int, xvar = climate_var_dif, by = snp,
-    #        overlay = TRUE, partial = TRUE, 
+    #        overlay = TRUE, partial = TRUE,
     #        breaks = c(unique(pred_sub$genotype_scaled)),
     #        xtrans = function(x) {(x *  scaled_var_sds_gbs_only[climate_var_dif]) + scaled_var_means_gbs_only[climate_var_dif]},
     #        ylab = "5 year height (cm)")
@@ -348,7 +347,7 @@
         height_4.8 <- pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 4.8][1]
         height_0 <- pred_sub_temp$pred[pred_sub_temp$tmax_sum_dif_unscaled == 0][1]
         
-        
+        # % Height change at 4.8
         height_change <- (height_4.8 - height_0) / height_0 * 100
            
         # Save values into model list
@@ -364,6 +363,14 @@
     # Attach data so that we can use visreg later if we need
     # gam_snp$data <- dat_snp
     
+    # ## Write predictions to file
+    #   pred_sub_out <- pred_sub %>%
+    #     dplyr::mutate(snp = snp) %>%
+    #     dplyr::select(snp, tmax_sum_dif_unscaled, genotype, pred, se)
+    #   
+    #   write_csv(pred_sub_out, path = paste0("./model_summaries/gam_summaries_", task_id, ".csv"),
+    #            append = TRUE)
+
     # Save into list
     gam_list[[x]] <- gam_snp_int
     names(gam_list)[x] <- snp
@@ -394,40 +401,39 @@
     # save(outlier_preds, 
     #   file = paste0("./output/outlier_preds_", Sys.Date(), ".Rdata"))
     
-  
-  ## Plot overlay of outlier SNPS
-  ggplot(outlier_preds, aes(x = tmax_sum_dif_unscaled, y = pred,
-                            group = factor(snp),
-                            col = factor(type))) +
-    geom_vline(aes(xintercept = 0), lty = 2, size = .15) +
-    geom_vline(xintercept = 1.1, size = .15) + 
-    geom_vline(xintercept = 4.8, size = .25) +
-    geom_line(alpha = 0.1,
-              show.legend = FALSE, size = .15) +
-    geom_smooth(aes(x = tmax_sum_dif_unscaled, 
-                    y = pred, group = factor(type)), 
-                    se = FALSE, size = .5) +
-   
-    labs(col = "Genotype") +
-   # xlim(-2.5, 7.5) +
-    ylab("Relative growth rate") +
-    xlab("Tmax transfer distance") +
-    theme_bw(10) + 
-    scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
- #   scale_color_manual(values = c("orangered", "grey50", "deepskyblue")) +
-    scale_color_manual(values = c("#FF6633", "grey50", "#6699CC")) + 
-    theme(panel.border = element_blank(), panel.grid.major = element_blank(),
-                         panel.grid.minor = element_blank(), 
-          axis.line = element_line(colour = "black"),
-          legend.position = "none")
-  
-  
-  # Save to file
-    ggsave(filename = paste0("./figs_tables/Figure 3 - outlier responses ", 
-                             Sys.Date(), ".pdf"),
-           units = "cm",
-           height = 6, width = 8,
-           useDingbats = FALSE )
+
+  # ## Plot overlay of outlier SNPS
+  # ggplot(outlier_preds, aes(x = tmax_sum_dif_unscaled, y = pred,
+  #                           group = factor(snp),
+  #                           col = factor(type))) +
+  #   geom_vline(aes(xintercept = 0), lty = 2, size = .5) +
+  #   geom_vline(xintercept = 4.8, size = .5) +
+  #   geom_line(alpha = 0.1,
+  #             show.legend = FALSE, size = .15) +
+  #   geom_smooth(aes(x = tmax_sum_dif_unscaled, 
+  #                   y = pred, group = factor(type)), 
+  #                   se = FALSE, size = .5) +
+  #  
+  #   labs(col = "Genotype") +
+  #  # xlim(-2.5, 7.5) +
+  #   ylab("Relative growth rate") +
+  #   xlab("Tmax transfer distance") +
+  #   theme_bw(8) + 
+  #   scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
+  #   facet_wrap(~type) +
+  #   scale_color_manual(values = c("#FF6633", "grey50", "#6699CC")) + 
+  #   theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+  #                        panel.grid.minor = element_blank(), 
+  #         axis.line = element_line(colour = "black"),
+  #         legend.position = "none")
+  # 
+  # 
+  # # Save to file
+  #   ggsave(filename = paste0("./figs_tables/Figure 2 - outlier responses ", 
+  #                            Sys.Date(), ".pdf"),
+  #          units = "cm",
+  #          height = 4, width = 6,
+  #          useDingbats = FALSE )
     
   
   
