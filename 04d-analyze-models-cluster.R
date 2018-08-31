@@ -5,8 +5,9 @@
 
 # Read in cluster run output ----------------------------------------------
 
-  # Good run
-  path_to_summaries <- "./output/run_3615743_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif/model_summaries/"
+  # Run with predictions
+  path_to_summaries <- "./output/run_3700632_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld/model_summaries/"
+  path_to_predictions <- "./output/run_3700632_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld/model_predictions/"
   
   ## Randomized phenotypes
     path_to_summaries <- "./output/run_3573817_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_rgrrand_1/model_summaries/" # 0 sig snps
@@ -16,6 +17,7 @@
     path_to_summaries <- "./output/run_3576843_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_rgrrand_5/model_summaries/" # 5 outlier snps
   
   
+  # Read in files
   sum_df_raw <- plyr::ldply(list.files(path_to_summaries, full = TRUE), read_csv)
   
   dim(sum_df_raw)
@@ -36,15 +38,35 @@
   # Filter out models that did not converge
   table(sum_df_raw$converged)
   
-# Looking at deviance explained  
-  hist(sum_df_raw$dev_dif); summary(sum_df_raw$dev_dif)
-  hist(sum_df_raw$dev_dif_random); summary(sum_df_raw$dev_dif_random)
   
-  hist(sum_df_raw$rsq_dif); summary(sum_df_raw$rsq_dif)
-  hist(sum_df_raw$rsq_dif_random); summary(sum_df_raw$rsq_dif_random)
+  ## Read in model predictions
+    pred_df_raw <- plyr::ldply(list.files(path_to_predictions, full = TRUE), 
+                               read_csv, col_names = c("snp", "tmax_sum_dif_unscaled", 
+                                                       "genotype", "pred", "se"))
+    pred_df_raw$genotype <- as.character(pred_df_raw$genotype)
+    
+    head(pred_df_raw)
+    dim(pred_df_raw)
+    summary(pred_df_raw)
+    
+  ## Calculate height change in warmer temperatures for each snp and genotype
   
-  
-
+    base0 <- median(pred_df_raw$pred[pred_df_raw$tmax_sum_dif_unscaled == 0])
+    
+   pred_df_long =  pred_df_raw %>%
+      dplyr::group_by(snp, genotype) %>%
+      do(data.frame(height_change_warmer = mean((.$pred[.$tmax_sum_dif_unscaled > 0]  - .$pred[.$tmax_sum_dif_unscaled == 0] ) /  .$pred[.$tmax_sum_dif_unscaled == 0] ) * 100,
+         height_change_warmer_base0 = mean((.$pred[.$tmax_sum_dif_unscaled > 0]  - base0 ) /  base0) * 100))
+   
+   head(pred_df_long)
+   dim(pred_df_long)
+   
+   summary(pred_df_long$height_change_warmer)
+    
+   
+ 
+ 
+ 
 # Sort and arrange data ---------------------------------------------------
 
   
@@ -85,21 +107,34 @@
   
   head(height_0_long)
   
-## Join all together
+  
+  
+  
+## Join all long dataframes together
   sum_df_long <- left_join(n_gen_long, p_val_long) %>%
     left_join(. , height_change_long) %>%
     left_join(., height_4.8_long) %>%
-    left_join(., height_0_long)
+    left_join(., height_0_long) %>%
+    left_join(., pred_df_long)
   
   head(sum_df_long)
+  dim(sum_df_long)
   
+
+  # Filter out based on number of gene copies
+    gen_copies_thresh <- 200
+    
+    sum_df_long <- sum_df_long %>%
+      dplyr::filter(n_gen >= gen_copies_thresh)
+    
+  ## Filter out heterozygotes?
+    sum_df_long <- sum_df_long %>%
+      dplyr::filter(genotype != "1")
   
-# Filter out based on number of gene copies
+  ## Remove those that predictions weren't made on accession 1
+    sum_df_long <- sum_df_long %>%
+      dplyr::filter(acc_pred == 1)
   
-  gen_copies_thresh <- 100
-  
-  sum_df_long <- sum_df_long %>%
-    dplyr::filter(n_gen >= gen_copies_thresh)
   
   
 # Calculate height change based on average at 0 transfer
@@ -107,7 +142,10 @@
   sum_df_long <- sum_df_long %>%
     mutate(height_change_0base = (height_4.8 - mean(height_0)) / mean(height_0) * 100)
   
- # plot(sum_df_long$height_change_0base, sum_df_long$height_change)
+  # Compare height measurements
+   # plot(sum_df_long$height_change_0base, sum_df_long$height_change, pch = ".")
+   # plot(sum_df_long$height_change_0base, sum_df_long$height_change_warmer, pch = ".") 
+   # abline(0,1); abline(h=0, lty = 2); abline(v=0, lty=2)
   
 
 # Correct p and q values
@@ -142,17 +180,22 @@
   percent_thresh <- 0.005
   
  top_snps_long <-  sum_df_long %>%
-    dplyr::filter(p_val_adj <= 0.05) %>%
-    dplyr::arrange(desc(height_change_0base)) %>%
+    dplyr::filter(p_val_adj <= 0.01) %>%
+    dplyr::arrange(desc(height_change_warmer_base0)) %>%
+ #  dplyr::arrange(desc(height_change)) %>%
     head(round(nrow(sum_df) * percent_thresh))
  
  top_snps_long$top_snp = TRUE # Make a column for T / F of top snp
  
+ summary(top_snps_long)
+ 
+ dim(top_snps_long)
  head(top_snps_long)
  
  bottom_snps_long <- sum_df_long %>%
-   dplyr::filter(p_val_adj <= 0.05) %>%
-   dplyr::arrange(height_change_0base) %>%
+   dplyr::filter(p_val_adj <= 0.01) %>%
+   dplyr::arrange(height_change_warmer_base0) %>%
+ #  dplyr::arrange(height_change) %>%
    head(round(nrow(sum_df) * percent_thresh))
  
  bottom_snps_long$bottom_snp = TRUE
@@ -161,10 +204,10 @@
  
  # Also make a comparable dataframe of 'random snps'
  
-   set.seed(42) # To make sure same SNPs are chosen everytime - reproducible
+   set.seed(129) # To make sure same SNPs are chosen everytime - reproducible
    
    mid_snps_long <- sum_df_long %>%
-     dplyr::filter(p_val_adj <= 0.05) %>%
+     dplyr::filter(p_val_adj <= 0.01) %>%
      dplyr::filter(!snp %in% c(top_snps_long$snp, bottom_snps_long$snp)) %>%
      # Make sure number of genotype copies is comparable
      dplyr::filter(n_gen <= quantile(c(top_snps_long$n_gen, bottom_snps_long$n_gen),
@@ -172,13 +215,13 @@
      dplyr::filter(n_gen >= gen_copies_thresh) %>%
      sample_n(round(nrow(sum_df) * percent_thresh))
    
+   
+   ## Any Snps sampled 2x?
+   sum(table(mid_snps_long$snp) > 1)
+   
      head(mid_snps_long)
      summary(mid_snps_long$height_change_0base)
-  
-   
-  hist(mid_snps_long$n_gen, breaks = 50, col = "black", xlim = c(0, 1000), ylim = c(0, 10))
-  hist(top_snps_long$n_gen, breaks = 50, col = "blue", add = TRUE)
-  hist(bottom_snps_long$n_gen, breaks = 50, col = "red", add = TRUE)
+
   
   summary(top_snps_long$n_gen)
   summary(mid_snps_long$n_gen)
@@ -192,6 +235,67 @@
                          bottom_snp = replace_na(bottom_snp, FALSE))
    
    head(sum_df_long)
+   
+   table(sum_df_long$top_snp)
+   
+   
+## Figure 2 -- Plot overlay of outlier SNPS ---------------------------------------
+   
+   # Join outlier dataframes with prediction dataframes
+   pred_df_outlier <- dplyr::left_join(top_snps_long, pred_df_raw) %>%
+         dplyr::mutate(type = "top_snp") %>%
+      bind_rows( dplyr::left_join(bottom_snps_long, pred_df_raw) %>%
+         dplyr::mutate(type = "bottom_snp")) %>%
+       bind_rows( dplyr::left_join(mid_snps_long, pred_df_raw) %>%
+                    dplyr::mutate(type = "mid_snp"))%>%
+         dplyr::mutate(snp_gen = paste0(snp,genotype))
+     #    dplyr::filter(type == "bottom_snp") %>%
+         
+     
+   ggplot(pred_df_outlier, aes(x = tmax_sum_dif_unscaled, y = pred,
+                             group = factor(snp_gen),
+                              col = factor(type))) +
+     geom_vline(aes(xintercept = 0), lty = 2, size = .25) +
+     geom_vline(xintercept = 4.8, size = .25) +
+     geom_line(alpha = 0.1,
+               show.legend = FALSE, size = .10) +
+   #  geom_point(alpha = 0.35, size = .25) +
+     geom_smooth(aes(x = tmax_sum_dif_unscaled,
+                     y = pred, group = factor(type)),
+                 se = FALSE, size = .5) +
+     
+     labs(col = "Genotype") +
+     ylim(.225, .325) +
+     ylab("Relative growth rate") +
+     xlab("Tmax transfer distance") +
+     theme_bw(8) + 
+     scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5),
+                        limits = c(0, 7.5)) +
+    # facet_wrap(~type) +
+   #  facet_wrap(~ type + snp) +
+     scale_color_manual(values = c("#FF6633", "grey50", "#6699CC")) + 
+     theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+           panel.grid.minor = element_blank(), 
+           axis.line = element_line(colour = "black"),
+           legend.position = "none")   
+   
+   # Save to file
+   ggsave(filename = paste0("./figs_tables/Figure 2 - outlier responses ", 
+                            Sys.Date(), ".pdf"),
+          units = "cm",
+          height = 4, width = 6,
+          useDingbats = FALSE )
+ 
+  summary(top_snps_long$height_change_warmer_base0)
+  summary(bottom_snps_long$height_change_warmer_base0)
+  summary(mid_snps_long$height_change_warmer_base0)
+  
+  summary(top_snps_long$height_change_0base)
+  summary(bottom_snps_long$height_change_0base)
+  summary(mid_snps_long$height_change_0base)
+  
+  (mean(top_snps_long$height_4.8) - mean(bottom_snps_long$height_4.8)) / mean(bottom_snps_long$height_4.8) * 100
+   
    
 
  
@@ -211,7 +315,7 @@
  head(man_df)
  
  # Set alpha for p values
- man_df$p_val_adj_alpha <- ifelse(man_df$p_val_adj < 0.05, 1, .15)
+ man_df$p_val_adj_alpha <- ifelse(man_df$p_val_adj < 0.05, 1, .35)
  
  # Set up shapes
  man_df <- man_df %>%
@@ -234,8 +338,7 @@
  ## Figure 3 - Manhattan plot ####
  
  # Setup
- cex = 1
- 
+
  # For labels on x axis 
  x_axis_breaks <- man_df %>%
    dplyr::select(index, chrom) %>%
@@ -249,27 +352,35 @@
    summarise_all(max)
  
  # Start plot
- ggplot(man_df, aes(x = index, y = height_change_0base,
-                    col = height_change_0base, label = SNP)) +
+ ggplot(man_df, aes(x = index, 
+                  y = height_change_warmer_base0,
+                #  y = height_change,
+                  col = height_change_warmer_base0,
+                #  col = height_change,
+                  label = SNP)) +
 
    # Vertical lines
    geom_vline(xintercept = chrom_breaks$index, col = "grey50", alpha = 0.8, size = .2) + 
    
    # Horizontal line
-   geom_hline(yintercept = 0, lty = 2, size = .5) +
+   geom_hline(yintercept = 0, lty = 2, size = .25) +
    
    # Add points
    geom_point(pch = man_df$pch, 
              # col = "black",
               alpha = man_df$p_val_adj_alpha, 
-              size = cex) +
+              size = .65) +
    
    # Overplot top and bottom SNPS
    geom_point(data = man_df[man_df$top_snp | man_df$bottom_snp, ],
-              aes(x = index, y = height_change_0base, bg = height_change_0base),
-              col = "black",
-              pch = man_df[man_df$top_snp | man_df$bottom_snp, ]$pch,
-              size = cex + .5) +
+              aes(x = index, 
+                  y = height_change_warmer_base0,
+                  bg = height_change_warmer_base0),
+                  # y = height_change,
+                  # bg = height_change),
+                  col = "black",
+                  pch = man_df[man_df$top_snp | man_df$bottom_snp, ]$pch,
+                  size = .65 + .35) +
    
    
    
@@ -299,13 +410,13 @@
  scale_colour_distiller(type = "seq", palette = "RdYlBu", 
                         direction = 1, 
                         aesthetics = c("color", "fill"),
-                        name = "% Change in RGR \n w/ 4.8°C increase") + 
+                        name = "% Change in RGR \n with 4.8°C increase") + 
    
    # Theme options
    scale_x_continuous(expand = c(0.01, 0.01), 
                       breaks = x_axis_breaks$index,
                       labels = x_axis_breaks$chrom) + 
-   scale_y_continuous(breaks = seq(-35, 25, 5)) + 
+   scale_y_continuous(breaks = seq(-30, 20, 5)) + 
    ylab("") + 
    xlab("Chromosome") + 
    theme_bw(8) + 
@@ -316,10 +427,15 @@
    # axis.text.x=element_blank(), axis.ticks.x=element_blank()) +
    NULL
  
- # Save as file
- ggsave(paste0("./figs_tables/Figure 3 - manhattan plot interaction term wo labels_", 
+ # Save as file - PNG
+ ggsave(paste0("./figs_tables/Figure 2 - manhattan plot interaction term wo labels_", 
                       Sys.Date(), ".png"),
-          width = 20, height = 6, units = "cm", dpi = 300)
+          width = 16, height = 4, units = "cm", dpi = 300)
+ 
+ # Save as PDF for legend
+ ggsave(paste0("./figs_tables/Figure 2 - manhattan plot interaction term LEGEND", 
+               Sys.Date(), ".pdf"),
+        width = 10, height = 2)
  
  
  
@@ -403,6 +519,52 @@
   }
   
   dim(gen_dat_mid)
+  
+  
+  
+  
+## Compare deviances ########################################################
+  
+  
+  # Make a dataframe that has deviance differences  
+  deviance_df <- sum_df_raw %>%
+    dplyr::select(snp, dev_dif, dev_dif_random) %>%
+    tidyr::gather("dev_type", "dev_dif", -snp) %>%
+    dplyr::mutate(has_outlier_snp = 
+                    ifelse(snp %in% c(top_snps_long$snp,
+                                      bottom_snps_long$snp), "Outlier genotypes" , 
+                           "Non-outlier genotypes"))
+  
+  deviance_df$has_outlier_snp[deviance_df$dev_type == "dev_dif_random"] <- "Random variable"
+  
+  
+  ## Figure S4 - differences in deviances ####
+  ggplot(deviance_df, aes(x = factor(has_outlier_snp), y = dev_dif, 
+                          fill = factor(has_outlier_snp)) )+ 
+    geom_boxplot(outlier.shape = NA, alpha = 1) + 
+    #   geom_jitter(aes(col = factor(has_outlier_snp)), alpha = .5, size = .25, pch = 16) + 
+    xlab("") + ylab("Difference in deviance") +
+    scale_fill_discrete(name = "") +
+    theme_bw(10) +
+    NULL
+  
+  ggsave(paste0("./figs_tables/Figure S4 - deviance explained ", Sys.Date(), ".pdf"),
+         units = "cm", height = 8, width = 15)
+  
+  
+  ## Statistical tests
+  deviance_df %>%
+    dplyr::filter(has_outlier_snp %in% c("Outlier genotypes", "Non-outlier genotypes")) %>%
+    wilcox.test(dev_dif ~ has_outlier_snp, data = .)
+  
+  deviance_df %>%
+    dplyr::filter(has_outlier_snp %in% c("Outlier genotypes", "Random variable")) %>%
+    wilcox.test(dev_dif ~ has_outlier_snp, data = .)
+  
+  
+  
+  
+  
 
   
   
@@ -410,7 +572,6 @@
    
    library(randomForest)
    #library(AUC)
-  # library(Boruta) # For variable importance?
    library(raster)
    library(pdp)
   
@@ -587,7 +748,7 @@
      start_flag = FALSE
      pp_df <- NULL # Initialize
      
-     reps = 10
+     reps = 1
      
      # Sample same number of SNPs as top snps in random forest
      n_snps_to_sample <- sum(top_snps_long$snp %in% colnames(rf_top)) 
@@ -1084,312 +1245,221 @@
   
   
   
-
-# --
-
+  
+  
+  
+  # Figure 2 - growth vs copies of alleles ##################
+  
+  ## Calculate number of top and bottom SNPs 
+  dat_snp_count <- dat_snp_unscaled %>%
+    dplyr::select(accession, tmax_sum_dif, rgr, section_block, PC1_gen, PC2_gen, PC3_gen, height_2014) %>%
+    dplyr::mutate(accession = as.numeric(as.character(accession))) %>% # Change accession to numeric
+    dplyr::left_join(., dplyr::select(gen_dat_top, accession, top_snps_long$snp)) %>%
+    mutate(n_top_snps = rowSums(dplyr::select(., top_snps_long$snp), na.rm = TRUE)) %>%
+    mutate(snp_chr7_9348369 = NULL) %>% # Remove this snp because it's in both top and bottom snps to not messu p counts
+    dplyr::left_join(., dplyr::select(gen_dat_bottom, accession, bottom_snps_long$snp)) %>%
+    mutate(n_bottom_snps = rowSums(dplyr::select(., bottom_snps_long$snp), na.rm = TRUE)) %>%
+    mutate(accession = factor(as.character(accession)))
+  
+  dim(dat_snp_count)
+  
+  summary(dat_snp_count$n_top_snps)
+  summary(dat_snp_count$n_bottom_snps)
+  
+  plot(dat_snp_count$n_bottom_snps, dat_snp_count$n_top_snps)
+  cor.test(dat_snp_count$n_bottom_snps, dat_snp_count$n_top_snps)
+  
+  
+  ## Scale number of top and bottom snps 
+  n_top_snps_mean <- mean(dat_snp_count$n_top_snps)
+  n_top_snps_sd <- sd(dat_snp_count$n_top_snps)
+  dat_snp_count$n_top_snps_unscaled <- dat_snp_count$n_top_snps
+  dat_snp_count$n_top_snps <- (dat_snp_count$n_top_snps - n_top_snps_mean) / n_top_snps_sd
+  
+  n_bottom_snps_mean <- mean(dat_snp_count$n_bottom_snps)
+  n_bottom_snps_sd <- sd(dat_snp_count$n_bottom_snps)
+  dat_snp_count$n_bottom_snps_unscaled <- dat_snp_count$n_bottom_snps
+  dat_snp_count$n_bottom_snps <- (dat_snp_count$n_bottom_snps - n_bottom_snps_mean) / n_bottom_snps_sd
+  
+  # Set formula
+  fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(n_top_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_top_snps, bs=\"cr\") + s(n_bottom_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_bottom_snps, bs=\"cr\") + s(accession, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC1_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC2_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC3_gen, bs=\"cr\")"))
+  
+  
+  # Gam with interaction effect
+  gam_snp = bam(formula = formula(fixed_effects),
+                data = dat_snp_count,
+                discrete = TRUE, 
+                nthreads = 8,
+                method = "fREML",
+                #   method = "ML",
+                family = "tw",
+                control = list(trace = FALSE))
+  
+  summary(gam_snp)
+  
+  
+  ## Plot predictions
+  
+  newdata <-  expand.grid(section_block = "IFG_1",
+                          height_2014 = 0,
+                          accession = "1",
+                          tmax_sum_dif = c(seq(min(dat_snp_unscaled$tmax_sum_dif),
+                                               max(dat_snp_unscaled$tmax_sum_dif),
+                                               length.out = 50)),
+                          PC1_gen = 0, PC2_gen = 0, PC3_gen = 0, 
+                          n_top_snps_unscaled = c(0,20),
+                          n_bottom_snps_unscaled = c(0, 20))
+  
+  
+  newdata$n_top_snps <- forward_transform(x = newdata$n_top_snps_unscaled,
+                                          var = 1,
+                                          means = n_top_snps_mean,
+                                          sd = n_top_snps_sd)
+  
+  newdata$n_bottom_snps <- forward_transform(x = newdata$n_bottom_snps_unscaled,
+                                             var = 1,
+                                             means = n_bottom_snps_mean,
+                                             sd = n_bottom_snps_sd)
+  
+  newdata$pred <- predict(gam_snp,
+                          newdata = newdata,
+                          se.fit = TRUE, type = "response")$fit
+  
+  newdata$se <- predict(gam_snp,
+                        newdata = newdata,
+                        se.fit = TRUE, type = "response")$se
+  
+  
+  newdata %>%
+    # dplyr::select(tmax_sum_dif, n_top_snps, n_bottom_snps, pred) %>%
+    dplyr::mutate(type_count = paste0(n_top_snps_unscaled, ":", n_bottom_snps_unscaled)) %>%
+    dplyr::mutate(tmax_sum_dif_unscaled = back_transform(tmax_sum_dif, var = "tmax_sum_dif",
+                                                         means = scaled_var_means_gbs_only, sds = scaled_var_sds_gbs_only)) %>%
+    dplyr::filter(type_count %in% c("20:0", "0:20")) %>%
+    ggplot(., aes(x = tmax_sum_dif_unscaled, y = pred)) +
+    geom_vline(aes(xintercept = 0), lty = 2, size = .25) +
+    geom_vline(xintercept = 4.8, size = .25) +
     
- # Figure 2 - growth vs copies of alleles ####
-     
-     fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(accession, bs = \"re\")"))
-
-     start <- Sys.time()
-     # Gam with interaction effect
-     gam_snp = bam(formula = formula(fixed_effects),
-                   data = dat_snp_unscaled,
-                   discrete = TRUE, 
-                   nthreads = 8,
-                   method = "fREML",
-                   #   method = "ML",
-                   family = "tw",
-                   control = list(trace = FALSE))
-     
-     summary(gam_snp)
-     
-     
-     # Join gen_dat_top with dat_snp data
-     
-     dat_snp_top <- dat_snp_unscaled %>%
-       dplyr::select(accession, accession_progeny, tmax_sum_dif) %>%
-       dplyr::mutate(accession = as.numeric(as.character(accession))) %>%
-       left_join(., gen_dat_top, by = c("accession" = "accession")) %>%
-       dplyr::select(accession, accession_progeny, tmax_sum_dif, snp_col_names) %>%
-       dplyr::mutate(rgr = gam_snp$fitted.values,
-                     rgr_resids = resid(gam_snp))
-
-     # Calculate number of top snps
-       dat_snp_top <- dat_snp_top %>%
-         mutate(n_top_snps = rowSums(dplyr::select(., top_snps_long$snp), na.rm = TRUE))
-       
-       hist(dat_snp_top$n_top_snps)
-       
-       # Run linear model on only individuals planted in warmer temperatures
-       
-       warm_thresh <- forward_transform(0, # Choose degrees of warming
-                                        "tmax_sum_dif",
-                                        means = scaled_var_means_gbs_only,
-                                        sds = scaled_var_sds_gbs_only)
-       
-       summary(gam(rgr_resids ~ n_top_snps,
-                   data = dat_snp_top[dat_snp_top$tmax_sum_dif > warm_thresh, ]))
-       
-       dat_snp_top %>%
-         dplyr::filter(tmax_sum_dif > warm_thresh) %>%
-         ggplot(., aes(n_top_snps, rgr_resids)) +
-         geom_point() + geom_smooth() + 
-         ylab("Residuals of RGR") + 
-         xlab("Number of beneficial SNPs") +
-         theme_bw(15)
-     
-     
-     ## Bottom SNPS
-     dat_snp_bottom <- dat_snp_unscaled %>%
-       dplyr::select(accession, accession_progeny, tmax_sum_dif) %>%
-       dplyr::mutate(accession = as.numeric(as.character(accession))) %>%
-       left_join(., gen_dat_bottom, by = c("accession" = "accession")) %>%
-       dplyr::select(accession, accession_progeny, tmax_sum_dif, snp_col_names) %>%
-       dplyr::mutate(rgr = gam_snp$fitted.values,
-                     rgr_resids = resid(gam_snp))
-     
-     dat_snp_bottom <- dat_snp_bottom %>%
-       mutate(n_bottom_snps = rowSums(dplyr::select(., bottom_snps_long$snp), na.rm = TRUE))
-     
-     hist(dat_snp_bottom$n_bottom_snps)
-     
-     
-     summary(gam(rgr_resids ~ n_bottom_snps,
-                 data = dat_snp_bottom[dat_snp_bottom$tmax_sum_dif > warm_thresh, ]))
-     
-     dat_snp_bottom %>%
-       dplyr::filter(tmax_sum_dif > warm_thresh) %>%
-       ggplot(., aes(n_bottom_snps, rgr_resids)) +
-       geom_point() + geom_smooth() + theme_bw(15)
-     
-     
-     ## Mid SNPS
-     
-     dat_snp_mid <- dat_snp_unscaled %>%
-       dplyr::select(accession, accession_progeny, tmax_sum_dif) %>%
-       dplyr::mutate(accession = as.numeric(as.character(accession))) %>%
-       left_join(., gen_dat_mid, by = c("accession" = "accession")) %>%
-       dplyr::select(accession, accession_progeny, tmax_sum_dif, snp_col_names) %>%
-       dplyr::mutate(rgr = gam_snp$fitted.values,
-                     rgr_resids = resid(gam_snp))
-     
-     dat_snp_mid <- dat_snp_mid %>%
-       mutate(n_mid_snps = rowSums(dplyr::select(., mid_snps_long$snp), na.rm = TRUE))
-     
-     hist(dat_snp_mid$n_mid_snps)
-     
-     
-     summary(gam(rgr_resids ~ n_mid_snps,
-                 data = dat_snp_mid[dat_snp_mid$tmax_sum_dif > warm_thresh, ]))
-     
-     dat_snp_mid %>%
-       dplyr::filter(tmax_sum_dif > warm_thresh) %>%
-       ggplot(., aes(n_mid_snps, rgr_resids)) +
-       geom_point() + geom_smooth() + theme_bw(15) 
-     
-     
-
-     ## Combine into a plot
-     
-     growth_snps_count <- left_join(dplyr::select(dat_snp_top, accession_progeny, 
-                                                  tmax_sum_dif, 
-                                                  rgr_resids, n_top_snps),
-                                    dplyr::select(dat_snp_bottom, accession_progeny, 
-                                                  tmax_sum_dif, 
-                                                  rgr_resids, n_bottom_snps))
-     
-     growth_snps_count <- left_join(growth_snps_count,
-                                    dplyr::select(dat_snp_mid, accession_progeny, 
-                                                  tmax_sum_dif, 
-                                                  rgr_resids, n_mid_snps))
-     
-     dim(growth_snps_count)
-     head(growth_snps_count)
-     nrow(growth_snps_count) == nrow(dat_snp_top) # Should both be true
-     nrow(growth_snps_count) == nrow(dat_snp_bottom) # Should both be true
-     
-     # Reformat from wide to long
-     growth_snps_count <- growth_snps_count %>%
-       gather(., key = "type", value = "count", 
-              -accession_progeny, -tmax_sum_dif, -rgr_resids) %>%
-       mutate(count2 = factor(count))
-     
-     head(growth_snps_count)
-     
-     
-     
-    ## Combined plot
-     growth_snps_count %>%
-       dplyr::filter(tmax_sum_dif > warm_thresh) %>%
-       ggplot(., aes(count, rgr_resids)) +
-       geom_hline(yintercept = 0, lty = 1, size = .5) +
-      geom_point(aes(x = count, y = rgr_resids,
-              col = type),
-             position = position_jitterdodge(),
-              pch = 16, alpha = 0.25, size = 0.25) +
-       geom_smooth(aes(count, rgr_resids, fill = type, col = type),
-                   method = "lm", size = .5) +
-       theme_bw(10) + 
-       xlab("Count of outlier alleles") + 
-       ylab("Residuals of relative growth rate") +
-       scale_fill_manual(values = c("#FF6633", "grey50", "#6699CC")) + 
-       scale_color_manual(values = c("#FF6633", "grey50", "#6699CC")) + 
-       theme(panel.border = element_blank(), panel.grid.major = element_blank(),
-             panel.grid.minor = element_blank(), 
-             axis.line = element_line(colour = "black"),
-             legend.position = "none") + 
-       NULL
-     
-     # Save to file
-     ggsave(filename = paste0("./figs_tables/Figure 2 - growth by outlier count ", 
-                              Sys.Date(), ".pdf"),
-            units = "cm",
-            height = 6, width = 8,
-            useDingbats = FALSE )
-     
-     
-     #### Testing 
-     
-     
-     dat_snp_unscaled2 <- left_join(dat_snp_unscaled, dplyr::select(dat_snp_top, 
-                                                                    accession_progeny, 
-                                                                    n_top_snps))
-     
-     dat_snp_unscaled2 <- left_join(dat_snp_unscaled2, dplyr::select(dat_snp_bottom,
-                                                                     accession_progeny,
-                                                                     n_bottom_snps))
-     
-    ## Scale number of top and bottom snps 
-     n_top_snps_mean <- mean(dat_snp_unscaled2$n_top_snps)
-     n_top_snps_sd <- sd(dat_snp_unscaled2$n_top_snps)
-     dat_snp_unscaled2$n_top_snps <- (dat_snp_unscaled2$n_top_snps - n_top_snps_mean) / n_top_snps_sd
-     
-     n_bottom_snps_mean <- mean(dat_snp_unscaled2$n_bottom_snps)
-     n_bottom_snps_sd <- sd(dat_snp_unscaled2$n_bottom_snps)
-     dat_snp_unscaled2$n_bottom_snps <- (dat_snp_unscaled2$n_bottom_snps - n_bottom_snps_mean) / n_bottom_snps_sd
-     
-     # Set formula
-     fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(n_top_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_top_snps, bs=\"cr\") + s(n_bottom_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_bottom_snps, bs=\"cr\") + s(accession, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC1_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC2_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC3_gen, bs=\"cr\")"))
-     
-     
-     # Gam with interaction effect
-     gam_snp = bam(formula = formula(fixed_effects),
-                   data = dat_snp_unscaled2,
-                   discrete = TRUE, 
-                   nthreads = 8,
-                   method = "fREML",
-                   #   method = "ML",
-                   family = "tw",
-                   control = list(trace = FALSE))
-     
-     summary(gam_snp)
-     
-     visreg(gam_snp, partial = FALSE)
-     
-     visreg(gam_snp, xvar = "tmax_sum_dif", scale = "response",
-            by = "n_top_snps", overlay = TRUE, partial = FALSE,
-            breaks = c(-2, 5))
-     
-     visreg(gam_snp, xvar = "tmax_sum_dif", scale = "response",
-            by = "n_bottom_snps", overlay = TRUE, partial = FALSE,
-            breaks = c(-2, 5))
-
- # Make spatial predictions across landscape -------------------------------
-     
-     # Load libraries ----------------------------------------------------------
-     
-     library(raster)
-     library(rasterVis)
-     
-     
- # Loading in rasters ------------------------------------------------------
-     
-     ## Read in elevation dem and create a hillshade for mapping
-     dem <- raster("./data/gis/dem/ClimateNA_DEM_cropped.tif")
-     
-     slope = raster::terrain(dem, opt='slope')
-     aspect = raster::terrain(dem, opt='aspect')
-     hill = hillShade(slope, aspect, 40, 270)
-     
-     ## Load in california outline
-     cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
-                                   proj4string = CRS("+proj=longlat +datum=WGS84"))
-     
-     lobata_range <- readShapePoly("./data/gis/valley_oak_range/qlobata_refined_grouped.shp",
-                                   proj4string = CRS("+proj=longlat +datum=WGS84"))
-     
-     lobata_range_rough <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
-                                         proj4string = CRS("+proj=longlat +datum=WGS84"))
-     
-     ## Creates vector with list of file paths to all .tif raster files
-     ## Directory path where future climate scenarios are located
-     dir_name <- "./data/gis/climate_data/BCM/future/"
-     raster_files <- list.files(dir_name, full.names = TRUE, recursive = TRUE)
-     raster_files <- raster_files[grep("*[[:digit:]].tif$", raster_files)] # Only those with .tif extension
-     raster_files <- raster_files[grep("jja_ave", raster_files)] # Only tmax sum files
-     
-     raster_files
-     
-     ## Select only 85 scenario
-     raster_files <- raster_files[grep("rcp85", raster_files)]
-     
-     
-     future_stack <- stack()
-     x = 1
-     
-     ## Loop through raster files and add climate values to dat_mom dataframe
-     for(file in raster_files){
-       
-       # Load in raster
-       raster_temp <- raster(file)
-       
-       cat("Working on file:", file, "...\n")
-       
-       # Check to see if extent is different, if it is - change it
-       if(x > 1 & !compareRaster(future_stack, raster_temp, stopiffalse = FALSE)){
-         extent(raster_temp) <- extent(future_stack)
-       }
-       
-       future_stack <- raster::stack(future_stack, raster_temp)
-       x = x + 1
-     }
-     
-     future_stack
-     
-     ## Clean up names
-     names(future_stack) <-  unlist(lapply(strsplit(x = gsub(pattern = "tmx2070_2099jja_ave_", 
-                                                             replacement = "", names(future_stack)),
-                                                    split = "_1"), "[", 1))
-     
-     tmax_rast <- raster("./data/gis/climate_data/BCM/historical/1951-1980/tmx1951_1980jja_ave_HST_1513103038/tmx1951_1980jja_ave_HST_1513103038.tif")
-     
-     
-     # Calculate difference between future and current
-     future_stack_tmax_dif <- future_stack - tmax_rast
-     names(future_stack_tmax_dif) <- names(future_stack) # Reassign name
-
-     # Scale values
-     future_stack_tmax_dif_scaled <- (future_stack_tmax_dif - scaled_var_means_gbs_only["tmax_sum_dif"]) /
-       scaled_var_sds_gbs_only["tmax_sum_dif"]
-     
-     
-     # Make data frame for prediction - one for top and one for bottom
-     newdata_rast_top <- data.frame(section_block = "IFG_1",
-                                height_2014 = 0,
-                                accession = "1",
-                                PC1_gen = 0, PC2_gen = 0, PC3_gen = 0, 
-                                n_top_snps = forward_transform(x = 20,
-                                                               var = 1,
-                                                               means = n_top_snps_mean,
-                                                               sd = n_top_snps_sd),
-                                n_bottom_snps = forward_transform(x = 0,
-                                                                  var = 1,
-                                                                  means = n_bottom_snps_mean,
-                                                                  sd = n_bottom_snps_sd))
-     
-     newdata_rast_bottom <- data.frame(section_block = "IFG_1",
+    geom_ribbon(aes(ymin = pred - 1.96*se, ymax = pred + 1.96 * se, fill = factor(type_count)), alpha = .25) +
+    geom_line(aes(col = factor(type_count))) + 
+    theme_bw(10) +
+    
+    scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
+    # ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
+    ylab("Relative growth rate") +
+    xlab("Tmax transfer distance") +
+    ylim(c(.20, .4)) +
+    scale_color_manual(values = c("#FF6633", "#6699CC")) +
+    scale_fill_manual(values = c("#FF6633", "#6699CC")) +
+    theme_bw(8) + 
+    theme(panel.border = element_blank(), 
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          axis.line = element_line(colour = "black"),
+          legend.position = "none") +
+    NULL
+  
+  ggsave(filename = paste0("./figs_tables/Figure 2 - outlier counts ", Sys.Date(), ".pdf"),
+         units = "cm", width = 6, height = 4)
+  
+  
+  
+  
+  
+  # Make spatial predictions across landscape -------------------------------
+  
+  # Load libraries ----------------------------------------------------------
+  
+  library(raster)
+  library(rasterVis)
+  
+  
+  # Loading in rasters ------------------------------------------------------
+  
+  ## Read in elevation dem and create a hillshade for mapping
+  dem <- raster("./data/gis/dem/ClimateNA_DEM_cropped.tif")
+  
+  slope = raster::terrain(dem, opt='slope')
+  aspect = raster::terrain(dem, opt='aspect')
+  hill = hillShade(slope, aspect, 40, 270)
+  
+  ## Load in california outline
+  cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
+                                proj4string = CRS("+proj=longlat +datum=WGS84"))
+  
+  lobata_range <- readShapePoly("./data/gis/valley_oak_range/qlobata_refined_grouped.shp",
+                                proj4string = CRS("+proj=longlat +datum=WGS84"))
+  
+  lobata_range_rough <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
+                                      proj4string = CRS("+proj=longlat +datum=WGS84"))
+  
+  ## Creates vector with list of file paths to all .tif raster files
+  ## Directory path where future climate scenarios are located
+  dir_name <- "./data/gis/climate_data/BCM/future/"
+  raster_files <- list.files(dir_name, full.names = TRUE, recursive = TRUE)
+  raster_files <- raster_files[grep("*[[:digit:]].tif$", raster_files)] # Only those with .tif extension
+  raster_files <- raster_files[grep("jja_ave", raster_files)] # Only tmax sum files
+  
+  raster_files
+  
+  ## Select only 85 scenario
+  raster_files <- raster_files[grep("rcp85", raster_files)]
+  
+  
+  future_stack <- stack()
+  x = 1
+  
+  ## Loop through raster files and add climate values to dat_mom dataframe
+  for(file in raster_files){
+    
+    # Load in raster
+    raster_temp <- raster(file)
+    
+    cat("Working on file:", file, "...\n")
+    
+    # Check to see if extent is different, if it is - change it
+    if(x > 1 & !compareRaster(future_stack, raster_temp, stopiffalse = FALSE)){
+      extent(raster_temp) <- extent(future_stack)
+    }
+    
+    future_stack <- raster::stack(future_stack, raster_temp)
+    x = x + 1
+  }
+  
+  future_stack
+  
+  ## Clean up names
+  names(future_stack) <-  unlist(lapply(strsplit(x = gsub(pattern = "tmx2070_2099jja_ave_", 
+                                                          replacement = "", names(future_stack)),
+                                                 split = "_1"), "[", 1))
+  
+  tmax_rast <- raster("./data/gis/climate_data/BCM/historical/1951-1980/tmx1951_1980jja_ave_HST_1513103038/tmx1951_1980jja_ave_HST_1513103038.tif")
+  
+  
+  # Calculate difference between future and current
+  future_stack_tmax_dif <- future_stack - tmax_rast
+  names(future_stack_tmax_dif) <- names(future_stack) # Reassign name
+  
+  # Scale values
+  future_stack_tmax_dif_scaled <- (future_stack_tmax_dif - scaled_var_means_gbs_only["tmax_sum_dif"]) /
+    scaled_var_sds_gbs_only["tmax_sum_dif"]
+  
+  
+  # Make data frame for prediction - one for top and one for bottom
+  newdata_rast_top <- data.frame(section_block = "IFG_1",
+                                 height_2014 = 0,
+                                 accession = "1",
+                                 PC1_gen = 0, PC2_gen = 0, PC3_gen = 0, 
+                                 n_top_snps = forward_transform(x = 20,
+                                                                var = 1,
+                                                                means = n_top_snps_mean,
+                                                                sd = n_top_snps_sd),
+                                 n_bottom_snps = forward_transform(x = 0,
+                                                                   var = 1,
+                                                                   means = n_bottom_snps_mean,
+                                                                   sd = n_bottom_snps_sd))
+  
+  newdata_rast_bottom <- data.frame(section_block = "IFG_1",
                                     height_2014 = 0,
                                     accession = "1",
                                     PC1_gen = 0, PC2_gen = 0, PC3_gen = 0, 
@@ -1398,154 +1468,202 @@
                                                                    means = n_top_snps_mean,
                                                                    sd = n_top_snps_sd),
                                     n_bottom_snps = forward_transform(x = 20,
-                                                                   var = 1,
-                                                                   means = n_bottom_snps_mean,
-                                                                   sd = n_bottom_snps_sd))
-     ## Get null prediction of height with no change in tmax
-     future_null <- tmax_rast
-     names(future_null) <- "tmax_sum_dif"
-     
-     # Need to scale tmax when actual transfer distance is 0
-     future_null[!is.na(future_null)] <- forward_transform(0, var = "tmax_sum_dif",
-                                                           means = scaled_var_means_gbs_only,
-                                                           sds = scaled_var_sds_gbs_only)
-     future_null
-     
-     # Top snps
-     future_null_height_top <- predict(future_null,
-                                   model = gam_snp,
-                                   const = newdata_rast_top,
-                                   progress = "text",
-                                   type = "response")
-     
-     future_null_height_top
-     summary(future_null_height_top)
-     
-     # Bottom snps
-     future_null_height_bottom <- predict(future_null,
+                                                                      var = 1,
+                                                                      means = n_bottom_snps_mean,
+                                                                      sd = n_bottom_snps_sd))
+  ## Get null prediction of height with no change in tmax
+  future_null <- tmax_rast
+  names(future_null) <- "tmax_sum_dif"
+  
+  # Need to scale tmax when actual transfer distance is 0
+  future_null[!is.na(future_null)] <- forward_transform(0, var = "tmax_sum_dif",
+                                                        means = scaled_var_means_gbs_only,
+                                                        sds = scaled_var_sds_gbs_only)
+  future_null
+  
+  # Top snps
+  future_null_height_top <- predict(future_null,
+                                    model = gam_snp,
+                                    const = newdata_rast_top,
+                                    progress = "text",
+                                    type = "response")
+  
+  future_null_height_top
+  summary(future_null_height_top)
+  
+  # Bottom snps
+  future_null_height_bottom <- predict(future_null,
                                        model = gam_snp,
                                        const = newdata_rast_bottom,
                                        progress = "text",
                                        type = "response")
-     
-     future_null_height_bottom
-     summary(future_null_height_bottom)
-   
-     
-     
-     
-     
-     
-     # Initialize stack for height changes
-     future_stack_height_change_top <- future_stack_tmax_dif
-     future_stack_height_change_bottom <- future_stack_tmax_dif
-     future_stack_height_change_topbottom <- future_stack_tmax_dif
-     
-     # Loop over scenarios
-     for(scenario in 1:nlayers(future_stack_tmax_dif)){
-       
-       cat("Working on scenario:", names(future_stack_tmax_dif)[scenario], "... \n")
-       
-       ## Use scaled raster
-       rast_temp <- future_stack_tmax_dif_scaled[[scenario]]
-       names(rast_temp) <- "tmax_sum_dif" # Rename so predict function works
-       
-       rast_temp_height_top <- predict(rast_temp,
-                                   model = gam_snp,
-                                   const = newdata_rast_top,
-                                   progress = "text",
-                                   type = "response")
-       
-       
-       rast_temp_height_bottom <- predict(rast_temp,
+  
+  future_null_height_bottom
+  summary(future_null_height_bottom)
+  
+  
+  
+  # Initialize stack for height changes
+  future_stack_height_change_top <- future_stack_tmax_dif
+  future_stack_height_change_bottom <- future_stack_tmax_dif
+  future_stack_height_change_topbottom <- future_stack_tmax_dif
+  
+  # Loop over scenarios
+  for(scenario in 1:nlayers(future_stack_tmax_dif)){
+    
+    cat("Working on scenario:", names(future_stack_tmax_dif)[scenario], "... \n")
+    
+    ## Use scaled raster
+    rast_temp <- future_stack_tmax_dif_scaled[[scenario]]
+    names(rast_temp) <- "tmax_sum_dif" # Rename so predict function works
+    
+    rast_temp_height_top <- predict(rast_temp,
+                                    model = gam_snp,
+                                    const = newdata_rast_top,
+                                    progress = "text",
+                                    type = "response")
+    
+    
+    rast_temp_height_bottom <- predict(rast_temp,
                                        model = gam_snp,
                                        const = newdata_rast_bottom,
                                        progress = "text",
                                        type = "response")
-       
-
-        # Dif bw top and null 
-         rast_temp_height_change_top <- (rast_temp_height_top - future_null_height_top) / future_null_height_top * 100
-         future_stack_height_change_top[[scenario]] <- rast_temp_height_change_top
-         names(future_stack_height_change_top)[scenario] <- names(future_stack_tmax_dif)[scenario] # Reassign name
-         
-         
-       # Dif bw bottom and null 
-         rast_temp_height_change_bottom <- (rast_temp_height_bottom - future_null_height_bottom) / future_null_height_bottom * 100
-         future_stack_height_change_bottom[[scenario]] <- rast_temp_height_change_bottom
-         names(future_stack_height_change_bottom)[scenario] <- names(future_stack_tmax_dif)[scenario] # Reassign name
-         
-         
-         # Dif bw top and bottom
-         rast_temp_height_change_topbottom <- (rast_temp_height_top - rast_temp_height_bottom) / rast_temp_height_bottom * 100
-         future_stack_height_change_topbottom[[scenario]] <- rast_temp_height_change_topbottom
-         names(future_stack_height_change_topbottom)[scenario] <- names(future_stack_tmax_dif)[scenario] # Reassign name
-       
-     } # End scenario loop
-     
-     
-     # Plot summaries across scenarios  
-     # histogram(future_stack_height_difference)
-     # bwplot(future_stack_height_difference)
-
-     
-     ## Average across emissions scenarios
-     future_stack_height_change_topbottom <- mean(future_stack_height_difference[[c("CCSM4_rcp85", 
-                                                                         "CNRM_rcp85",
-                                                                         "Fgoals_rcp85",
-                                                                         "IPSL_rcp85",
-                                                                         "MIROC_rcp85")]], na.rm = TRUE)
-     
-     summary(future_stack_height_change_topbottom )
-     names(future_stack_height_change_topbottom) <- "RCP 8.5"
-     
-     ## Project to latlong
-     future_stack_height_change_topbottom <- projectRaster(future_stack_height_change_topbottom, 
-                                                    crs = CRS("+proj=longlat +datum=WGS84"))
-     
-     
-     ## Crop them
-     future_stack_height_change_topbottom <- mask(future_stack_height_change_topbottom, cali_outline)
-     
-     summary(future_stack_height_change_topbottom)
-     quantile(future_stack_height_change_topbottom, probs = c(0.01, 0.99))
-     
-     
- ## Figure 2 - spatial predictions ####
-     ## Options for levelplot
-     pixel_num = 1e5 ## Can make resolution better by making this 1e6 
-     
-     ## Plots of changes in height - RCP 85
-     levelplot(future_stack_height_change_topbottom,
-               margin = FALSE,
-               maxpixels = 1000000,
-               par.settings = rasterTheme(region = brewer.pal('RdYlBu', n = 9)),
-               at = seq(40, 70, 1),
-               #  scales=list(draw=FALSE),
-               #  xlab = "", ylab ="",
-               main = "Rising emissions (RCP 8.5)") + 
-       latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
-     #  latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
-       latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
-     
-     # Main plot
-     dev.copy(png, paste0("./figs_tables/Figure 1 - RCP85 ", Sys.Date(), ".png"),
-              res = 300, units = "cm", width = 16, height = 16)
-     dev.off()
-     
-     # For legend
-     dev.copy(pdf, paste0("./figs_tables/Figure 1 - RCP85 for legend ", Sys.Date(), ".pdf"),
-              width = 5, height = 3)
-     dev.off()
-     
-     
-     
-     
-     
-     
-     
-     
-     
+    
+    
+    # Dif bw top and null 
+    rast_temp_height_change_top <- (rast_temp_height_top - future_null_height_top) / future_null_height_top * 100
+    future_stack_height_change_top[[scenario]] <- rast_temp_height_change_top
+    names(future_stack_height_change_top)[scenario] <- names(future_stack_tmax_dif)[scenario] # Reassign name
+    
+    
+    # Dif bw bottom and null 
+    rast_temp_height_change_bottom <- (rast_temp_height_bottom - future_null_height_bottom) / future_null_height_bottom * 100
+    future_stack_height_change_bottom[[scenario]] <- rast_temp_height_change_bottom
+    names(future_stack_height_change_bottom)[scenario] <- names(future_stack_tmax_dif)[scenario] # Reassign name
+    
+    
+    # Dif bw top and bottom
+    rast_temp_height_change_topbottom <- (rast_temp_height_top - rast_temp_height_bottom) / rast_temp_height_bottom * 100
+    future_stack_height_change_topbottom[[scenario]] <- rast_temp_height_change_topbottom
+    names(future_stack_height_change_topbottom)[scenario] <- names(future_stack_tmax_dif)[scenario] # Reassign name
+    
+  } # End scenario loop
+  
+  
+  # Plot summaries across scenarios  
+  # histogram(future_stack_height_change_topbottom)
+  # bwplot(future_stack_height_difference)
+  
+  
+  ## Average across emissions scenarios
+  future_stack_height_change_top_avg <- mean(future_stack_height_change_top, na.rm = TRUE)
+  future_stack_height_change_bottom_avg <- mean(future_stack_height_change_bottom, na.rm = TRUE)
+  future_stack_height_change_topbottom_avg <- mean(future_stack_height_change_topbottom, na.rm = TRUE)
+  
+  ## Project to latlong
+  future_stack_height_change_top_avg <- projectRaster(future_stack_height_change_top_avg, 
+                                                      crs = CRS("+proj=longlat +datum=WGS84"))
+  future_stack_height_change_bottom_avg <- projectRaster(future_stack_height_change_bottom_avg, 
+                                                         crs = CRS("+proj=longlat +datum=WGS84"))
+  future_stack_height_change_topbottom_avg <- projectRaster(future_stack_height_change_topbottom_avg, 
+                                                            crs = CRS("+proj=longlat +datum=WGS84"))
+  
+  ## Crop them
+  future_stack_height_change_top_avg <- mask(future_stack_height_change_top_avg, 
+                                             cali_outline)
+  future_stack_height_change_bottom_avg <- mask(future_stack_height_change_bottom_avg, 
+                                                cali_outline)
+  future_stack_height_change_topbottom_avg <- mask(future_stack_height_change_topbottom_avg, 
+                                                   cali_outline)
+  
+  
+  
+  summary(future_stack_height_change_topbottom)
+  quantile(future_stack_height_change_top_avg, probs = c(0.005, 0.995))
+  quantile(future_stack_height_change_bottom_avg, probs = c(0.005, 0.995))
+  quantile(future_stack_height_change_topbottom_avg, probs = c(0.01, 0.99))
+  
+  
+  ## Figure 2 - spatial predictions ####
+  
+  ## Plots of changes in height - RCP 85
+  levelplot(future_stack_height_change_top_avg,
+            margin = FALSE,
+            maxpixels = 1000000,
+            par.settings = rasterTheme(region = brewer.pal('RdYlBu', n = 9)),
+            at = seq(-3, 2, length.out = 18),
+            main = "Top genotypes") + 
+    latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
+    latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
+    latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
+  
+  # Main plot
+  dev.copy(png, paste0("./figs_tables/Figure 2 - top genotypes map ", Sys.Date(), ".png"),
+           res = 300, units = "cm", width = 16, height = 16)
+  dev.off()
+  
+  # For legend
+  dev.copy(pdf, paste0("./figs_tables/Figure 2 - top genotypes legend ", Sys.Date(), ".pdf"),
+           width = 5, height = 3)
+  dev.off()
+  
+  
+  
+  ## Plots of changes in height - RCP 85
+  levelplot(future_stack_height_change_bottom_avg,
+            margin = FALSE,
+            maxpixels = 1000000,
+            par.settings = rasterTheme(region = brewer.pal('RdYlBu', n = 9)),
+            at = seq(-4, -9, length.out = 18),
+            main = "Bottom genotypes") + 
+    latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
+    latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
+    latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
+  
+  # Main plot
+  dev.copy(png, paste0("./figs_tables/Figure 2 - bottom genotypes map ", Sys.Date(), ".png"),
+           res = 300, units = "cm", width = 16, height = 16)
+  dev.off()
+  
+  # For legend
+  dev.copy(pdf, paste0("./figs_tables/Figure 2 - bottom genotypes legend ", Sys.Date(), ".pdf"),
+           width = 5, height = 3)
+  dev.off()
+  
+  
+  ## Compare histograms of heights
+  
+  
+  height_change_vals <-   rbind(data.frame(type = "top_snps",
+                                           height_change = na.omit(values(future_stack_height_change_top_avg))),
+                                data.frame(type = "bottom_snps", 
+                                           height_change = na.omit(values(future_stack_height_change_bottom_avg))))
+  
+  ggplot(height_change_vals, aes(height_change)) + 
+    geom_histogram(aes(fill = type), col = "white", bins = 50, size = .01) + 
+    # geom_density(aes(fill = type, col = type), alpha = 0.5) +
+    xlab("% change in relative growth rate") + ylab("Frequency") +
+    scale_x_continuous(breaks = c(seq(-10, 5, 2.5)),
+                       limits = c(-10, 5)) +
+    scale_fill_manual(values = c("#6699CC", "#FF6633")) + # Flipped from normal order
+    scale_color_manual(values = c("#6699CC", "#FF6633")) + # Flipped from normal order
+    theme_bw(8) + 
+    theme(panel.border = element_blank(), 
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          axis.line = element_line(colour = "black"),
+          legend.position = "none") +
+    NULL
+  
+  ggsave(filename = paste0("./figs_tables/Figure 2 - histogram of height predictions ", Sys.Date(), ".pdf"),
+         units = "cm", width = 6, height = 4)
+  
+  
+  
+  
+  
+  
      
      
      
