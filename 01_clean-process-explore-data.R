@@ -192,7 +192,7 @@
   #                             col_names = c("chrom", "pos"))
       
     ## Using iterative filtering
-    snp_pos <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4.012.pos", col_names = c("chrom", "pos"))
+    snp_pos <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4_noLD.012.pos", col_names = c("chrom", "pos"))
       
     snp_pos
     
@@ -207,7 +207,7 @@
     #                              col_names = col_names, na = "-1")
     
     # Iterative filtering
-    genotypes <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4.012",
+    genotypes <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4_noLD.012",
                                  col_names = col_names, na = "-1")
     
     ## Remove first column
@@ -220,7 +220,7 @@
     #                         col_names = "ID")
     
     # Iterative filtering
-    indv <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4.012.indv",
+    indv <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4_noLD.012.indv",
                             col_names = "ID")
     dim(indv)
     indv 
@@ -275,7 +275,7 @@
       #                              col_names = col_names, na = "-1")
       
       # Iterative filtering
-      genotypes_all <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4.012",
+      genotypes_all <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4_noLD.012",
                                        col_names = col_names, na = "-1")
       
       ## Remove first column
@@ -288,7 +288,7 @@
       #                         col_names = "ID")
       
       # Iterative filtering
-      indv_all <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4.012.indv",
+      indv_all <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4_noLD.012.indv",
                                   col_names = "ID")
       dim(indv_all)
       indv_all
