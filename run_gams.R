@@ -14,7 +14,7 @@
   library(patchwork) # Installed on home directory
 
 # Load data
- load("../gam_cluster_2018-08-15.Rdata")
+ load("../gam_cluster_2018-08-28.Rdata")
 
 
 # Save functions
@@ -91,7 +91,7 @@
   #  fixed_effects_int <- paste0(fixed_effects_int,  "+ s(mem1, bs =\"cr\") + s(mem2, bs =\"cr\") + s(mem3, bs =\"cr\") + s(mem4, bs =\"cr\")")
 
    ## Randomize RGR data
-    # dat_snp_unscaled$rgr <- sample(dat_snp_unscaled$rgr)
+     dat_snp_unscaled$rgr <- sample(dat_snp_unscaled$rgr)
 
   # Gam with interaction effect
     gam_snp_int = bam(formula = make_formula(fixed_effects_int, random_effects),
@@ -305,6 +305,14 @@
 
     # Attach data so that we can use visreg later if we need
     # gam_snp$data <- dat_snp
+
+   ## Write predictions to file
+      pred_sub_out <- pred_sub %>%
+        dplyr::mutate(snp = snp) %>%
+        dplyr::select(snp, tmax_sum_dif_unscaled, genotype, pred, se)
+      
+      write_csv(pred_sub_out, path = paste0("./model_predictions/gam_predictions_", task_id, ".csv"),
+               append = TRUE)
     
 
     # Save into list

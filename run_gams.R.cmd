@@ -30,14 +30,14 @@
 #$ -r n
 #
 #  Job array indexes
-#$ -t 1-17415:50
-#-t 1-17415:50
-# 17415 Snps after iterative filtering
+#$ -t 1-14020:50
+#-t 1-14020:50
+# 14020 Snps after iterative filtering
 
 # Set variable that will be passed to R script
 # Interval needs to match what is set in Job array indexes
 
-set run_label="rgr_fREML_discrete_v3_tw_genpc_devdif"
+set run_label="rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand"
 set interval=50
 set climate_var_dif='tmax_sum_dif'
 
@@ -89,6 +89,7 @@ mkdir output
 mkdir gam_mods_data
 mkdir model_summaries
 mkdir model_plots
+mkdir model_predictions
 
 #
   # if more than 10 jobtasks, send only "a" mail.  until...
