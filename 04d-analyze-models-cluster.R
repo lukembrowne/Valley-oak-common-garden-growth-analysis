@@ -9,14 +9,45 @@
   path_to_summaries <- "./output/run_3700632_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld/model_summaries/"
   path_to_predictions <- "./output/run_3700632_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld/model_predictions/"
   
+  
+  
   ## Randomized phenotypes
-    path_to_summaries <- "./output/run_3573817_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_rgrrand_1/model_summaries/" # 0 sig snps
-    path_to_summaries <- "./output/run_3576839_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_rgrrand_2/model_summaries/" # 0 sig snps
-    path_to_summaries <- "./output/run_3576840_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_rgrrand_3/model_summaries/" # 3 outlier snps
-    path_to_summaries <-  "./output/run_3576842_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_rgrrand_4/model_summaries/" # 1 outlier snp
-    path_to_summaries <- "./output/run_3576843_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_rgrrand_5/model_summaries/" # 5 outlier snps
   
-  
+    # # Run 1 - 0 SNPs passed - tested on Sept 4th 2018
+    #   path_to_summaries <- "./output/run_3709949_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3709949_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    #   # Run 2 - 0 SNPs passed
+    #   path_to_summaries <- "./output/run_3709950_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3709950_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    #   # Run 3 - 0 SNPs passed
+    #   path_to_summaries <- "./output/run_3709951_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3709951_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    #   # Run 4 - 0 SNPs passed
+    #   path_to_summaries <- "./output/run_3709955_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3709955_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    #   # Run 5 - 0 SNPs passed
+    #   path_to_summaries <- "./output/run_3709957_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3709957_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    #   # Run 6 - 0 SNPs passed
+    #   path_to_summaries <- "./output/run_3718299_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3718299_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    #   # Run 7 - 0 SNPs passed
+    #   path_to_summaries <- "./output/run_3718300_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3718300_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    #   # Run 8 - 0 SNPs passed
+    #   path_to_summaries <- "./output/run_3718301_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3718301_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    #   # Run 9 - 0 SNPs passed
+    #   path_to_summaries <- "./output/run_3718302_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3718302_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    #   # Run 10 - 0 SNPs passed
+    #   path_to_summaries <- "./output/run_3718304_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3718304_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    
+      
+      
+      
+      
   # Read in files
   sum_df_raw <- plyr::ldply(list.files(path_to_summaries, full = TRUE), read_csv)
   
@@ -257,33 +288,34 @@
                               col = factor(type))) +
      geom_vline(aes(xintercept = 0), lty = 2, size = .25) +
      geom_vline(xintercept = 4.8, size = .25) +
-     geom_line(alpha = 0.1,
-               show.legend = FALSE, size = .10) +
+     geom_line(alpha = 0.2,
+               show.legend = FALSE, size = .2) +
    #  geom_point(alpha = 0.35, size = .25) +
      geom_smooth(aes(x = tmax_sum_dif_unscaled,
                      y = pred, group = factor(type)),
-                 se = FALSE, size = .5) +
-     
+                 se = FALSE, size = .75) +
+
      labs(col = "Genotype") +
-     ylim(.225, .325) +
+  #   ylim(.225, .325) +
      ylab("Relative growth rate") +
      xlab("Tmax transfer distance") +
-     theme_bw(8) + 
-     scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5),
-                        limits = c(0, 7.5)) +
+     theme_bw(10) + 
+     scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
     # facet_wrap(~type) +
    #  facet_wrap(~ type + snp) +
-     scale_color_manual(values = c("#FF6633", "grey50", "#6699CC")) + 
+     scale_color_manual(values = c("#FF6633", "grey50", "#6699CC"), 
+                        labels = c("Detrimental genotypes", "Random genotypes",
+                                  "Beneficial genotypes"),
+                        name = "") + 
      theme(panel.border = element_blank(), panel.grid.major = element_blank(),
            panel.grid.minor = element_blank(), 
-           axis.line = element_line(colour = "black"),
-           legend.position = "none")   
+           axis.line = element_line(colour = "black"))   
    
    # Save to file
    ggsave(filename = paste0("./figs_tables/Figure 2 - outlier responses ", 
                             Sys.Date(), ".pdf"),
           units = "cm",
-          height = 4, width = 6,
+          height = 8, width = 15,
           useDingbats = FALSE )
  
   summary(top_snps_long$height_change_warmer_base0)
@@ -461,6 +493,7 @@
     gen_dat_top[, snp] <- apply(gen_dat_clim_all[, snp], 1, function(x) {
                 if(is.na(x)){ NA
                 } else if(x == ben_gen){ 1
+              #  } else if(x == 1){ .5
                 } else {  0
                 }
               }) # End apply
@@ -575,36 +608,16 @@
    library(raster)
    library(pdp)
   
-  ## Count number of positives - where allele is found
-  pos_thresh <- 1
-   
 
   ## For TOP SNPS
      rf_top <- gen_dat_top[ , snp_col_names]
      dim(rf_top)
      
      ## Count positives
-     pos <-  apply(rf_top[ ,top_snps_long$snp], 2, function(x) sum(x == 1, na.rm = TRUE) )
-     summary(pos)
-     hist(pos, breaks =20)
-     
-     
-     # Remove SNPs below threshold
-       # For presences
-       ind1 <- which(apply(rf_top, 2, function(x) sum(x == 1, na.rm = TRUE))
-                     < pos_thresh)
-       if(length(ind1) > 0) rf_top <- rf_top[, -ind1] # Need to check if indexes were found
-       
-       # For absences
-       ind2 <- which(apply(rf_top, 2, function(x) sum(x == 0, na.rm = TRUE)) < pos_thresh)
-       if(length(ind2 ) > 0) rf_top <- rf_top[, -ind2]
-       
-       dim(rf_top)
-       
-       
-       ## How many top SNPs pass this threshold?
-       sum(top_snps_long$snp %in% colnames(rf_top))
-       
+     pos_top <-  apply(rf_top[ ,top_snps_long$snp], 2, function(x) sum(x == 1, na.rm = TRUE) )
+     summary(pos_top)
+     hist(pos_top, breaks =20)
+
        
    ## For BOTTOM SNPS
        rf_bottom <- gen_dat_bottom[ , snp_col_names]
@@ -612,28 +625,10 @@
        
        
        ## Count positives
-       pos <-  apply(rf_top[ , bottom_snps_long$snp], 2, function(x) sum(x == 1, na.rm = TRUE) )
-       summary(pos)
-       hist(pos, breaks =20)
-       
-       
-     # Remove SNPs below threshold
-       # For presences
-       ind1 <- which(apply(rf_bottom, 2, function(x) sum(x == 1, na.rm = TRUE))
-                     < pos_thresh)
-       if(length(ind1) > 0) rf_bottom <- rf_bottom[, -ind1] # Need to check if indexes were found
-       
-       # For absences
-       ind2 <- which(apply(rf_bottom, 2, function(x) sum(x == 0, na.rm = TRUE)) < pos_thresh)
-       if(length(ind2 ) > 0) rf_bottom <- rf_bottom[, -ind2]
-       
-       dim(rf_bottom)
-       
-       
-       ## How many bottom SNPs pass this threshold?
-       sum(bottom_snps_long$snp %in% colnames(rf_bottom))     
-       
-       
+       pos_bottom <-  apply(rf_bottom[ , bottom_snps_long$snp], 2, function(x) sum(x == 1, na.rm = TRUE) )
+       summary(pos_bottom)
+       hist(pos_bottom, breaks =20)
+      
     ## For mid snps
        rf_mid<- gen_dat_mid[ , snp_col_names]
        dim(rf_mid)
@@ -732,8 +727,8 @@
                        #    "bioclim_19", # R = 0.79 with aet; R = 0.84 with bioclim_18
                            "elevation",
                            "latitude", 
-                           "longitude", # R = -0.84 with latitude
-                            "random")
+                           "longitude") # R = -0.84 with latitude
+                          #  "random")
      
      pairs.panels(gen_dat_top[, climate_vars_rf])
      
@@ -755,7 +750,7 @@
  
      
 ## Begin Random forest loop         
-  for(mode in c("top_snps", "bottom_snps", "random_snps")){   # , random_env
+  for(mode in c("top_snps", "bottom_snps", "random_snps")){ # , random_env,  "random_snps"
     
     # Start rep loop
     for(rep in 1:reps){  
@@ -829,14 +824,11 @@
          rf <- randomForest::randomForest(y ~.,
                             data = dat_rf,
                             importance = TRUE,
-                            #   nodesize = 10,
-                               sampsize = c(min(n0, n1), min(n0, n1)),
-                           # sampsize = c(10, 10),
-                            ntree = 1000)
-
-         # plot(test)
-         # plotImpHistory(test)
+                            sampsize = c(min(n0, n1), min(n0, n1)),
+                            ntree = 100)
          
+         rf
+
          # print(importance(rf))
           # cat("OOB error rate: ", mean(rf$err.rate[, 1]), "\n")
           # cat("Class1 error rate: ", rf$confusion[2,3], "\n")
@@ -863,15 +855,8 @@
          # Save importance and OOB error rates
          if(start_flag == FALSE){
            
-          # # Importance 
-           # importance_boruta <- data.frame(mode = mode, rep = rep, snp = snp_name,
-           #                                 climate_var = rownames(attStats(boruta_rf)),
-           #                                 meanImp = attStats(boruta_rf)$meanImp,
-           #                                 decision = attStats(boruta_rf)$decision)
-           
-           
            importance_rf <- data.frame(mode = mode, rep = rep, snp = snp_name,
-                                           climate_var =  rownames(randomForest::importance(rf, scale = FALSE)),
+                                         climate_var =  rownames(randomForest::importance(rf, scale = FALSE)),
                                            randomForest::importance(rf, scale = FALSE))
            
            
@@ -883,31 +868,25 @@
            
          } else { 
 
-           
-          # importance_boruta <- rbind(importance_boruta, data.frame(mode = mode, rep = rep, snp = snp_name,
-          #                                                          climate_var = rownames(attStats(boruta_rf)),
-          #                                                          meanImp = attStats(boruta_rf)$meanImp,
-          #                                                          decision = attStats(boruta_rf)$decision))
-          
-          importance_rf <- rbind(importance_rf, data.frame(mode = mode, rep = rep, 
+         importance_rf <- rbind(importance_rf, data.frame(mode = mode, rep = rep, 
                                                            snp = snp_name,
                                     climate_var =  rownames(randomForest::importance(rf, 
                                                                             scale = FALSE)),
                                                randomForest::importance(rf, scale = FALSE)))
           
-            error_df <- rbind(error_df, data.frame(mode = mode, 
-                                                   rep = rep, 
-                                                   snp = snp_name, 
-                                                   tail(rf$err.rate, 1)))
+          error_df <- rbind(error_df, data.frame(mode = mode, 
+                                                 rep = rep, 
+                                                 snp = snp_name, 
+                                                 tail(rf$err.rate, 1)))
          } # End else for start flag
   
          # Plot partial plot
           for(climate_var in climate_vars_rf){
-           
-             pp_out <- pdp::partial(rf, pred.var = climate_var, 
+
+             pp_out <- pdp::partial(rf, pred.var = climate_var,
                                plot = FALSE, which.class = 2L,
-                               prob = TRUE, smooth = TRUE)
-            
+                               prob = TRUE, smooth = FALSE)
+
              pp_df_temp <- data.frame(snp = snp_name,
                                       mode = mode,
                                       rep = rep,
@@ -918,26 +897,22 @@
                                       x_val = pp_out[, 1],
                                       stringsAsFactors = FALSE)
 
-  
-           if(!exists("pp_df")){ # If pp_df doesn't exist yet
-             pp_df = pp_df_temp
-           } else {
-             pp_df <- bind_rows(pp_df, pp_df_temp)
-           }
-           
+
+             if(!exists("pp_df")){ # If pp_df doesn't exist yet
+               pp_df = pp_df_temp
+             } else {
+               pp_df <- bind_rows(pp_df, pp_df_temp)
+             }
+
           } # End climate vars loop
 
-         
-         #   
-         # }
-         
          
          ## Predict across a raster and add to stack
   
              # Second column is positives
         
              rf_rast_df_nona$pred = predict(rf, rf_rast_df_nona, type = "prob")[, 2]
-             
+
 
              rf_rast_df_temp <- left_join(rf_rast_df, rf_rast_df_nona[, c("cell_id", "pred")])
 
@@ -950,7 +925,7 @@
           if(mode == "bottom_snps") stack_bottom <- stack(stack_bottom, rast)
           if(mode == "random_snps")   stack_random_snps <- stack(stack_random_snps, rast)
           if(mode == "random_env")   stack_random_env <- stack(stack_random_env, rast)
-        
+
            start_flag <- TRUE # Flip flag to true
   
        } # End loop over SNPs
@@ -958,6 +933,8 @@
      } # End rep
     
   } # End mode loop ####################
+     
+
      
      
      
@@ -985,7 +962,7 @@
        importance_rf$climate_var[importance_rf$climate_var == "tmax_sum"] <- "Tmax"
        importance_rf$climate_var[importance_rf$climate_var == "tmin_winter"] <- "Tmin"
        importance_rf$climate_var[importance_rf$climate_var == "elevation"] <- "Elevation"
-       importance_rf$climate_var[importance_rf$climate_var == "random"] <- "Random"
+       importance_rf$climate_var[importance_rf$climate_var == "random"] <- "Random variable"
        importance_rf$climate_var <- factor(importance_rf$climate_var)
        
        table(importance_rf$climate_var)
@@ -1009,7 +986,7 @@
          pp_df$var[pp_df$var == "tmax_sum"] <- "Tmax"
          pp_df$var[pp_df$var == "tmin_winter"] <- "Tmin"
          pp_df$var[pp_df$var == "elevation"] <- "Elevation"
-         pp_df$var[pp_df$var == "random"] <- "Random"
+         pp_df$var[pp_df$var == "random"] <- "Random variable"
          pp_df$var <- factor(pp_df$var)
          table(pp_df$var)
          
@@ -1060,6 +1037,7 @@
      group_by(mode, snp, climate_var ) %>%
        summarise_all(funs(mean, median, sd)) %>% # Average across reps
        dplyr::filter(mode != "random_snps") %>%
+       dplyr::filter(climate_var != "Random variable") %>%
        dplyr::mutate(climate_var = factor(climate_var,
                                           levels = importance_rf_df_top$climate_var)) %>%
      ggplot(., aes(climate_var, MeanDecreaseAccuracy_mean, fill = mode)) + 
@@ -1121,10 +1099,29 @@
     
      
   ## Take mean of rasters, weighted by class1 error - higher weights to lower error
-   #  top_snps_stack <- weighted.mean(stack_top,
-   #                                  w = 1 - error_df$OOB[error_df$mode == "top_snps"])
-   # bottom_snps_stack <- weighted.mean(stack_bottom,
-   #                                  w = 1 - error_df$OOB[error_df$mode == "bottom_snps"])
+    
+ # Top snps
+ #  top_error <-   error_df %>%
+ #      dplyr::filter(mode == "top_snps") %>%
+ #      dplyr::group_by(mode, snp) %>%
+ #      summarise_all(mean)
+ #  
+ #  summary(top_error)
+ #  
+ # # Bottom snps 
+ #  bottom_error <-   error_df %>%
+ #    dplyr::filter(mode == "bottom_snps") %>%
+ #    dplyr::group_by(mode, snp) %>%
+ #    summarise_all(mean)
+ #  summary(bottom_error)
+ #    
+ #  top_snps_stack <- weighted.mean(stack_top_avg,
+ #                                    w = 1 - top_error$OOB)
+ #  
+ #  top_snps_stack <- weighted.mean(stack_top,
+ #                                  w = 1 - error_df$OOB[error_df$mode == "top_snps"])
+ #  bottom_snps_stack <- weighted.mean(stack_bottom_avg,
+ #                                    w = 1 - bottom_err$OOB)
    #  random_snps_stack <- weighted.mean(stack_random_snps,
    #                                     w = 1 - error_df$OOB[error_df$mode == "random_snps"])
    #  random_env_stack <- weighted.mean(stack_random_env,
@@ -1192,23 +1189,12 @@
      dev.off()
    
      
-  # # Get values by region
-  #  # Not 100% sure if extract is doing exactly what we want   
-  #   prob_by_region <- data.frame(region = lobata_range$REGION,
-  #                                prob   = unlist(lapply(raster::extract(top_snps_stack,
-  #                                                         y = lobata_range), mean)))
-  #   
-  # 
-  #   ggplot(prob_by_region, aes(region, prob)) + 
-  #     geom_bar(stat = "identity", col = "black", fill = "steelblue2") + theme_bw(15)
-  #    
-     
-  
   
  # Figure 4 - partial dependence plots ####
 
   pp_df %>%
     dplyr::filter(mode != "random_snps") %>%
+    dplyr::filter(var != "Random variable") %>%
     dplyr::mutate(var = factor(var, # Reorder based on importance
                                levels = rev(importance_rf_df_top$climate_var))) %>%
     group_by(mode, snp, var, x_val) %>% # Average across reps
@@ -1216,10 +1202,10 @@
    ggplot(., 
           aes(x = x_val,
               y = prob,
-           #   y = prob_centered,
+          #    y = prob_centered,
            #   y = prob_scaled,
               group = snp, col = mode, fill = mode), alpha = 0.75) + 
-  #   geom_line(lwd = .25, alpha = 0.15) + 
+ #    geom_line(lwd = .25, alpha = 0.15) + 
     ylab("Probablity of occurrence") + xlab("") + 
     theme_bw(8) + 
     # theme(legend.position="none") +
@@ -1282,7 +1268,7 @@
   dat_snp_count$n_bottom_snps <- (dat_snp_count$n_bottom_snps - n_bottom_snps_mean) / n_bottom_snps_sd
   
   # Set formula
-  fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(n_top_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_top_snps, bs=\"cr\") + s(n_bottom_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_bottom_snps, bs=\"cr\") + s(accession, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC1_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC2_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC3_gen, bs=\"cr\")"))
+    fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(n_top_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_top_snps, bs=\"cr\") + s(n_bottom_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_bottom_snps, bs=\"cr\") + s(accession, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC1_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC2_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC3_gen, bs=\"cr\")"))
   
   
   # Gam with interaction effect
@@ -1297,6 +1283,17 @@
   
   summary(gam_snp)
   
+  ## Save output
+  
+  ## Save gam summary to file
+  # sink(file = paste0("./figs_tables/Table S2 - outlier_count_gam_model_summary_",
+  #                    Sys.Date(), ".txt"))
+  # summary(gam_snp)
+  # anova(gam_snp)
+  # sink()
+  
+  
+  
   
   ## Plot predictions
   
@@ -1305,10 +1302,13 @@
                           accession = "1",
                           tmax_sum_dif = c(seq(min(dat_snp_unscaled$tmax_sum_dif),
                                                max(dat_snp_unscaled$tmax_sum_dif),
-                                               length.out = 50)),
+                                               length.out = 50), 
+                                              forward_transform(4.8, "tmax_sum_dif",
+                                                                scaled_var_means_gbs_only,
+                                                                scaled_var_sds_gbs_only)),
                           PC1_gen = 0, PC2_gen = 0, PC3_gen = 0, 
-                          n_top_snps_unscaled = c(0,20),
-                          n_bottom_snps_unscaled = c(0, 20))
+                          n_top_snps_unscaled = c(0,10, 20),
+                          n_bottom_snps_unscaled = c(0,10, 20))
   
   
   newdata$n_top_snps <- forward_transform(x = newdata$n_top_snps_unscaled,
@@ -1335,7 +1335,7 @@
     dplyr::mutate(type_count = paste0(n_top_snps_unscaled, ":", n_bottom_snps_unscaled)) %>%
     dplyr::mutate(tmax_sum_dif_unscaled = back_transform(tmax_sum_dif, var = "tmax_sum_dif",
                                                          means = scaled_var_means_gbs_only, sds = scaled_var_sds_gbs_only)) %>%
-    dplyr::filter(type_count %in% c("20:0", "0:20")) %>%
+    dplyr::filter(type_count %in% c("20:0", "10:10", "0:20")) %>%
     ggplot(., aes(x = tmax_sum_dif_unscaled, y = pred)) +
     geom_vline(aes(xintercept = 0), lty = 2, size = .25) +
     geom_vline(xintercept = 4.8, size = .25) +
@@ -1349,19 +1349,45 @@
     ylab("Relative growth rate") +
     xlab("Tmax transfer distance") +
     ylim(c(.20, .4)) +
-    scale_color_manual(values = c("#FF6633", "#6699CC")) +
-    scale_fill_manual(values = c("#FF6633", "#6699CC")) +
-    theme_bw(8) + 
+    # scale_color_manual(values = c("#FF6633", "#6699CC")) +
+    # scale_fill_manual(values = c("#FF6633", "#6699CC")) +
+    #theme_bw(8) + downsize version
+    theme_bw(10) +
     theme(panel.border = element_blank(), 
           panel.grid.major = element_blank(),
           panel.grid.minor = element_blank(), 
           axis.line = element_line(colour = "black"),
-          legend.position = "none") +
+          legend.position = "none", 
+          plot.margin = ggplot2::margin(1.5,1.5,1.5,1.5, "cm")) +
     NULL
   
-  ggsave(filename = paste0("./figs_tables/Figure 2 - outlier counts ", Sys.Date(), ".pdf"),
-         units = "cm", width = 6, height = 4)
+  # ggsave(filename = paste0("./figs_tables/Figure 2 - outlier counts ", Sys.Date(), ".pdf"),
+  #        units = "cm", width = 6, height = 4)
   
+  ggsave(filename = paste0("./figs_tables/Figure 2 - outlier counts upsizes ", Sys.Date(), ".pdf"),
+         units = "cm", width = 12, height = 8)
+  
+  
+  ## Calculating differences in growth rates
+ test =  newdata %>%
+    # dplyr::select(tmax_sum_dif, n_top_snps, n_bottom_snps, pred) %>%
+    dplyr::mutate(type_count = paste0(n_top_snps_unscaled, ":", n_bottom_snps_unscaled)) %>%
+    dplyr::mutate(tmax_sum_dif_unscaled = back_transform(tmax_sum_dif, var = "tmax_sum_dif",
+                                                         means = scaled_var_means_gbs_only, sds = scaled_var_sds_gbs_only)) %>%
+    dplyr::filter(type_count %in% c("20:0", "10:10", "0:20"))
+ 
+ (test$pred[test$type_count == "20:0" & test$tmax_sum_dif_unscaled == 4.8] - 
+   test$pred[test$type_count == "10:10" & test$tmax_sum_dif_unscaled == 4.8]) / 
+   test$pred[test$type_count == "10:10" & test$tmax_sum_dif_unscaled == 4.8] * 100
+ 
+ 
+ (test$pred[test$type_count == "20:0" & test$tmax_sum_dif_unscaled == 4.8] - 
+     test$pred[test$type_count == "0:20" & test$tmax_sum_dif_unscaled == 4.8]) / 
+   test$pred[test$type_count == "0:20" & test$tmax_sum_dif_unscaled == 4.8] * 100
+ 
+ (test$pred[test$type_count == "10:10" & test$tmax_sum_dif_unscaled == 4.8] - 
+     test$pred[test$type_count == "0:20" & test$tmax_sum_dif_unscaled == 4.8]) / 
+   test$pred[test$type_count == "0:20" & test$tmax_sum_dif_unscaled == 4.8] * 100
   
   
   
