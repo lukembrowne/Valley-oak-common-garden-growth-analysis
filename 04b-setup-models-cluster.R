@@ -21,8 +21,8 @@
   library(rasterVis)
   library(pdp)
   library(ggrepel)
+  library(caret)
   
- 
   
   # function to transform from raw to scaled variables
     forward_transform <- function(x, var, means, sds){
@@ -220,13 +220,36 @@
   head(pred)
 
   pred
+  
+  ## Create folds for 80-20 validation
+  set.seed(129)
+  
+  folds <- caret::createFolds(factor(dat_snp_unscaled$accession), k = 5)
+
+  # table(dat_snp_unscaled$accession)
+  # table(dat_snp_unscaled$accession[folds[[1]]])
+  # table(dat_snp_unscaled$accession[folds[[2]]])
+  # table(dat_snp_unscaled$accession[folds[[3]]])
+  # table(dat_snp_unscaled$accession[folds[[4]]])
+  # table(dat_snp_unscaled$accession[folds[[5]]])
+  # 
+  # table(dat_snp_unscaled$section_block)
+  # table(dat_snp_unscaled$section_block[folds[[1]]])
+  # table(dat_snp_unscaled$section_block[folds[[2]]])
+  # table(dat_snp_unscaled$section_block[folds[[3]]])
+  # table(dat_snp_unscaled$section_block[folds[[4]]])
+  # table(dat_snp_unscaled$section_block[folds[[5]]])
+  # 
+  
+  
 
 # Save data to file that will be uploaded to cluster  
   # save(dat_snp, dat_snp_unscaled,
   #      snp_col_names, pred,
   #      scaled_snps_means, scaled_snps_sds,
   #      scaled_var_means_gbs_only, scaled_var_sds_gbs_only,
+  #      folds,
   #   file = paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
-
+  # 
 
  
