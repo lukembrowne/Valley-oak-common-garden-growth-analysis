@@ -14,7 +14,7 @@
   library(patchwork) # Installed on home directory
 
 # Load data
- load("../gam_cluster_2018-08-28.Rdata")
+ load("../gam_cluster_2018-09-07.Rdata")
 
 
 # Save functions
@@ -64,9 +64,6 @@
       next
     }
 
-    # Choose numbers of knots
-    # k = length(table(pull(dat_snp, snp)))
-    
     # Convert to factor
     # dat_snp[, snp] <- as.factor(pull(dat_snp, snp))
      dat_snp_unscaled[, snp] <- as.factor(pull(dat_snp_unscaled, snp))
@@ -91,7 +88,7 @@
   #  fixed_effects_int <- paste0(fixed_effects_int,  "+ s(mem1, bs =\"cr\") + s(mem2, bs =\"cr\") + s(mem3, bs =\"cr\") + s(mem4, bs =\"cr\")")
 
    ## Randomize RGR data
-     dat_snp_unscaled$rgr <- sample(dat_snp_unscaled$rgr)
+   #  dat_snp_unscaled$rgr <- sample(dat_snp_unscaled$rgr)
 
   # Gam with interaction effect
     gam_snp_int = bam(formula = make_formula(fixed_effects_int, random_effects),
@@ -162,6 +159,41 @@
     gam_snp_int$rsq_dif <- gam_snp_int_summary$r.sq - gam_no_snp_summary$r.sq
     gam_snp_int$rsq_dif_random <- gam_random_summary$r.sq - gam_no_snp_summary$r.sq
     
+
+
+  ### Training and testing validation
+    dat_snp_train <-  dat_snp_unscaled[!is.na(pull(dat_snp_unscaled, snp)), ]
+    dat_snp_train <- dat_snp_train[-folds[[1]], ]
+    #dim(dat_snp_train)
+    
+    dat_snp_test <-  dat_snp_unscaled[!is.na(pull(dat_snp_unscaled, snp)), ]
+    dat_snp_test <- dat_snp_test[folds[[1]], ]
+    #dim(dat_snp_test)
+    
+    
+    gam_snp_int_train = bam(formula = make_formula(fixed_effects_int, random_effects),
+                            data =dat_snp_train,
+                            discrete = TRUE, 
+                            nthreads = 8,
+                            method = "fREML",
+                            family = "tw")
+    
+   # print(summary(gam_snp_int_train))
+    
+    gam_snp_int_test = bam(formula = make_formula(fixed_effects_int, random_effects),
+                           data = dat_snp_test,
+                           discrete = TRUE, 
+                           nthreads = 8,
+                           method = "fREML",
+                           family = "tw")
+    
+   # print(summary(gam_snp_int_test))
+    
+    # Save summaries
+    gam_snp_int_train_summary <- summary(gam_snp_int_train)
+    gam_snp_int_test_summary <- summary(gam_snp_int_test)
+
+
     
 
  ## Save sample size per genotype
@@ -222,26 +254,46 @@
 
 
     
-  # Make PREDICTION
-    gam_preds <-  predict(gam_snp_int, 
-                          newdata = pred_sub,
-                          type = "response",
-                          se = TRUE)
-    pred_sub$pred <- gam_preds$fit
-    pred_sub$se <- gam_preds$se.fit
+   # Make PREDICTIONs
+      
+    # Full model  
+      gam_preds <-  predict(gam_snp_int, 
+                            newdata = pred_sub,
+                            type = "response",
+                            se = TRUE)
+      pred_sub$pred <- gam_preds$fit
+      pred_sub$se <- gam_preds$se.fit
+    
+    
+    ## Training model
+      gam_preds_train <-  predict(gam_snp_int_train, 
+                            newdata = pred_sub,
+                            type = "response",
+                            se = TRUE)
+      pred_sub$pred_train <- gam_preds_train$fit
+      pred_sub$se_train <- gam_preds_train$se.fit
+      
+    
+    ## Testing model
+      gam_preds_test <-  predict(gam_snp_int_test, 
+                            newdata = pred_sub,
+                            type = "response",
+                            se = TRUE)
+      pred_sub$pred_test <- gam_preds_test$fit
+      pred_sub$se_test <- gam_preds_test$se.fit
     
     pred_sub$genotype <- factor(pred_sub$genotype)
     
    # Backtransform climate variable
-     dat_snp_trans <- dat_snp %>%
-                  dplyr::select(climate_var_dif, snp, rgr) %>%
-                     # Back transform X axis
-                     mutate(!!climate_var_dif := back_transform(x = get(climate_var_dif),
-                                                     var = climate_var_dif,
-                                                     means = scaled_var_means_gbs_only,
-                                                     sds = scaled_var_sds_gbs_only)) %>%
-                    # Filter down to just 0,1,2 genotypes
-                    dplyr::filter(get(snp) %in% c(0, 1, 2))
+    # dat_snp_trans <- dat_snp %>%
+    #             dplyr::select(climate_var_dif, snp, rgr) %>%
+    #                # Back transform X axis
+    #                mutate(!!climate_var_dif := back_transform(x = get(climate_var_dif),
+    #                                                var = climate_var_dif,
+    #                                                means = scaled_var_means_gbs_only,
+    #                                                sds = scaled_var_sds_gbs_only)) %>%
+    #               # Filter down to just 0,1,2 genotypes
+    #               dplyr::filter(get(snp) %in% c(0, 1, 2))
 
   
  # # Climate transfer functions by genotype     
@@ -303,21 +355,147 @@
       }
 
 
-    # Attach data so that we can use visreg later if we need
-    # gam_snp$data <- dat_snp
+    ## Write model summary to file
+    # Save into dataframe 
+    gam_mod_summary_df <- data.frame(
+      
+      # climate var
+      climate_var = climate_var_dif,
+      
+      # Snp name
+      snp = snp,
+      
+      # Accession used for prediction
+      acc_pred = gam_snp_int$accession_pred,
+      
+      # Sample size
+      n = gam_snp_int_summary$n,
+      
+      # Sample size of genotypes
+      n_gen0 = gam_snp_int$n_gen0,
+      n_gen1 = gam_snp_int$n_gen1,
+      n_gen2 = gam_snp_int$n_gen2,
+      
+      # Converged?
+      converged = gam_snp_int$mgcv.conv,
+      
+      # Deviance explained
+      dev_explained = gam_snp_int_summary$dev.expl,
+      
+      # Difference in deviance
+      dev_dif = gam_snp_int$dev_dif,
+      dev_dif_random = gam_snp_int$dev_dif_random,
+      
+      # Rsquared adjusted
+      rsq_adj = gam_snp_int_summary$r.sq,
+      
+      # Difference in r squared
+      rsq_dif = gam_snp_int$rsq_dif,
+      rsq_dif_random = gam_snp_int$rsq_dif_random,
+      
+      # Predictions of change in height
+      height_change_gen_0 = gam_snp_int$height_change_gen_0,
+      height_change_gen_1 = gam_snp_int$height_change_gen_1,
+      height_change_gen_2 = gam_snp_int$height_change_gen_2,
+      
+      # Predictions of absolute height
+      height_4.8_gen_0 = gam_snp_int$height_4.8_gen_0,
+      height_4.8_gen_1 = gam_snp_int$height_4.8_gen_1,
+      height_4.8_gen_2 = gam_snp_int$height_4.8_gen_2,
+      
+      # Predictions of absolute height
+      height_0_gen_0 = gam_snp_int$height_0_gen_0,
+      height_0_gen_1 = gam_snp_int$height_0_gen_1,
+      height_0_gen_2 = gam_snp_int$height_0_gen_2,
+      
+      
+      # # Use grep to look at the last number of the smooth summary table - 
+      # # Should correspond to the genotype
+       # # Returns NA if no match
+      p_val_gen_0 = ifelse(length(gam_snp_int_summary$s.table[grep(pattern = "0$",
+                               rownames(gam_snp_int_summary$s.table)), "p-value"]) == 0,
+                              yes = NA,
+                              no = gam_snp_int_summary$s.table[grep(pattern = "0$",
+                               rownames(gam_snp_int_summary$s.table)), "p-value"]),
+      
+      p_val_gen_1 = ifelse(length(gam_snp_int_summary$s.table[grep(pattern = "1$",
+                          rownames(gam_snp_int_summary$s.table)), "p-value"]) == 0,
+                           yes = NA,
+                           no = gam_snp_int_summary$s.table[grep(pattern = "1$",
+                           rownames(gam_snp_int_summary$s.table)), "p-value"]),
+      
+      p_val_gen_2 = ifelse(length(gam_snp_int_summary$s.table[grep(pattern = "2$",
+                           rownames(gam_snp_int_summary$s.table)), "p-value"]) == 0,
+                           yes = NA,
+                           no = gam_snp_int_summary$s.table[grep(pattern = "2$",
+                            rownames(gam_snp_int_summary$s.table)), "p-value"]),
+      
+      
+      ## Training model
+      p_val_gen_0_train = ifelse(length(gam_snp_int_train_summary$s.table[grep(pattern = "0$",
+                             rownames(gam_snp_int_train_summary$s.table)), "p-value"]) == 0,
+                           yes = NA,
+                           no = gam_snp_int_train_summary$s.table[grep(pattern = "0$",
+                              rownames(gam_snp_int_train_summary$s.table)), "p-value"]),
+      
+      p_val_gen_1_train = ifelse(length(gam_snp_int_train_summary$s.table[grep(pattern = "1$",
+                            rownames(gam_snp_int_train_summary$s.table)), "p-value"]) == 0,
+                           yes = NA,
+                           no = gam_snp_int_train_summary$s.table[grep(pattern = "1$",
+                             rownames(gam_snp_int_train_summary$s.table)), "p-value"]),
+      
+      p_val_gen_2_train = ifelse(length(gam_snp_int_train_summary$s.table[grep(pattern = "2$",
+                              rownames(gam_snp_int_train_summary$s.table)), "p-value"]) == 0,
+                           yes = NA,
+                           no = gam_snp_int_train_summary$s.table[grep(pattern = "2$",
+                            rownames(gam_snp_int_train_summary$s.table)), "p-value"]),
+      
+      ## Testing model
+      p_val_gen_0_test = ifelse(length(gam_snp_int_test_summary$s.table[grep(pattern = "0$",
+                            rownames(gam_snp_int_test_summary$s.table)), "p-value"]) == 0,
+                           yes = NA,
+                           no = gam_snp_int_test_summary$s.table[grep(pattern = "0$",
+                              rownames(gam_snp_int_test_summary$s.table)), "p-value"]),
+      
+      p_val_gen_1_test = ifelse(length(gam_snp_int_test_summary$s.table[grep(pattern = "1$",
+                             rownames(gam_snp_int_test_summary$s.table)), "p-value"]) == 0,
+                           yes = NA,
+                           no = gam_snp_int_test_summary$s.table[grep(pattern = "1$",
+                              rownames(gam_snp_int_test_summary$s.table)), "p-value"]),
+      
+      p_val_gen_2_test = ifelse(length(gam_snp_int_test_summary$s.table[grep(pattern = "2$",
+                              rownames(gam_snp_int_test_summary$s.table)), "p-value"]) == 0,
+                           yes = NA,
+                           no = gam_snp_int_test_summary$s.table[grep(pattern = "2$",
+                             rownames(gam_snp_int_test_summary$s.table)), "p-value"])
+      
+      
+    )
+    
+   print(gam_mod_summary_df)
+    
+    
+    # ## Write summary to file
+    
+    # If first time, write column names, if not, append to CSV
+    if(x == 1){
+      append = FALSE
+    } else if(x > 1){
+      append = TRUE
+    }
+    
+      write_csv(gam_mod_summary_df, path = paste0("./model_summaries/gam_summaries_", task_id, ".csv"),
+               append = append)
+    
 
    ## Write predictions to file
       pred_sub_out <- pred_sub %>%
         dplyr::mutate(snp = snp) %>%
-        dplyr::select(snp, tmax_sum_dif_unscaled, genotype, pred, se)
+        dplyr::select(snp, tmax_sum_dif_unscaled, genotype, pred, se, pred_train, se_train, pred_test, se_test)
       
       write_csv(pred_sub_out, path = paste0("./model_predictions/gam_predictions_", task_id, ".csv"),
-               append = TRUE)
+               append = append)
     
-
-    # Save into list
-    gam_list[[x]] <- gam_snp_int
-    names(gam_list)[x] <- snp
     
     x = x + 1
     
@@ -337,111 +515,6 @@
     cat("\n")   
     
   } # End SNP loop
-
-
-  
-  
-  # Run summary for each model
-  gam_list_summary <- lapply(gam_list, summary)
-  
-  # Save into dataframe 
-  gam_mod_summary_df <- data.frame(
-    
-    # climate var
-    climate_var = climate_var_dif,
-    
-    # Snp name
-    snp = names(gam_list),
-
-    # Accession used for prediction
-    acc_pred = unlist(lapply(gam_list, function(x) x$accession_pred)),
-    
-    # Sample size
-    n = unlist(lapply(gam_list_summary, function(x) x$n)),
-
-    # Sample size of genotypes
-    n_gen0 = unlist(lapply(gam_list, function(x) x$n_gen0)),
-    n_gen1 = unlist(lapply(gam_list, function(x) x$n_gen1)),
-    n_gen2 = unlist(lapply(gam_list, function(x) x$n_gen2)),
-
-    # Converged?
-    converged = unlist(lapply(gam_list, function(x) x$mgcv.conv)),
-
-    # Deviance explained
-    dev_explained = unlist(lapply(gam_list_summary, function(x) x$dev.expl)),
-  
-    # Difference in deviance
-    dev_dif = unlist(lapply(gam_list, function(x) x$dev_dif)),
-    dev_dif_random = unlist(lapply(gam_list, function(x) x$dev_dif_random)),
-    
-    # Rsquared adjusted
-    rsq_adj = unlist(lapply(gam_list_summary, function(x) x$r.sq)),
-  
-    # Difference in r squared
-    rsq_dif = unlist(lapply(gam_list, function(x) x$rsq_dif)),
-    rsq_dif_random = unlist(lapply(gam_list, function(x) x$rsq_dif_random)),
-    
-    # Estimated degrees of freedom
-  #  edf = unlist(lapply(gam_list, function(x) sum(x$edf))),
-    
-    # Predictions of change height
-    height_change_gen_0 = unlist(lapply(gam_list, function(x) x$height_change_gen_0)),
-    height_change_gen_1 = unlist(lapply(gam_list, function(x) x$height_change_gen_1)),
-    height_change_gen_2 = unlist(lapply(gam_list, function(x) x$height_change_gen_2)),
-
-    # Predictions of absolute height
-    height_4.8_gen_0 = unlist(lapply(gam_list, function(x) x$height_4.8_gen_0)),
-    height_4.8_gen_1 = unlist(lapply(gam_list, function(x) x$height_4.8_gen_1)),
-    height_4.8_gen_2 = unlist(lapply(gam_list, function(x) x$height_4.8_gen_2)),
-  
-    # Predictions of absolute height
-    height_0_gen_0 = unlist(lapply(gam_list, function(x) x$height_0_gen_0)),
-    height_0_gen_1 = unlist(lapply(gam_list, function(x) x$height_0_gen_1)),
-    height_0_gen_2 = unlist(lapply(gam_list, function(x) x$height_0_gen_2)),
-
-    # P values for interaction terms
-    p_val_int = ifelse(unlist(lapply(gam_list_summary, function(x)
-      length(x$s.table[grep(pattern = "^ti", 
-                            rownames(x$s.table)), "p-value"]) == 0)), 
-      yes = NA, 
-      no = unlist(lapply(gam_list_summary, function(x)
-        x$s.table[grep(pattern = "^ti",
-                       rownames(x$s.table)), "p-value"]))), 
-    
-    # Use grep to look at the last number of the smooth summary table - 
-    # Should correspond to the genotype
-    # Returns NA if no match
-   	p_val_gen_0 = ifelse(unlist(lapply(gam_list_summary, function(x)
-   	                            length(x$s.table[grep(pattern = "0$",
-   	                                           rownames(x$s.table)), "p-value"]) == 0)), 
-   	                     yes = NA, 
-   	                     no = unlist(lapply(gam_list_summary, function(x)
-   	                                                x$s.table[grep(pattern = "0$",
-   	                                               rownames(x$s.table)), "p-value"]))),
-   	p_val_gen_1 = ifelse(unlist(lapply(gam_list_summary, function(x)
-   	                      length(x$s.table[grep(pattern = "1$",
-   	                        rownames(x$s.table)), "p-value"]) == 0)), 
-   	                          yes = NA, 
-   	                       no = unlist(lapply(gam_list_summary, function(x)
-   	                              x$s.table[grep(pattern = "1$",
-   	                              rownames(x$s.table)), "p-value"]))),
-   	
-   	p_val_gen_2 = ifelse(unlist(lapply(gam_list_summary, function(x)
-   	                       length(x$s.table[grep(pattern = "2$",
-   	                        rownames(x$s.table)), "p-value"]) == 0)), 
-   	                      yes = NA, 
-   	                      no = unlist(lapply(gam_list_summary, function(x)
-   	                      x$s.table[grep(pattern = "2$",
-   	                                     rownames(x$s.table)), "p-value"])))
-    
-      )
-  
-  head(gam_mod_summary_df)
-  
- 
- write.csv(gam_mod_summary_df, file = paste0("./model_summaries/gam_summaries_", task_id, ".csv"),
-                               row.names = FALSE)
-
 
 
 
