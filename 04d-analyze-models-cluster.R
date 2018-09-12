@@ -9,6 +9,10 @@
   path_to_summaries <- "./output/run_3700632_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld/model_summaries/"
   path_to_predictions <- "./output/run_3700632_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld/model_predictions/"
   
+  # Run with predictions
+  path_to_summaries <- "./output/run_3788255_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld/model_summaries/"
+  path_to_predictions <- "./output/run_3788255_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld/model_predictions/"
+
   
   
   ## Randomized phenotypes
@@ -45,25 +49,24 @@
     #   path_to_predictions <- "./output/run_3718304_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
     
       
-      
-      
-      
+    
   # Read in files
-  sum_df_raw <- plyr::ldply(list.files(path_to_summaries, full = TRUE), read_csv)
-  
-  dim(sum_df_raw)
-  sum_df_raw
-  
-  summary(sum_df_raw)
+    sum_df_raw <- plyr::ldply(list.files(path_to_summaries, full = TRUE), read_csv)
+    
+    dim(sum_df_raw)
+    sum_df_raw
+    
+    summary(sum_df_raw)
   
   
   ## Missing snps
   # Find if there indexes if needed to re-run manually or on the cluster
-  which(!snp_col_names %in% sum_df_raw$snp)
-  snp_col_names[which(!snp_col_names %in% sum_df_raw$snp)]
+    which(!snp_col_names %in% sum_df_raw$snp)
+    snp_col_names[which(!snp_col_names %in% sum_df_raw$snp)]
+    
   
   # For backup
-  sum_df <- sum_df_raw
+    sum_df <- sum_df_raw
   
 
   # Filter out models that did not converge
@@ -72,8 +75,7 @@
   
   ## Read in model predictions
     pred_df_raw <- plyr::ldply(list.files(path_to_predictions, full = TRUE), 
-                               read_csv, col_names = c("snp", "tmax_sum_dif_unscaled", 
-                                                       "genotype", "pred", "se"))
+                               read_csv)
     pred_df_raw$genotype <- as.character(pred_df_raw$genotype)
     
     head(pred_df_raw)
@@ -81,27 +83,60 @@
     summary(pred_df_raw)
     
   ## Calculate height change in warmer temperatures for each snp and genotype
+    # And for training and testing sets
   
-    base0 <- median(pred_df_raw$pred[pred_df_raw$tmax_sum_dif_unscaled == 0])
+  base0 <- median(pred_df_raw$pred[pred_df_raw$tmax_sum_dif_unscaled == 0])
     
    pred_df_long =  pred_df_raw %>%
       dplyr::group_by(snp, genotype) %>%
-      do(data.frame(height_change_warmer = mean((.$pred[.$tmax_sum_dif_unscaled > 0]  - .$pred[.$tmax_sum_dif_unscaled == 0] ) /  .$pred[.$tmax_sum_dif_unscaled == 0] ) * 100,
-         height_change_warmer_base0 = mean((.$pred[.$tmax_sum_dif_unscaled > 0]  - base0 ) /  base0) * 100))
-   
+      do(data.frame(height_change_warmer = mean((.$pred[.$tmax_sum_dif_unscaled > 0]  - .$pred[.$tmax_sum_dif_unscaled == 0] ) /  .$pred[.$tmax_sum_dif_unscaled == 0] ) * 100))
+         
    head(pred_df_long)
    dim(pred_df_long)
    
    summary(pred_df_long$height_change_warmer)
-    
    
- 
- 
- 
+   
+   # Calculate correlations for each snp and genotype in training and testing
+  train_test_cors <-  pred_df_raw %>%
+     dplyr::filter(tmax_sum_dif_unscaled > 0) %>%
+     dplyr::group_by(snp, genotype) %>%
+     dplyr::summarise(train_test_cor_1 = cor(pred_train_1, pred_test_1),
+                      train_test_cor_2 = cor(pred_train_2, pred_test_2),
+                      train_test_cor_3 = cor(pred_train_3, pred_test_3),
+                      train_test_cor_4 = cor(pred_train_4, pred_test_4),
+                      train_test_cor_5 = cor(pred_train_5, pred_test_5)) %>%
+    ungroup()
+  
+  # Average across CV correlations
+  train_test_cors$train_test_cor <- rowMeans(dplyr::select(train_test_cors, 
+                                                  contains("train_test")),
+                                             na.rm = TRUE)
+
+  glimpse(train_test_cors)
+  
+  map(train_test_cors, ~sum(is.na(.)))
+  
+  
+  # Join back to predictions dataframe
+  pred_df_long <- dplyr::left_join(pred_df_long, train_test_cors)
+  
+  head(pred_df_long)
+  dim(pred_df_long)
+  
+  
+  ## Plotting example
+  pred_df_raw %>%
+    filter(snp == "snp_chr6_17041689") %>%
+   # filter(genotype == "2") %>%
+    ggplot(., aes(tmax_sum_dif_unscaled, pred)) + geom_line() +
+  geom_line(aes(tmax_sum_dif_unscaled, pred_train_1), col = "blue") + 
+    geom_line(aes(tmax_sum_dif_unscaled, pred_test_1), col = "red") +  
+    theme_bw(15) + facet_wrap(~genotype)
+  
+   
 # Sort and arrange data ---------------------------------------------------
 
-  
-  
   ## Convert to from wide to long format
   n_gen_long <- sum_df %>%
     dplyr::select(snp, n_gen0, n_gen1, n_gen2, acc_pred, n) %>%
@@ -116,7 +151,7 @@
       mutate(genotype = gsub("p_val_gen_", "", genotype))
   
     head(p_val_long)
-  
+    
   height_change_long <- sum_df %>%
     dplyr::select(snp, height_change_gen_0, height_change_gen_1, height_change_gen_2) %>%
     gather(key = "genotype", value = "height_change", -snp) %>%
@@ -165,8 +200,10 @@
   ## Remove those that predictions weren't made on accession 1
     sum_df_long <- sum_df_long %>%
       dplyr::filter(acc_pred == 1)
-  
-  
+    
+    
+   
+    
   
 # Calculate height change based on average at 0 transfer
   
@@ -212,6 +249,9 @@
   
  top_snps_long <-  sum_df_long %>%
     dplyr::filter(p_val_adj <= 0.01) %>%
+   dplyr::filter(train_test_cor > 0.8) %>%
+ #  dplyr::filter(p_val_train <= 0.05 & 
+ #                  p_val_test <= 0.05) %>%   # Significant in training and testing
     dplyr::arrange(desc(height_change_warmer_base0)) %>%
  #  dplyr::arrange(desc(height_change)) %>%
     head(round(nrow(sum_df) * percent_thresh))
@@ -219,6 +259,19 @@
  top_snps_long$top_snp = TRUE # Make a column for T / F of top snp
  
  summary(top_snps_long)
+ 
+ 
+ # ## Plotting example
+ # pred_df_raw %>%
+ #   filter(snp == "snp_chr6_14932901") %>%
+ #   # filter(genotype == "2") %>%
+ #   ggplot(., aes(tmax_sum_dif_unscaled, pred)) + geom_line() +
+ #   geom_line(aes(tmax_sum_dif_unscaled, pred_train), col = "blue") + 
+ #   geom_line(aes(tmax_sum_dif_unscaled, pred_test), col = "red") +  
+ #   theme_bw(15) + facet_wrap(~genotype)
+ # 
+ # 
+ 
  
  dim(top_snps_long)
  head(top_snps_long)
