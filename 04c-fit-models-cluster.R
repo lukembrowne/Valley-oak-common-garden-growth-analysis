@@ -38,10 +38,12 @@
     # Choose snp
     snp <- snp_col_names[snp_index]
 
- ## LOOPING THROUGH TOP SNPS
+ # # LOOPING THROUGH TOP SNPS
  # for(snp in c(top_snps_long$snp, bottom_snps_long$snp, mid_snps_long$snp)){
  #   save_outlier_preds <- TRUE # Save output of the top SNPs for plotting together
-
+ # 
+    
+    
       # For timing loops
       start_time <- Sys.time()
     
@@ -132,48 +134,12 @@
     gam_snp_int$rsq_dif_random <- gam_random_summary$r.sq - gam_no_snp_summary$r.sq
     
     
-    
-    
-  ### Training and testing validation
-    dat_snp_train <-  dat_snp_unscaled[!is.na(pull(dat_snp_unscaled, snp)), ]
-    dat_snp_train <- dat_snp_train[-folds[[1]], ]
-    dim(dat_snp_train)
-    
-    dat_snp_test <-  dat_snp_unscaled[!is.na(pull(dat_snp_unscaled, snp)), ]
-    dat_snp_test <- dat_snp_test[folds[[1]], ]
-    dim(dat_snp_test)
-    
-    
-    gam_snp_int_train = bam(formula = make_formula(fixed_effects_int, random_effects),
-                            data =dat_snp_train,
-                            discrete = TRUE, 
-                            nthreads = 8,
-                            method = "fREML",
-                            family = "tw")
-    
-   # print(summary(gam_snp_int_train))
-    
-    gam_snp_int_test = bam(formula = make_formula(fixed_effects_int, random_effects),
-                           data = dat_snp_test,
-                           discrete = TRUE, 
-                           nthreads = 8,
-                           method = "fREML",
-                           family = "tw")
-    
-   # print(summary(gam_snp_int_test))
-    
-    
-    # Save summaries
-    gam_snp_int_train_summary <- summary(gam_snp_int_train)
-    gam_snp_int_test_summary <- summary(gam_snp_int_test)
-
-
-    ## Save sample size per genotype
+   ## Save sample size per genotype
       gen_table <-  table(dat_snp_unscaled[, snp])
       
-      gam_snp_int$n_gen0 <- gen_table["0"]
-      gam_snp_int$n_gen1 <- gen_table["1"]
-      gam_snp_int$n_gen2 <- gen_table["2"]
+      gam_snp_int$n_gen0 <- as.numeric(gen_table["0"])
+      gam_snp_int$n_gen1 <- as.numeric(gen_table["1"])
+      gam_snp_int$n_gen2 <- as.numeric(gen_table["2"])
       
       
   # Visualization plots
@@ -217,12 +183,27 @@
       ## For SNPs as factors
       pred_sub <-  pred_sub  %>%
         dplyr::filter(genotype %in% pull(dat_snp_unscaled, snp)) %>%
-        dplyr::mutate(!!snp := genotype)
+        dplyr::mutate(!!snp := as.character(genotype)) %>% # Change to character for factoring
+        dplyr::mutate(genotype = as.character(genotype))
       
       # Change accession number if genetic data is missing so we don't get errors in prediction
         while(!(pred_sub$accession[1] %in%  gam_snp_int$model$accession)){
           pred_sub$accession <- as.character(as.numeric(pred_sub$accession) + 1)
         }
+      
+    ## Remove extra columns
+      pred_sub <- pred_sub %>%
+        dplyr::select(-tmin_dif_unscaled, -tmin_dif,
+                      -tave_dif_unscaled, -tave_dif,
+                      -tave_lgm_dif_unscaled, -tave_lgm_dif,
+                      -tmax_sum_lgm_dif_unscaled, -tmax_sum_lgm_dif,
+                      -tmin_winter_dif_unscaled, -tmin_winter_dif,          
+                     -tmin_winter_lgm_dif_unscaled, -tmin_winter_lgm_dif,         
+                     -DD5_dif_unscaled, -DD5_dif,                    
+                     -DD5_lgm_dif_unscaled, -DD5_lgm_dif,             
+                     -random_dif_unscaled, -random_dif)
+      
+      
 
     # Make PREDICTIONs
       
@@ -233,27 +214,105 @@
                             se = TRUE)
       pred_sub$pred <- gam_preds$fit
       pred_sub$se <- gam_preds$se.fit
+      
     
-    
-    ## Training model
-      gam_preds_train <-  predict(gam_snp_int_train, 
-                                  newdata = pred_sub,
-                                  type = "response",
-                                  se = TRUE)
-      pred_sub$pred_train <- gam_preds_train$fit
-      pred_sub$se_train <- gam_preds_train$se.fit
       
       
-    ## Testing model
-      gam_preds_test <-  predict(gam_snp_int_test, 
-                                 newdata = pred_sub,
-                                 type = "response",
-                                 se = TRUE)
-      pred_sub$pred_test <- gam_preds_test$fit
-      pred_sub$se_test <- gam_preds_test$se.fit
-    
+### Training and testing validation
+      
+    for(fold in 1:length(folds)){
+
+        dat_snp_train <- dat_snp_unscaled[-folds[[fold]], ]      
+        dat_snp_train <-  dat_snp_train[!is.na(pull(dat_snp_train, snp)), ]
+        
+        dim(dat_snp_train)
+        
+        dat_snp_test <- dat_snp_unscaled[folds[[fold]], ]
+        dat_snp_test <-  dat_snp_test[!is.na(pull(dat_snp_test, snp)), ]
+        dim(dat_snp_test)
+        
+      # Training model  
+       gam_snp_int_train = bam(formula = make_formula(fixed_effects_int, random_effects),
+                                data =dat_snp_train,
+                                discrete = TRUE, 
+                                nthreads = 8,
+                                method = "fREML",
+                                family = "tw")
+        
+        # print(summary(gam_snp_int_train))
+      # Testing model  
+        gam_snp_int_test = bam(formula = make_formula(fixed_effects_int, random_effects),
+                               data = dat_snp_test,
+                               discrete = TRUE, 
+                               nthreads = 8,
+                               method = "fREML",
+                               family = "tw")
+        
+        # print(summary(gam_snp_int_test))
+        
+        
+        # Save summaries
+        # gam_snp_int_train_summary <- summary(gam_snp_int_train)
+        # gam_snp_int_test_summary <- summary(gam_snp_int_test)
+        
+      
+      
+      ## Making predictions
  
-    pred_sub$genotype <- factor(pred_sub$genotype)
+        # Change accession number if genetic data is missing so we don't get errors in prediction
+        while(!(pred_sub$accession[1] %in%  gam_snp_int_train$model$accession) | 
+              !(pred_sub$accession[1] %in%  gam_snp_int_test$model$accession)){
+          pred_sub$accession <- as.character(as.numeric(pred_sub$accession) + 1)
+        }
+        
+        
+        # Filter down to exclude gneotypes that are not in model to avoid error in prediction
+        pred_sub_train <- pred_sub %>%
+                          dplyr::filter(genotype %in% pull(dat_snp_train, snp))
+        table(pred_sub_train$genotype)
+        
+        gam_preds_train <-  predict(gam_snp_int_train, 
+                                    newdata = pred_sub_train,
+                                    type = "response",
+                                    se = TRUE)
+        
+        pred_sub_train[paste0("pred_train_", fold)] <- gam_preds_train$fit
+        pred_sub_train[paste0("se_train_", fold)] <- gam_preds_train$se.fit
+        
+        # Join back to main prediction df
+        pred_sub <- left_join(pred_sub, 
+                             dplyr::select(pred_sub_train, 
+                                           genotype, tmax_sum_dif, 
+                                           paste0("pred_train_", fold),
+                                           paste0("se_train_", fold)))
+        
+        
+      ## Testing model
+       
+       # Filter down to exclude gneotypes that are not in model to avoid error in prediction
+       pred_sub_test <- pred_sub %>%
+         dplyr::filter(genotype %in% pull(dat_snp_test, snp))
+       table(pred_sub_test$genotype)
+       
+       
+        gam_preds_test <-  predict(gam_snp_int_test, 
+                                   newdata = pred_sub_test,
+                                   type = "response",
+                                   se = TRUE)
+        
+        pred_sub_test[paste0("pred_test_", fold)] <- gam_preds_test$fit
+        pred_sub_test[paste0("se_test_", fold)] <- gam_preds_test$se.fit
+        
+        # Join back to main prediction df
+        pred_sub <- left_join(pred_sub, 
+                              dplyr::select(pred_sub_test, 
+                                            genotype, tmax_sum_dif, 
+                                            paste0("pred_test_", fold),
+                                            paste0("se_test_", fold)))
+      }
+    
+      # Factor genotypes
+      pred_sub$genotype <- factor(pred_sub$genotype)
     
     # Backtransform climate variable
     # dat_snp_trans <- dat_snp_unscaled %>%
@@ -450,47 +509,47 @@
                            rownames(gam_snp_int_summary$s.table)), "p-value"]) == 0,
                            yes = NA,
                            no = gam_snp_int_summary$s.table[grep(pattern = "2$",
-                            rownames(gam_snp_int_summary$s.table)), "p-value"]),
+                            rownames(gam_snp_int_summary$s.table)), "p-value"])
       
       
-      ## Training model
-      p_val_gen_0_train = ifelse(length(gam_snp_int_train_summary$s.table[grep(pattern = "0$",
-                             rownames(gam_snp_int_train_summary$s.table)), "p-value"]) == 0,
-                           yes = NA,
-                           no = gam_snp_int_train_summary$s.table[grep(pattern = "0$",
-                              rownames(gam_snp_int_train_summary$s.table)), "p-value"]),
-      
-      p_val_gen_1_train = ifelse(length(gam_snp_int_train_summary$s.table[grep(pattern = "1$",
-                            rownames(gam_snp_int_train_summary$s.table)), "p-value"]) == 0,
-                           yes = NA,
-                           no = gam_snp_int_train_summary$s.table[grep(pattern = "1$",
-                             rownames(gam_snp_int_train_summary$s.table)), "p-value"]),
-      
-      p_val_gen_2_train = ifelse(length(gam_snp_int_train_summary$s.table[grep(pattern = "2$",
-                              rownames(gam_snp_int_train_summary$s.table)), "p-value"]) == 0,
-                           yes = NA,
-                           no = gam_snp_int_train_summary$s.table[grep(pattern = "2$",
-                            rownames(gam_snp_int_train_summary$s.table)), "p-value"]),
-      
-      ## Testing model
-      p_val_gen_0_test = ifelse(length(gam_snp_int_test_summary$s.table[grep(pattern = "0$",
-                            rownames(gam_snp_int_test_summary$s.table)), "p-value"]) == 0,
-                           yes = NA,
-                           no = gam_snp_int_test_summary$s.table[grep(pattern = "0$",
-                              rownames(gam_snp_int_test_summary$s.table)), "p-value"]),
-      
-      p_val_gen_1_test = ifelse(length(gam_snp_int_test_summary$s.table[grep(pattern = "1$",
-                             rownames(gam_snp_int_test_summary$s.table)), "p-value"]) == 0,
-                           yes = NA,
-                           no = gam_snp_int_test_summary$s.table[grep(pattern = "1$",
-                              rownames(gam_snp_int_test_summary$s.table)), "p-value"]),
-      
-      p_val_gen_2_test = ifelse(length(gam_snp_int_test_summary$s.table[grep(pattern = "2$",
-                              rownames(gam_snp_int_test_summary$s.table)), "p-value"]) == 0,
-                           yes = NA,
-                           no = gam_snp_int_test_summary$s.table[grep(pattern = "2$",
-                             rownames(gam_snp_int_test_summary$s.table)), "p-value"])
-      
+      # ## Training model
+      # p_val_gen_0_train = ifelse(length(gam_snp_int_train_summary$s.table[grep(pattern = "0$",
+      #                        rownames(gam_snp_int_train_summary$s.table)), "p-value"]) == 0,
+      #                      yes = NA,
+      #                      no = gam_snp_int_train_summary$s.table[grep(pattern = "0$",
+      #                         rownames(gam_snp_int_train_summary$s.table)), "p-value"]),
+      # 
+      # p_val_gen_1_train = ifelse(length(gam_snp_int_train_summary$s.table[grep(pattern = "1$",
+      #                       rownames(gam_snp_int_train_summary$s.table)), "p-value"]) == 0,
+      #                      yes = NA,
+      #                      no = gam_snp_int_train_summary$s.table[grep(pattern = "1$",
+      #                        rownames(gam_snp_int_train_summary$s.table)), "p-value"]),
+      # 
+      # p_val_gen_2_train = ifelse(length(gam_snp_int_train_summary$s.table[grep(pattern = "2$",
+      #                         rownames(gam_snp_int_train_summary$s.table)), "p-value"]) == 0,
+      #                      yes = NA,
+      #                      no = gam_snp_int_train_summary$s.table[grep(pattern = "2$",
+      #                       rownames(gam_snp_int_train_summary$s.table)), "p-value"]),
+      # 
+      # ## Testing model
+      # p_val_gen_0_test = ifelse(length(gam_snp_int_test_summary$s.table[grep(pattern = "0$",
+      #                       rownames(gam_snp_int_test_summary$s.table)), "p-value"]) == 0,
+      #                      yes = NA,
+      #                      no = gam_snp_int_test_summary$s.table[grep(pattern = "0$",
+      #                         rownames(gam_snp_int_test_summary$s.table)), "p-value"]),
+      # 
+      # p_val_gen_1_test = ifelse(length(gam_snp_int_test_summary$s.table[grep(pattern = "1$",
+      #                        rownames(gam_snp_int_test_summary$s.table)), "p-value"]) == 0,
+      #                      yes = NA,
+      #                      no = gam_snp_int_test_summary$s.table[grep(pattern = "1$",
+      #                         rownames(gam_snp_int_test_summary$s.table)), "p-value"]),
+      # 
+      # p_val_gen_2_test = ifelse(length(gam_snp_int_test_summary$s.table[grep(pattern = "2$",
+      #                         rownames(gam_snp_int_test_summary$s.table)), "p-value"]) == 0,
+      #                      yes = NA,
+      #                      no = gam_snp_int_test_summary$s.table[grep(pattern = "2$",
+      #                        rownames(gam_snp_int_test_summary$s.table)), "p-value"])
+      # 
       
       
     )
@@ -514,7 +573,9 @@
     # ## Write predictions to file
       pred_sub_out <- pred_sub %>%
         dplyr::mutate(snp = snp) %>%
-        dplyr::select(snp, tmax_sum_dif_unscaled, genotype, pred, se, pred_train, se_train, pred_test, se_test)
+        dplyr::select(snp, tmax_sum_dif_unscaled, genotype, pred, se,
+                      contains("train"),
+                      contains("test"))
 
       write_csv(pred_sub_out, path = paste0("./model_predictions/gam_predictions_", task_id, ".csv"),
                append = append)
