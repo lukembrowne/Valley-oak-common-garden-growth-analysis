@@ -72,8 +72,24 @@
   summary(bglr_gen_scaled[, 1:10])
   
   
+  ## Calculate kinship matrix
+  
+  # Need to first convert to -1, 0, 1 matrix
+  
+  
+  kin_mat <- as.matrix(gen_dat_clim[, snp_col_names])
+  kin_mat[kin_mat == 0] <- -1
+  kin_mat[kin_mat == 1] <- 0
+  kin_mat[kin_mat == 2] <- 1
+  
+  kin_mat <- A.mat(kin_mat) # Calculate kinship matrix
+  
   ## Calculate PCA on genetic data
-    pca_gen = prcomp(bglr_gen_scaled, center = FALSE, scale = FALSE)
+  #  pca_gen = prcomp(bglr_gen_scaled, center = FALSE, scale = FALSE)
+  
+  pca_gen = prcomp(kin_mat, center = TRUE, scale = TRUE) ## PCA on kinship matrix
+  
+  
    # biplot(pca_gen)
     summary(pca_gen)
   #  screeplot(pca_gen, bstick = TRUE)
@@ -119,7 +135,6 @@
       #                                   Sys.Date(), ".png"),
       #            res = 300, width = 1800, height =2400)
       #   dev.off()
-
 
     pcs <- as.data.frame(pca_gen$x[, 1:10])
     colnames(pcs) <- paste0(colnames(pcs), "_gen")
@@ -250,6 +265,6 @@
   #      scaled_var_means_gbs_only, scaled_var_sds_gbs_only,
   #      folds,
   #   file = paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
-  # 
+
 
  
