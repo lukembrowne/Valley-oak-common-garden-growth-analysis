@@ -89,7 +89,11 @@
     
    pred_df_long =  pred_df_raw %>%
       dplyr::group_by(snp, genotype) %>%
-      do(data.frame(height_change_warmer = mean((.$pred[.$tmax_sum_dif_unscaled > 0]  - .$pred[.$tmax_sum_dif_unscaled == 0] ) /  .$pred[.$tmax_sum_dif_unscaled == 0] ) * 100))
+     do(data.frame(height_change_warmer = mean((.$pred[.$tmax_sum_dif_unscaled > 0]  -
+                                                  .$pred[.$tmax_sum_dif_unscaled == 0] ) /
+                                                 .$pred[.$tmax_sum_dif_unscaled == 0] ) * 100,
+                   height_change_warmer_base0 = mean((.$pred[.$tmax_sum_dif_unscaled > 0]
+                                                      - base0 ) /  base0) * 100))
          
    head(pred_df_long)
    dim(pred_df_long)
@@ -198,8 +202,8 @@
       dplyr::filter(genotype != "1")
   
   ## Remove those that predictions weren't made on accession 1
-    sum_df_long <- sum_df_long %>%
-      dplyr::filter(acc_pred == 1)
+    # sum_df_long <- sum_df_long %>%
+    #   dplyr::filter(acc_pred == 1)
     
     
    
@@ -246,42 +250,96 @@
 ## Identify top and bottom XXX% of SNPs
   
   percent_thresh <- 0.005
+  p_val_adj_thresh <- 0.05
+  train_test_cor_thresh <- 0.5
   
+ # top_snps_long <-  sum_df_long %>%
+ #    dplyr::filter(p_val_adj <= p_val_adj_thresh) %>%
+ #   dplyr::filter(train_test_cor > train_test_cor_thresh) %>%
+ #    dplyr::arrange(desc(height_change_warmer_base0)) %>%
+ # #  dplyr::arrange(desc(height_change)) %>%
+ #    head(round(nrow(sum_df) * percent_thresh))
+ 
+ 
  top_snps_long <-  sum_df_long %>%
-    dplyr::filter(p_val_adj <= 0.01) %>%
-   dplyr::filter(train_test_cor > 0.8) %>%
- #  dplyr::filter(p_val_train <= 0.05 & 
- #                  p_val_test <= 0.05) %>%   # Significant in training and testing
-    dplyr::arrange(desc(height_change_warmer_base0)) %>%
- #  dplyr::arrange(desc(height_change)) %>%
-    head(round(nrow(sum_df) * percent_thresh))
+   dplyr::filter(p_val_adj <= p_val_adj_thresh) %>%
+   dplyr::filter(train_test_cor > train_test_cor_thresh) %>%
+  # dplyr::filter(height_change_warmer_base0 >= mean(height_change_warmer_base0) + 
+  #                 2 * sd(height_change_warmer_base0))
+   dplyr::filter(height_change_warmer_base0 >= mean(height_change_warmer_base0) +
+                   2.5 * mad(height_change_warmer_base0))
+ 
+ dim(top_snps_long)
+   
+ 
+# 
+#  hist(sum_df_long$height_change_warmer_base0, breaks = 50)
+#  abline(v = mean(sum_df_long$height_change_warmer_base0) + 
+#           sd(sum_df_long$height_change_warmer_base0), lwd = 5,
+#         col = "skyblue2")
+#  abline(v = mean(sum_df_long$height_change_warmer_base0) + 
+#           2*sd(sum_df_long$height_change_warmer_base0), lwd = 5,
+#         col = "skyblue2")
+#  
+#  abline(v = mean(sum_df_long$height_change_warmer_base0) -
+#           sd(sum_df_long$height_change_warmer_base0), lwd = 5,
+#         col = "skyblue2")
+#  abline(v = mean(sum_df_long$height_change_warmer_base0) - 
+#           2*sd(sum_df_long$height_change_warmer_base0), lwd = 5,
+#         col = "skyblue2")
+#  
  
  top_snps_long$top_snp = TRUE # Make a column for T / F of top snp
  
  summary(top_snps_long)
+
+ hist(top_snps_long$height_change_warmer_base0, breaks = 30)
+ hist(top_snps_long$height_change_warmer, breaks = 30)
  
  
- # ## Plotting example
- # pred_df_raw %>%
- #   filter(snp == "snp_chr6_14932901") %>%
- #   # filter(genotype == "2") %>%
- #   ggplot(., aes(tmax_sum_dif_unscaled, pred)) + geom_line() +
- #   geom_line(aes(tmax_sum_dif_unscaled, pred_train), col = "blue") + 
- #   geom_line(aes(tmax_sum_dif_unscaled, pred_test), col = "red") +  
- #   theme_bw(15) + facet_wrap(~genotype)
- # 
- # 
  
+ ## Plotting example
+ top_snps_long$snp[1:3]
+ 
+ for(top_snp in top_snps_long$snp[1:3]){
+ 
+ g <- pred_df_raw %>%
+   filter(snp == top_snp) %>%
+    filter(genotype == top_snps_long$genotype[top_snps_long$snp == top_snp]) %>%
+   ggplot(., aes(tmax_sum_dif_unscaled, pred)) + geom_line() +
+   geom_line(aes(tmax_sum_dif_unscaled, pred_train_1), col = "blue") +
+   geom_line(aes(tmax_sum_dif_unscaled, pred_train_2), col = "blue") +
+   geom_line(aes(tmax_sum_dif_unscaled, pred_train_3), col = "blue") +
+   geom_line(aes(tmax_sum_dif_unscaled, pred_train_4), col = "blue") +
+   geom_line(aes(tmax_sum_dif_unscaled, pred_train_5), col = "blue") +
+   geom_line(aes(tmax_sum_dif_unscaled, pred_test_1), col = "red") +
+   geom_line(aes(tmax_sum_dif_unscaled, pred_test_2), col = "red") +
+   geom_line(aes(tmax_sum_dif_unscaled, pred_test_3), col = "red") +
+   geom_line(aes(tmax_sum_dif_unscaled, pred_test_4), col = "red") +
+   geom_line(aes(tmax_sum_dif_unscaled, pred_test_5), col = "red") +
+   theme_bw(15) + facet_wrap(~genotype) + 
+   ggtitle(top_snp)
+ 
+  print(g)
+  
+ }
  
  dim(top_snps_long)
  head(top_snps_long)
  
- bottom_snps_long <- sum_df_long %>%
-   dplyr::filter(p_val_adj <= 0.01) %>%
-   dplyr::arrange(height_change_warmer_base0) %>%
- #  dplyr::arrange(height_change) %>%
-   head(round(nrow(sum_df) * percent_thresh))
+ # bottom_snps_long <- sum_df_long %>%
+ #   dplyr::filter(p_val_adj <= p_val_adj_thresh) %>%
+ #   dplyr::arrange(height_change_warmer_base0) %>%
+ #   dplyr::filter(train_test_cor > train_test_cor_thresh) %>%
+ # #  dplyr::arrange(height_change) %>%
+ #   head(round(nrow(sum_df) * percent_thresh))
  
+ bottom_snps_long <- sum_df_long %>%
+   dplyr::filter(p_val_adj <= p_val_adj_thresh) %>%
+   dplyr::filter(train_test_cor > train_test_cor_thresh) %>%
+   dplyr::filter(height_change_warmer_base0 <= mean(height_change_warmer_base0) - 
+                                        2.5 * mad(height_change_warmer_base0))
+
  bottom_snps_long$bottom_snp = TRUE
  
  head(bottom_snps_long)
@@ -291,7 +349,8 @@
    set.seed(129) # To make sure same SNPs are chosen everytime - reproducible
    
    mid_snps_long <- sum_df_long %>%
-     dplyr::filter(p_val_adj <= 0.01) %>%
+     dplyr::filter(p_val_adj <= p_val_adj_thresh) %>%
+     dplyr::filter(train_test_cor > train_test_cor_thresh) %>%
      dplyr::filter(!snp %in% c(top_snps_long$snp, bottom_snps_long$snp)) %>%
      # Make sure number of genotype copies is comparable
      dplyr::filter(n_gen <= quantile(c(top_snps_long$n_gen, bottom_snps_long$n_gen),
@@ -321,6 +380,10 @@
    head(sum_df_long)
    
    table(sum_df_long$top_snp)
+   
+   hist(sum_df_long$height_change_warmer_base0[sum_df_long$top_snp])
+   
+   hist(top_snps_long$height_change_warmer_base0)
    
    
 ## Figure 2 -- Plot overlay of outlier SNPS ---------------------------------------
@@ -715,7 +778,7 @@
      
     # Function to downscale and project raster 
      process_raster <- function(rast){
-       rast <- aggregate(rast, fact = 5) # Make smaller by averaging across cells
+       rast <- aggregate(rast, fact = 20) # Make smaller by averaging across cells
        rast_latlon <- projectRaster(rast, crs = CRS("+proj=longlat +datum=WGS84"))
        plot(rast_latlon)
        return(rast_latlon)
@@ -1401,7 +1464,7 @@
     # ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
     ylab("Relative growth rate") +
     xlab("Tmax transfer distance") +
-    ylim(c(.20, .4)) +
+    ylim(c(.20, .5)) +
     # scale_color_manual(values = c("#FF6633", "#6699CC")) +
     # scale_fill_manual(values = c("#FF6633", "#6699CC")) +
     #theme_bw(8) + downsize version
