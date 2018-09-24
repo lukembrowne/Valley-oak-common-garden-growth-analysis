@@ -93,6 +93,8 @@ back_transform <- function(x, var, means, sds){
 # Convert factors
   dat_all_scaled$section <- factor(dat_all_scaled$section)
   dat_all_scaled$section_block <- factor(dat_all_scaled$section_block) 
+  # dat_all_scaled$section_row <- factor(dat_all_scaled$section_row) 
+  # dat_all_scaled$section_line <- factor(dat_all_scaled$section_line) 
   dat_all_scaled$accession <- factor(dat_all_scaled$accession)
   dat_all_scaled$site <- factor(dat_all_scaled$site)
   
@@ -101,9 +103,8 @@ back_transform <- function(x, var, means, sds){
 
 # Set formula for gam
   form <- formula(paste0("rgr ~ section_block + s(height_2014, bs =\"cr\") + s(", var, " , bs = \"cr\") + s(accession, bs = \"re\")"))
-  
-  
-  # With all 5,000+ seedlings
+                      
+# With all 5,000+ seedlings
   gam_all <- bam(formula = form,
                  data = dat_all_scaled,
                  discrete = TRUE, 
@@ -114,6 +115,8 @@ back_transform <- function(x, var, means, sds){
                control = list(trace = FALSE))
   
   summary(gam_all)
+  
+  
   
   test = summary(gam_all)
   
