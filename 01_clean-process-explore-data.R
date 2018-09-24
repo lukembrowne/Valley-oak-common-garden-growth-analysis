@@ -117,18 +117,43 @@
 
 # Formatting rows and lines -----------------------------------------------
 
-    ## Make rows and columns unique to use as random effect latter
-    dat_all$section_row <- paste0(dat_all$section, "-", dat_all$row)
-    dat_all$section_line <- paste0(dat_all$section, "-", dat_all$line)
-    
-    ## Make sure they are unique
-      count =  dat_all %>%
-          group_by(section_row, section_line) %>%
-          mutate(count = n()) 
-      table(count$count) ## Should all be 1
-      which(count$count > 1) ## Should return nothing
-    
-    
+  ## Make rows and columns unique to use as random effect latter
+  dat_all$section_row <- paste0(dat_all$section, "-", dat_all$row)
+  dat_all$section_line <- paste0(dat_all$section, "-", dat_all$line)
+  
+  ## Make sure they are unique
+  count =  dat_all %>%
+    group_by(section_row, section_line) %>%
+    mutate(count = n()) 
+  table(count$count) ## Should all be 1
+  which(count$count > 1) ## Should return nothing
+  
+    ## Add coordinates for rows and lines
+      #  dat_all$row <- factor(dat_all$row, levels = c(LETTERS,
+      #                                               "AA", "AB", "AC", "AD", "AE",
+      #                                               "AF", "AG", "AH", "AI", "AJ",
+      #                                               "AK", "AL", "AM", "AN", "AO",
+      #                                               "AP"))
+      # table(dat_all$row)
+      # dat_all$row <- as.numeric(dat_all$row)
+      # 
+      # 
+      # # Separate sections
+      # dat_all$row[dat_all$section == "Block1"] <- dat_all$row[dat_all$section == "Block1"] + 100
+      # dat_all$line[dat_all$section == "Block1"] <- dat_all$line[dat_all$section == "Block1"] + 100
+      # 
+      # dat_all$row[dat_all$section == "North"] <- dat_all$row[dat_all$section == "North"] + 200
+      # dat_all$line[dat_all$section == "North"] <- dat_all$line[dat_all$section == "North"] + 200
+      # 
+      # dat_all$row[dat_all$section == "North annex"] <- dat_all$row[dat_all$section == "North annex"] + 300
+      # dat_all$line[dat_all$section == "North annex"] <- dat_all$line[dat_all$section == "North annex"] + 300
+      
+      # plot(dat_all$row, dat_all$line, type = "n", xlim = c(0, 50), ylim = c(0, 75))
+      # text(dat_all$row, dat_all$line, 
+      #      labels = as.character(dat_all$locality), cex = 0.25)
+      # 
+      # 
+      # 
 
 # Formatting height and RGR -----------------------------------------------
 
@@ -142,8 +167,9 @@
       }
       
       #### Round height values to the nearest 5
-      # dat_all$height_2015 <- round(dat_all$height_2015 / 5) * 5
-      # dat_all$height_2017 <- round(dat_all$height_2017 / 5) * 5
+     # dat_all$height_2014 <- round(dat_all$height_2014 / 5) * 5
+      dat_all$height_2015 <- round(dat_all$height_2015 / 5) * 5
+      dat_all$height_2017 <- round(dat_all$height_2017 / 5) * 5
       
       ## Calculate height difference
       # dat_all$height_dif <- dat_all$height_2017 - dat_all$height_2015
@@ -362,13 +388,16 @@
       # dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.005, na.rm = TRUE) |
       #               dat_all$rgr >= quantile(dat_all$rgr, 0.995, na.rm = TRUE)] <- NA
       
+      
+      ## Filter out individuals without an estimated RGR
+       dat_all <- dplyr::filter(dat_all, !is.na(rgr))
+
     # Exclude individuals with a negative growth rate
       dat_all <- dplyr::filter(dat_all, rgr >= 0)
 
-
-      ## Filter out individuals without an estimated RGR
-       dat_all <- dplyr::filter(dat_all, !is.na(rgr))
       }
+
+    
 
     ## Filtering based on survival  
       dim(dat_all)
