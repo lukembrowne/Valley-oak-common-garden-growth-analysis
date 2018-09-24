@@ -6,10 +6,6 @@
 # Read in cluster run output ----------------------------------------------
 
   # Run with predictions
-  path_to_summaries <- "./output/run_3700632_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld/model_summaries/"
-  path_to_predictions <- "./output/run_3700632_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld/model_predictions/"
-  
-  # Run with predictions
   path_to_summaries <- "./output/run_3813910_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld/model_summaries/"
   path_to_predictions <- "./output/run_3813910_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld/model_predictions/"
 
@@ -50,7 +46,7 @@
     
       
     
-  # Read in files
+ # Read in files
     sum_df_raw <- plyr::ldply(list.files(path_to_summaries, full = TRUE), read_csv)
     
     dim(sum_df_raw)
@@ -66,69 +62,23 @@
     
   
   # For backup
-    sum_df <- sum_df_raw
+  sum_df <- sum_df_raw
   
-
   # Filter out models that did not converge
   table(sum_df_raw$converged)
   
   
-  ## Read in model predictions
-    pred_df_raw <- plyr::ldply(list.files(path_to_predictions, full = TRUE), 
-                               read_csv)
-    pred_df_raw$genotype <- as.character(pred_df_raw$genotype)
-    
-    head(pred_df_raw)
-    dim(pred_df_raw)
-    summary(pred_df_raw)
-    
-  ## Calculate height change in warmer temperatures for each snp and genotype
-  base0 <- median(pred_df_raw$pred[pred_df_raw$tmax_sum_dif_unscaled == 0])
-    
-   pred_df_long =  pred_df_raw %>%
-      dplyr::group_by(snp, genotype) %>%
-     do(data.frame(height_change_warmer = mean((.$pred[.$tmax_sum_dif_unscaled >= 0]  -
-                                                  .$pred[.$tmax_sum_dif_unscaled == 0] ) /
-                                                 .$pred[.$tmax_sum_dif_unscaled == 0] ) * 100,
-                   height_change_warmer_base0 = mean((.$pred[.$tmax_sum_dif_unscaled >= 0]
-                                                      - base0 ) /  base0) * 100))
-         
-   head(pred_df_long)
-   dim(pred_df_long)
-   
-   summary(pred_df_long$height_change_warmer)
-   
-   
-   # Calculate correlations for each snp and genotype in training and testing
-  train_test_cors <-  pred_df_raw %>%
-     dplyr::filter(tmax_sum_dif_unscaled > 0) %>%
-     dplyr::group_by(snp, genotype) %>%
-     dplyr::summarise(train_test_cor_1 = cor(pred_train_1, pred_test_1),
-                      train_test_cor_2 = cor(pred_train_2, pred_test_2),
-                      train_test_cor_3 = cor(pred_train_3, pred_test_3),
-                      train_test_cor_4 = cor(pred_train_4, pred_test_4),
-                      train_test_cor_5 = cor(pred_train_5, pred_test_5)) %>%
-    ungroup()
+## Read in model predictions
+  pred_df_raw <- plyr::ldply(list.files(path_to_predictions, full = TRUE), 
+                             read_csv)
+  pred_df_raw$genotype <- as.character(pred_df_raw$genotype)
   
-  # Average across CV correlations
-  train_test_cors$train_test_cor <- rowMeans(dplyr::select(train_test_cors, 
-                                                  contains("train_test")),
-                                             na.rm = TRUE)
-
-  glimpse(train_test_cors)
-  
-  map(train_test_cors, ~sum(is.na(.))) # Count number of NAs
+  head(pred_df_raw)
+  dim(pred_df_raw)
+  summary(pred_df_raw)
   
   
-  # Join back to predictions dataframe
-  pred_df_long <- dplyr::left_join(pred_df_long, train_test_cors)
-  
-  head(pred_df_long)
-  dim(pred_df_long)
-  
-  
-   
-# Sort and arrange data ---------------------------------------------------
+# Convert to long format ---------------------------------------------------
 
   ## Convert to from wide to long format
   n_gen_long <- sum_df %>%
@@ -167,14 +117,12 @@
   head(height_0_long)
   
   
-  
-  
+
 ## Join all long dataframes together
   sum_df_long <- left_join(n_gen_long, p_val_long) %>%
     left_join(. , height_change_long) %>%
     left_join(., height_4.8_long) %>%
-    left_join(., height_0_long) %>%
-    left_join(., pred_df_long)
+    left_join(., height_0_long) 
   
   head(sum_df_long)
   dim(sum_df_long)
@@ -195,20 +143,68 @@
     #   dplyr::filter(acc_pred == 1)
     
     
-   
+
+    
+    # Subset to just predictions of SNPs that pass filters
+    
+    pred_df_sub <- pred_df_raw %>%
+      mutate(snp_gen = paste0(snp, genotype)) %>%
+      # Snp-genotype must be in sum_df_long dataframe
+      filter(snp_gen %in% paste0(sum_df_long$snp, sum_df_long$genotype)) 
+    
+    dim(pred_df_sub)
+    
+    
+    ## Calculate height change in warmer temperatures for each snp and genotype
+    base0 <- mean(pred_df_sub$pred[pred_df_sub$tmax_sum_dif_unscaled == 0])
+
+    pred_df_long =  pred_df_sub %>%
+      dplyr::group_by(snp, genotype) %>%
+      do(data.frame(height_change_warmer = mean((.$pred[.$tmax_sum_dif_unscaled >= 0]  -
+                                               .$pred[.$tmax_sum_dif_unscaled == 0] ) /
+                                               .$pred[.$tmax_sum_dif_unscaled == 0] ) * 100,
+                    height_change_warmer_base0 = mean((.$pred[.$tmax_sum_dif_unscaled >= 0]
+                                                       - base0 ) /  base0) * 100))
+    
+    head(pred_df_long)
+    dim(pred_df_long)
+    
+    summary(pred_df_long$height_change_warmer)
+    summary(pred_df_long$height_change_warmer_base0)
+    
+    
+    # Calculate correlations for each snp and genotype in training and testing
+    train_test_cors <-  pred_df_sub %>%
+      dplyr::filter(tmax_sum_dif_unscaled >= 0) %>%
+      dplyr::group_by(snp, genotype) %>%
+      dplyr::summarise(train_test_cor_1 = cor(pred_train_1, pred_test_1),
+                       train_test_cor_2 = cor(pred_train_2, pred_test_2),
+                       train_test_cor_3 = cor(pred_train_3, pred_test_3),
+                       train_test_cor_4 = cor(pred_train_4, pred_test_4),
+                       train_test_cor_5 = cor(pred_train_5, pred_test_5)) %>%
+      ungroup()
+    
+    # Average across CV correlations
+    train_test_cors$train_test_cor <- rowMeans(dplyr::select(train_test_cors, 
+                                                             contains("train_test")),
+                                               na.rm = TRUE)
+    
+    glimpse(train_test_cors)
+    
+    map(train_test_cors, ~sum(is.na(.))) # Count number of NAs
+    
+    
+    # Join back to predictions dataframe
+    pred_df_long <- dplyr::left_join(pred_df_long, train_test_cors)
+    
+    head(pred_df_long)
+    dim(pred_df_long)
+    
+    
+    # Join prediction dataframe to summary dataframe
+    sum_df_long <- left_join(sum_df_long, pred_df_long)
     
   
-# Calculate height change based on average at 0 transfer
-  
-  sum_df_long <- sum_df_long %>%
-    mutate(height_change_0base = (height_4.8 - mean(height_0)) / mean(height_0) * 100)
-  
-  # Compare height measurements
-   # plot(sum_df_long$height_change_0base, sum_df_long$height_change, pch = ".")
-   # plot(sum_df_long$height_change_0base, sum_df_long$height_change_warmer, pch = ".") 
-   # abline(0,1); abline(h=0, lty = 2); abline(v=0, lty=2)
-  
-
 # Correct p and q values
   # Vignette - https://bioconductor.org/packages/release/bioc/vignettes/qvalue/inst/doc/qvalue.pdf
   
@@ -238,51 +234,31 @@
   
 ## Identify top and bottom XXX% of SNPs
   
- # percent_thresh <- 0.005
   p_val_adj_thresh <- 0.05
   mad_thresh <- 2 # Median absolute deviation for outlier detection
   train_test_cor_thresh <- 0.6
   
  top_snps_long <-  sum_df_long %>%
     dplyr::filter(p_val_adj <= p_val_adj_thresh) %>%
-   dplyr::filter(train_test_cor > train_test_cor_thresh) %>%
-   dplyr::filter(height_change_warmer_base0 >= median(height_change_warmer_base0) +
+    dplyr::filter(train_test_cor >= train_test_cor_thresh) %>%
+    dplyr::filter(height_change_warmer_base0 >= median(height_change_warmer_base0) +
                    mad_thresh * mad(height_change_warmer_base0)) %>%
-  dplyr::arrange(desc(height_change_warmer_base0))
-
+    dplyr::arrange(desc(height_change_warmer_base0))
+ 
  #    head(round(nrow(sum_df) * percent_thresh))
 
  dim(top_snps_long)
    
- 
-# 
-#  hist(sum_df_long$height_change_warmer_base0, breaks = 50)
-#  abline(v = mean(sum_df_long$height_change_warmer_base0) + 
-#           sd(sum_df_long$height_change_warmer_base0), lwd = 5,
-#         col = "skyblue2")
-#  abline(v = mean(sum_df_long$height_change_warmer_base0) + 
-#           2*sd(sum_df_long$height_change_warmer_base0), lwd = 5,
-#         col = "skyblue2")
-#  
-#  abline(v = mean(sum_df_long$height_change_warmer_base0) -
-#           sd(sum_df_long$height_change_warmer_base0), lwd = 5,
-#         col = "skyblue2")
-#  abline(v = mean(sum_df_long$height_change_warmer_base0) - 
-#           2*sd(sum_df_long$height_change_warmer_base0), lwd = 5,
-#         col = "skyblue2")
-#  
- 
  top_snps_long$top_snp = TRUE # Make a column for T / F of top snp
  
- summary(top_snps_long)
+ dim(top_snps_long)
+ head(top_snps_long)
 
  ## Any SNPs in top_snps twice?
  sum(table(top_snps_long$snp) > 1)
  which(table(top_snps_long$snp) > 1)
  
-# top_snps_long <- top_snps_long[-which(top_snps_long$snp == "snp_chr6_17041689")[2], ] # only keep one genotype
- 
- 
+
  ## Plotting example
    # top_snps_long$snp[1:3]
    # 
@@ -302,34 +278,30 @@
    #   geom_line(aes(tmax_sum_dif_unscaled, pred_test_3), col = "red") +
    #   geom_line(aes(tmax_sum_dif_unscaled, pred_test_4), col = "red") +
    #   geom_line(aes(tmax_sum_dif_unscaled, pred_test_5), col = "red") +
-   #   theme_bw(15) + facet_wrap(~genotype) + 
+   #   theme_bw(15) + facet_wrap(~genotype) +
    #   ggtitle(top_snp)
    # 
    #  print(g)
-   #  
-   # }
    # 
-   # dim(top_snps_long)
-   # head(top_snps_long)
+   # }
 
  
  ## Bottom SNPs
  bottom_snps_long <- sum_df_long %>%
-   
    dplyr::filter(p_val_adj <= p_val_adj_thresh) %>%
-   dplyr::filter(train_test_cor > train_test_cor_thresh) %>%
+   dplyr::filter(train_test_cor >= train_test_cor_thresh) %>%
    dplyr::filter(height_change_warmer_base0 <= median(height_change_warmer_base0) - 
                    mad_thresh * mad(height_change_warmer_base0))
    
 
- bottom_snps_long$bottom_snp = TRUE
- 
- head(bottom_snps_long)
- dim(bottom_snps_long)
- 
- ## Any SNPs in bottom_snps twice?
- sum(table(bottom_snps_long$snp) > 1)
- 
+   bottom_snps_long$bottom_snp = TRUE
+   
+   head(bottom_snps_long)
+   dim(bottom_snps_long)
+   
+   ## Any SNPs in bottom_snps twice?
+   sum(table(bottom_snps_long$snp) > 1)
+   
  
 
  # Also make a comparable dataframe of 'random snps'
@@ -337,28 +309,23 @@
   # set.seed(129) # To make sure same SNPs are chosen everytime - reproducible
    
    mid_snps_long <- sum_df_long %>%
-     # dplyr::filter(p_val_adj <= p_val_adj_thresh) %>%
-     # dplyr::filter(train_test_cor > train_test_cor_thresh) %>%
+     dplyr::filter(p_val_adj <= p_val_adj_thresh) %>%
+     dplyr::filter(train_test_cor >= train_test_cor_thresh) %>%
      dplyr::filter(!snp %in% c(top_snps_long$snp, bottom_snps_long$snp)) %>%
-     # # Make sure number of genotype copies is comparable
-     # dplyr::filter(n_gen <= quantile(c(top_snps_long$n_gen, bottom_snps_long$n_gen),
-     #                                 0.9)) %>% 
      sample_n(mean(c(nrow(top_snps_long), nrow(bottom_snps_long))))
    
    
    ## Any Snps sampled 2x?
    sum(table(mid_snps_long$snp) > 1)
    
-     head(mid_snps_long)
-     summary(mid_snps_long$height_change_0base)
+   head(mid_snps_long)
 
-  
   summary(top_snps_long$n_gen)
   summary(mid_snps_long$n_gen)
   summary(bottom_snps_long$n_gen)
   
+  
   ## Join back to main DF
-   
    sum_df_long <- left_join(sum_df_long, dplyr::select(top_snps_long, snp, genotype, top_snp)) %>%
                   left_join(., dplyr::select(bottom_snps_long, snp, genotype, bottom_snp)) %>%
                   mutate(top_snp = replace_na(top_snp, FALSE),
@@ -417,171 +384,148 @@
            axis.line = element_line(colour = "black"))   
    
    # Save to file
-   # ggsave(filename = paste0("./figs_tables/Figure 2 - outlier responses ", 
-   #                          Sys.Date(), ".pdf"),
-   #        units = "cm",
-   #        height = 8, width = 15,
-   #        useDingbats = FALSE )
-   # 
+   ggsave(filename = paste0("./figs_tables/Figure 2 - outlier responses ",
+                            Sys.Date(), ".pdf"),
+          units = "cm",
+          height = 8, width = 15,
+          useDingbats = FALSE )
+   
   summary(top_snps_long$height_change_warmer_base0)
   summary(bottom_snps_long$height_change_warmer_base0)
   summary(mid_snps_long$height_change_warmer_base0)
+
+ 
+# Figure 3 - Manhattan plot ---------------------------------------------------------
   
-  summary(top_snps_long$height_change_0base)
-  summary(bottom_snps_long$height_change_0base)
-  summary(mid_snps_long$height_change_0base)
+   man_df1 <- data.frame(SNP = snp_col_names, 
+                         snp_pos)
+   
+   man_df1$index <- 1:nrow(man_df1) ## For x axis plotting
+   
+   man_df <- left_join(man_df1, sum_df_long, by = c("SNP" = "snp"))
   
-  (mean(top_snps_long$height_4.8) - mean(bottom_snps_long$height_4.8)) / mean(bottom_snps_long$height_4.8) * 100
+   head(man_df)
    
+   # Set alpha for p values
+   man_df$p_val_adj_alpha <- ifelse(man_df$p_val_adj < 0.05, 1, .35)
    
-
- 
- 
- 
-# Manhattan plots ---------------------------------------------------------
-
-  ## Figure 3 - Manhattan plot ####  
+   # Set up shapes
+   man_df <- man_df %>%
+     mutate(pch = ifelse(genotype == 0 | genotype == 2, 16, 17)) # Circles for homozygotes, trianges for hets
+   
+   man_df <- man_df %>%
+     mutate(pch = ifelse((genotype == 0 & (top_snp | bottom_snp)) | 
+                           (genotype == 2 & ( top_snp | bottom_snp)), 21, pch)) # Outlined shapes
+   
+   man_df <- man_df %>%
+     mutate(pch = ifelse((genotype == 1 & (top_snp | bottom_snp)), 24, pch)) # Outlined shapes
+   
+   table(man_df$pch)
+   
+   ## Clean up chromosome names - clear scaffold names
+   man_df <- man_df %>%
+     mutate(chrom = ifelse(grepl("chr", chrom), chrom, ""))
   
+   # For labels on x axis 
+   x_axis_breaks <- man_df %>%
+     dplyr::select(index, chrom) %>%
+     group_by(chrom) %>%
+     summarise_all(mean)
+   
+   # For vertical lines showing chromosome sections
+   chrom_breaks <- man_df %>%
+     dplyr::select(index, chrom) %>%
+     group_by(chrom) %>%
+     summarise_all(max)
+   
+   # Start plot
+   ggplot(man_df, aes(x = index, 
+                    y = height_change_warmer_base0,
+                  #  y = height_change,
+                    col = height_change_warmer_base0,
+                  #  col = height_change,
+                    label = SNP)) +
   
- # library(CMplot)
- 
- man_df1 <- data.frame(SNP = snp_col_names, 
-                       snp_pos)
- 
- man_df1$index <- 1:nrow(man_df1) ## For x axis plotting
- 
- man_df <- left_join(man_df1, sum_df_long, by = c("SNP" = "snp"))
-
- head(man_df)
- 
- # Set alpha for p values
- man_df$p_val_adj_alpha <- ifelse(man_df$p_val_adj < 0.05, 1, .35)
- 
- # Set up shapes
- man_df <- man_df %>%
-   mutate(pch = ifelse(genotype == 0 | genotype == 2, 16, 17)) # Circles for homozygotes, trianges for hets
- 
- man_df <- man_df %>%
-   mutate(pch = ifelse((genotype == 0 & (top_snp | bottom_snp)) | 
-                         (genotype == 2 & ( top_snp | bottom_snp)), 21, pch)) # Outlined shapes
- 
- man_df <- man_df %>%
-   mutate(pch = ifelse((genotype == 1 & (top_snp | bottom_snp)), 24, pch)) # Outlined shapes
- 
- table(man_df$pch)
- 
- ## Clean up chromosome names - clear scaffold names
- man_df <- man_df %>%
-   mutate(chrom = ifelse(grepl("chr", chrom), chrom, ""))
- 
- 
-
- 
- # Setup
-
- # For labels on x axis 
- x_axis_breaks <- man_df %>%
-   dplyr::select(index, chrom) %>%
-   group_by(chrom) %>%
-   summarise_all(mean)
- 
- # For vertical lines showing chromosome sections
- chrom_breaks <- man_df %>%
-   dplyr::select(index, chrom) %>%
-   group_by(chrom) %>%
-   summarise_all(max)
- 
- # Start plot
- ggplot(man_df, aes(x = index, 
-                  y = height_change_warmer_base0,
-                #  y = height_change,
-                  col = height_change_warmer_base0,
-                #  col = height_change,
-                  label = SNP)) +
-
-   # Vertical lines
-   geom_vline(xintercept = chrom_breaks$index, col = "grey50", alpha = 0.8, size = .2) + 
-   
-   # Horizontal line
-   geom_hline(yintercept = 0, lty = 2, size = .25) +
-   
-   # Add points
-   geom_point(pch = man_df$pch, 
-             # col = "black",
-              alpha = man_df$p_val_adj_alpha, 
-              size = .65) +
-   
-   # Overplot top and bottom SNPS
-   geom_point(data = man_df[man_df$top_snp | man_df$bottom_snp, ],
-              aes(x = index, 
-                  y = height_change_warmer_base0,
-                  bg = height_change_warmer_base0),
-                  # y = height_change,
-                  # bg = height_change),
-                  col = "black",
-                  pch = man_df[man_df$top_snp | man_df$bottom_snp, ]$pch,
-                  size = .65 + .35) +
-   
-   
-   
-   # # Add snp names
-   #   geom_text_repel(
-   #     aes(index, y = height_change_gen_0),
-   #     data = subset(man_df, height_change_gen_0 > 0 & p_val_adj_gen_0 < 0.05),
-   #     col = "black"
+     # Vertical lines
+     geom_vline(xintercept = chrom_breaks$index, col = "grey50", alpha = 0.8, size = .2) + 
+     
+     # Horizontal line
+     geom_hline(yintercept = 0, lty = 2, size = .25) +
+     
+     # Add points
+     geom_point(pch = man_df$pch, 
+               # col = "black",
+                alpha = man_df$p_val_adj_alpha, 
+                size = .65) +
+     
+     # Overplot top and bottom SNPS
+     geom_point(data = man_df[man_df$top_snp | man_df$bottom_snp, ],
+                aes(x = index, 
+                    y = height_change_warmer_base0,
+                    bg = height_change_warmer_base0),
+                    # y = height_change,
+                    # bg = height_change),
+                    col = "black",
+                    pch = man_df[man_df$top_snp | man_df$bottom_snp, ]$pch,
+                    size = .65 + .35) +
+     
+     
+     
+     # # Add snp names
+     #   geom_text_repel(
+     #     aes(index, y = height_change_gen_0),
+     #     data = subset(man_df, height_change_gen_0 > 0 & p_val_adj_gen_0 < 0.05),
+     #     col = "black"
+     #   ) +
+     #   geom_text_repel(
+     #     aes(index, y = height_change_gen_1),
+     #     data = subset(man_df, height_change_gen_1 > 0 & p_val_adj_gen_1 < 0.05),
+     #     col = "black"
    #   ) +
    #   geom_text_repel(
-   #     aes(index, y = height_change_gen_1),
-   #     data = subset(man_df, height_change_gen_1 > 0 & p_val_adj_gen_1 < 0.05),
+   #     aes(index, y = height_change_gen_2),
+   #     data = subset(man_df, height_change_gen_2 > 0 & p_val_adj_gen_2 < 0.05),
    #     col = "black"
- #   ) +
- #   geom_text_repel(
- #     aes(index, y = height_change_gen_2),
- #     data = subset(man_df, height_change_gen_2 > 0 & p_val_adj_gen_2 < 0.05),
- #     col = "black"
- #   ) +
- 
- # Scale colors
- # scale_colour_viridis_c(option = "D", direction = -1, name = "% Change in RGR \n w/ 4.8°C increase") + 
- # scale_fill_viridis_c(option = "D", direction = -1, 
- #                      name = "% Change in RGR \n w/ 4.8°C increase",
- #                      guide = FALSE) + 
- 
- scale_colour_distiller(type = "seq", palette = "RdYlBu", 
-                        direction = 1, 
-                        aesthetics = c("color", "fill"),
-                        name = "% Change in RGR \n with 4.8°C increase") + 
+   #   ) +
    
-   # Theme options
-   scale_x_continuous(expand = c(0.01, 0.01), 
-                      breaks = x_axis_breaks$index,
-                      labels = x_axis_breaks$chrom) + 
-   scale_y_continuous(breaks = seq(-30, 20, 5)) + 
-   ylab("") + 
-   xlab("Chromosome") + 
-   theme_bw(8) + 
-   theme(panel.border = element_blank(), panel.grid.major = element_blank(),
-         panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
-        # legend.position = "none") +
-           )+
-   # axis.text.x=element_blank(), axis.ticks.x=element_blank()) +
-   NULL
- 
- # Save as file - PNG
- # ggsave(paste0("./figs_tables/Figure 2 - manhattan plot interaction term wo labels_", 
- #                      Sys.Date(), ".png"),
- #          width = 16, height = 4, units = "cm", dpi = 300)
- # 
- # # Save as PDF for legend
- # ggsave(paste0("./figs_tables/Figure 2 - manhattan plot interaction term LEGEND", 
- #               Sys.Date(), ".pdf"),
- #        width = 10, height = 2)
- 
- 
- 
- 
- 
- 
+   # Scale colors
+   # scale_colour_viridis_c(option = "D", direction = -1, name = "% Change in RGR \n w/ 4.8°C increase") + 
+   # scale_fill_viridis_c(option = "D", direction = -1, 
+   #                      name = "% Change in RGR \n w/ 4.8°C increase",
+   #                      guide = FALSE) + 
+   
+   scale_colour_distiller(type = "seq", palette = "RdYlBu", 
+                          direction = 1, 
+                          aesthetics = c("color", "fill"),
+                          name = "% Change in RGR \n with 4.8°C increase") + 
+     
+     # Theme options
+     scale_x_continuous(expand = c(0.01, 0.01), 
+                        breaks = x_axis_breaks$index,
+                        labels = x_axis_breaks$chrom) + 
+     scale_y_continuous(breaks = seq(-30, 20, 5)) + 
+     ylab("") + 
+     xlab("Chromosome") + 
+     theme_bw(8) + 
+     theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+           panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")
+          # legend.position = "none") +
+             )+
+     # axis.text.x=element_blank(), axis.ticks.x=element_blank()) +
+     NULL
+   
+   # Save as file - PNG
+     ggsave(paste0("./figs_tables/Figure 2 - manhattan plot interaction term wo labels_",
+                          Sys.Date(), ".png"),
+              width = 16, height = 4, units = "cm", dpi = 300)
+    
+     # Save as PDF for legend
+     ggsave(paste0("./figs_tables/Figure 2 - manhattan plot interaction term LEGEND",
+                   Sys.Date(), ".pdf"),
+            width = 10, height = 2)
+   
+   
+   
 
 # Convert outlier SNPs genotypes to precense absence --------------------------
 
@@ -654,6 +598,7 @@
     gen_dat_mid[, snp] <- apply(gen_dat_clim_all[, snp], 1, function(x) {
       if(is.na(x)){ NA
       } else if(x == ben_gen){ 1
+      } else if(x == 1){ .5 # Set heterozygotes to presence
       } else {  0
       }
     }) # End apply
@@ -674,18 +619,21 @@
     dplyr::select(snp, dev_dif, dev_dif_random) %>%
     tidyr::gather("dev_type", "dev_dif", -snp) %>%
     dplyr::mutate(has_outlier_snp = 
-                    ifelse(snp %in% c(top_snps_long$snp,
-                                      bottom_snps_long$snp), "Outlier genotypes" , 
-                           "Non-outlier genotypes"))
+                  case_when(snp %in% top_snps_long$snp ~ "Beneficial genotype",
+                            snp %in% bottom_snps_long$snp ~ "Detrimental genotype", 
+                            TRUE ~ "Non-outlier genotype"))
+  
+  table(deviance_df$has_outlier_snp)
   
   deviance_df$has_outlier_snp[deviance_df$dev_type == "dev_dif_random"] <- "Random variable"
   
   
-  
-  ggplot(deviance_df, aes(x = factor(has_outlier_snp), y = dev_dif, 
+  deviance_df %>%
+    dplyr::filter(has_outlier_snp != "Random variable") %>%
+  ggplot(., aes(x = factor(has_outlier_snp), y = dev_dif, 
                           fill = factor(has_outlier_snp)) )+ 
     geom_boxplot(outlier.shape = NA, alpha = 1) + 
-    #   geom_jitter(aes(col = factor(has_outlier_snp)), alpha = .5, size = .25, pch = 16) + 
+  #     geom_jitter(aes(col = factor(has_outlier_snp)), alpha = .5, size = .25, pch = 16) + 
     xlab("") + ylab("Difference in deviance") +
     scale_fill_discrete(name = "") +
     theme_bw(10) +
@@ -697,20 +645,14 @@
   
   ## Statistical tests
   deviance_df %>%
-    dplyr::filter(has_outlier_snp %in% c("Outlier genotypes", "Non-outlier genotypes")) %>%
-    wilcox.test(dev_dif ~ has_outlier_snp, data = .)
-  
-  deviance_df %>%
-    dplyr::filter(has_outlier_snp %in% c("Outlier genotypes", "Random variable")) %>%
-    wilcox.test(dev_dif ~ has_outlier_snp, data = .)
-  
-
+    dplyr::filter(has_outlier_snp  != "Random variable") %>%
+    dplyr::mutate(has_outlier_snp = factor(has_outlier_snp)) %>%
+    kruskal.test(dev_dif ~ has_outlier_snp, data = .)
   
   
 # Random forest on just beneficial alleles ------------------------
    
    library(randomForest)
-   #library(AUC)
    library(raster)
    library(pdp)
   
