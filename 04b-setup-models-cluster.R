@@ -111,8 +111,8 @@
       # # Pc1 vs pc2
       #   plot(xx[, 1], xx[, 2],
       #        las = 1,
-      #        xlab = paste0("PC1: ", summary(pca_gen)$importance[2, 1], "% variance explained"),
-      #        ylab = paste0("PC2: ", summary(pca_gen)$importance[2, 2], "% variance explained"),
+      #        xlab = paste0("PC1: ", summary(pca_gen)$importance[2, 1] * 100, "% variance explained"),
+      #        ylab = paste0("PC2: ", summary(pca_gen)$importance[2, 2] * 100, "% variance explained"),
       #        pch = 19,
       #        type = "n")
       #   text(xx[, 1], xx[, 2],
@@ -123,8 +123,8 @@
       #   # Pc1 vs pc3
       #   plot(xx[, 1], xx[, 3],
       #        las = 1,
-      #        xlab = paste0("PC1: ", summary(pca_gen)$importance[2, 1], "% variance explained"),
-      #        ylab = paste0("PC3: ", summary(pca_gen)$importance[2, 3], "% variance explained"),
+      #        xlab = paste0("PC1: ", summary(pca_gen)$importance[2, 1] * 100, "% variance explained"),
+      #        ylab = paste0("PC3: ", summary(pca_gen)$importance[2, 3] * 100, "% variance explained"),
       #        pch = 19,
       #        type = "n")
       #   text(xx[, 1], xx[, 3],
