@@ -1102,6 +1102,8 @@
 
          
          ## Predict across a raster and add to stack
+         
+         ## TESTING
   
              # Second column is positives
              rf_rast_df_nona$pred = predict(rf, rf_rast_df_nona, type = "response")
