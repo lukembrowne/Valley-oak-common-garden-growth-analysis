@@ -10,39 +10,40 @@
   path_to_predictions <- "./output/run_3813910_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld/model_predictions/"
 
   
-  
   ## Randomized phenotypes
   
-    # # Run 1 - 0 SNPs passed - tested on Sept 4th 2018
-    #   path_to_summaries <- "./output/run_3709949_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3709949_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-    #   # Run 2 - 0 SNPs passed
-    #   path_to_summaries <- "./output/run_3709950_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3709950_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-    #   # Run 3 - 0 SNPs passed
-    #   path_to_summaries <- "./output/run_3709951_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3709951_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-    #   # Run 4 - 0 SNPs passed
-    #   path_to_summaries <- "./output/run_3709955_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3709955_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-    #   # Run 5 - 0 SNPs passed
-    #   path_to_summaries <- "./output/run_3709957_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3709957_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-    #   # Run 6 - 0 SNPs passed
-    #   path_to_summaries <- "./output/run_3718299_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3718299_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-    #   # Run 7 - 0 SNPs passed
-    #   path_to_summaries <- "./output/run_3718300_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3718300_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-    #   # Run 8 - 0 SNPs passed
-    #   path_to_summaries <- "./output/run_3718301_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3718301_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-    #   # Run 9 - 0 SNPs passed
-    #   path_to_summaries <- "./output/run_3718302_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3718302_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-    #   # Run 10 - 0 SNPs passed
-    #   path_to_summaries <- "./output/run_3718304_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3718304_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    # # Run 1 - 0 SNPs passed - tested on Sept 25th 2018
+      path_to_summaries <- "./output/run_3826675_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+      path_to_predictions <- "./output/run_3826675_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+      # Run 2 - 0 SNPs passed
+      path_to_summaries <- "./output/run_3826678_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+      path_to_predictions <- "./output/run_3826678_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+      # # Run 3 - 0 SNPs passed
+      path_to_summaries <- "./output/run_3826681_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+      path_to_predictions <- "./output/run_3826681_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+      # Run 4 - 0 SNPs passed
+      path_to_summaries <- "./output/run_3826685_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+      path_to_predictions <- "./output/run_3826685_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+      # Run 5 - 0 SNPs passed
+      path_to_summaries <- "./output/run_3826688_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+      path_to_predictions <- "./output/run_3826688_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+      
+      
+      # # Run 6 - 0 SNPs passed
+      # path_to_summaries <- "./output/run_3718299_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+      # path_to_predictions <- "./output/run_3718299_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+      # # Run 7 - 0 SNPs passed
+      # path_to_summaries <- "./output/run_3718300_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+      # path_to_predictions <- "./output/run_3718300_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+      # # Run 8 - 0 SNPs passed
+      # path_to_summaries <- "./output/run_3718301_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+      # path_to_predictions <- "./output/run_3718301_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+      # # Run 9 - 0 SNPs passed
+      # path_to_summaries <- "./output/run_3718302_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+      # path_to_predictions <- "./output/run_3718302_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+      # # Run 10 - 0 SNPs passed
+      # path_to_summaries <- "./output/run_3718304_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+      # path_to_predictions <- "./output/run_3718304_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
     
       
     
@@ -78,7 +79,7 @@
   summary(pred_df_raw)
   
   
-# Convert to long format ---------------------------------------------------
+# Convert to long format and set filters ---------------------------------------------------
 
   ## Convert to from wide to long format
   n_gen_long <- sum_df %>%
@@ -145,8 +146,7 @@
     
 
     
-    # Subset to just predictions of SNPs that pass filters
-    
+  # Subset to just predictions of SNPs that pass filters
     pred_df_sub <- pred_df_raw %>%
       mutate(snp_gen = paste0(snp, genotype)) %>%
       # Snp-genotype must be in sum_df_long dataframe
@@ -235,7 +235,7 @@
 ## Identify top and bottom XXX% of SNPs
   
   p_val_adj_thresh <- 0.05
-  mad_thresh <- 2 # Median absolute deviation for outlier detection
+  mad_thresh <- 2.5 # Median absolute deviation for outlier detection
   train_test_cor_thresh <- 0.6
   
  top_snps_long <-  sum_df_long %>%
@@ -342,7 +342,7 @@
    
    
 
-## Figure 2 -- Plot overlay of outlier SNPS ---------------------------------------
+## Figure 2 - Plot overlay of outlier SNPS ---------------------------------------
    
    # Join outlier dataframes with prediction dataframes
    pred_df_outlier <- dplyr::left_join(top_snps_long, pred_df_raw) %>%
@@ -654,7 +654,8 @@
    
    library(randomForest)
    library(raster)
-   library(pdp)
+  # library(pdp)
+   library(factoextra)
   
 
   ## For TOP SNPS
@@ -711,7 +712,7 @@
      
     # Function to downscale and project raster 
      process_raster <- function(rast){
-       rast <- aggregate(rast, fact = 20) # Make smaller by averaging across cells
+       rast <- aggregate(rast, fact = 5) # Make smaller by averaging across cells
        rast_latlon <- projectRaster(rast, crs = CRS("+proj=longlat +datum=WGS84"))
        plot(rast_latlon)
        return(rast_latlon)
@@ -788,11 +789,10 @@
      pairs.panels(gen_dat_top[, climate_vars_rf])
      
      
-     ## Calculate PCA on climate and spatial variables
+   ## Calculate PCA on climate and spatial variables
      
-     
-     ## Scale climate variables
-     x = 1
+     ## Scale climate variables based on GBS moms
+     x = 1 # used in loop
      
      scaled_var_means_rf <- NA
      scaled_var_sds_rf <- NA
@@ -820,23 +820,34 @@
      
      
      ## PCA on climate variables
-     pca_clim = prcomp(gen_dat_top_scaled[ , climate_vars_rf], center = FALSE, scale = FALSE) 
+     pca_clim = prcomp(gen_dat_top_scaled[ , c(climate_vars_rf, "latlong")], center = FALSE, scale = FALSE) 
      
-      biplot(pca_clim)
+     biplot(pca_clim)
      summary(pca_clim)
-       screeplot(pca_clim, bstick = TRUE)
+     screeplot(pca_clim, bstick = TRUE)
+     
+     ## Visualize results
+     fviz_contrib(pca_clim, choice = "var", axes = 1)
+     fviz_contrib(pca_clim, choice = "var", axes = 2)
+     fviz_contrib(pca_clim, choice = "var", axes = 3)
+     fviz_contrib(pca_clim, choice = "var", axes = 4)
+     
+     fviz_pca_var(pca_clim, col.var="contrib")
+     
+     fviz_pca_var(pca_clim, axes = c(1, 2), col.var="contrib")
+     fviz_pca_var(pca_clim, axes = c(3, 4), col.var="contrib")
        
-       pcs <- as.data.frame(pca_clim$x[, 1:7])
-      # colnames(pcs) <- paste0(colnames(pcs), "_gen")
+     pcs <- as.data.frame(pca_clim$x[, 1:7])
        
-       gen_dat_top <- bind_cols(gen_dat_top, pcs)
-       gen_dat_bottom <- bind_cols(gen_dat_bottom, pcs)
-       gen_dat_mid <- bind_cols(gen_dat_mid, pcs)
+     # Add PCs as columns to dataframes
+     gen_dat_top <- bind_cols(gen_dat_top, pcs)
+     gen_dat_bottom <- bind_cols(gen_dat_bottom, pcs)
+     gen_dat_mid <- bind_cols(gen_dat_mid, pcs)
        
        
     # Convert raster df to PC space
        
-       ## Transform
+       ## Forward scale variables first
        for(var in climate_vars_rf){
          
          # For all seedlings  
@@ -846,12 +857,12 @@
                                                     sds = scaled_var_sds_rf)
        }
        
-      summary( rf_rast_df_nona)
+      summary(rf_rast_df_nona)
       
       ## Makt lat long interaction
       rf_rast_df_nona$latlong <- rf_rast_df_nona$latitude * rf_rast_df_nona$longitude
        
-       
+      # Generate predictions
       rf_rast_df_nona = bind_cols(rf_rast_df_nona,
                                   data.frame(predict(pca_clim, rf_rast_df_nona[ , -1])))
       
@@ -859,7 +870,7 @@
       
       summary(rf_rast_df_nona)
       
-      climate_vars_rf <- c("PC1","PC2","PC3")
+      climate_vars_rf <- c("PC1","PC2","PC3", "PC4")
      
      
      
@@ -874,13 +885,9 @@
      pp_df <- NULL # Initialize
      
      reps = 1
-     
-     # Sample same number of SNPs as top snps in random forest
-     n_snps_to_sample <- sum(top_snps_long$snp %in% colnames(rf_top)) 
- 
-     
+
 ## Begin Random forest loop         
-  for(mode in c("top_snps", "bottom_snps", "random_snps")){ # , random_env,  "random_snps"
+  for(mode in c("top_snps", "bottom_snps")){ # , random_env,  "random_snps"
     
     # Start rep loop
     for(rep in 1:reps){  
@@ -893,10 +900,7 @@
       if(mode == "bottom_snps" | mode == "random_env") {
         snps <- bottom_snps_long$snp
       }
-      
-      
-      # If random_snps, choose same number of top snps, but snps that aren't top or bottom snps
-      # But only do it on the first rep so that we remeasure the same 'random snps' each rep
+
       if(mode == "random_snps") {
         snps <- mid_snps_long$snp
       }
@@ -907,7 +911,6 @@
          snp_name <- snps[snp]
          
          cat("Working on mode:", mode, "rep: ", rep, " snp:", snp, "  ", snp_name, "...\n")
-         
          
          # Get climate and snp data
          if(mode == "top_snps"){
@@ -934,10 +937,11 @@
          # }
 
         # Count number of precense / absence
-         n1 <- sum(y == 1, na.rm = TRUE)
-         n0 <- sum(y == 0, na.rm = TRUE)
+         # n1 <- sum(y == 1, na.rm = TRUE)
+         # n0 <- sum(y == 0, na.rm = TRUE)
+         # 
          
-         not_NAs <- !is.na(y) # True if not NA
+          not_NAs <- !is.na(y) # True if not NA
          
          # Convert to factor
        #  y <- factor(y)
@@ -947,6 +951,10 @@
          #   warning("Length of levels of y not equal to 2- something is wrong")
          #   next
          # }
+          
+          if(any(y == 2, na.rm = TRUE)){
+            stop("Why is there a 2 in the genotype?")
+          }
          
         # Set up dataframe for random forest
          dat_rf <- cbind(y = y[not_NAs], X[not_NAs, ])
@@ -957,39 +965,27 @@
          #                    importance = TRUE,
          #                    sampsize = c(min(n0, n1), min(n0, n1)))
          
-         # rf <- randomForest::randomForest(y ~.,
-         #                                  data = dat_rf,
-         #                                  importance = TRUE)
-         # 
-         # rf
-         # 
-         # 
-         # print(summary(lm(y ~., data = dat_rf)))
-         
-         # Test out scaling y
+         ## Scale y
         # dat_rf$y <- scale(dat_rf$y)[, 1]
          
-         # rf <- gam(y ~ s(tmax_sum, bs = "cr") +
-         #              s(tmin_winter, bs = "cr") +
-         #             s(cwd, bs = "cr") +
-         #             s(bioclim_04, bs = "cr") +
-         #             s(bioclim_15, bs = "cr") +
-         #           #  s(bioclim_18, bs = "cr") +
-         #             s(elevation, bs = "cr") +
-         #             s(latitude, bs = "cr") +
-         #             s(longitude, bs = "cr"),
-         #           # method = "fREML",
-         #           # discrete = TRUE,
-         #           select = TRUE,
-         #           data = dat_rf)
-         # 
-         rf <- gam(y ~ s(PC1, bs = "cr", k = 3) + 
+         rf <- gam(y ~ s(PC1, bs = "cr", k = 3) +
                        s(PC2, bs = "cr", k = 3) +
-                       s(PC3, bs = "cr", k = 3)  , 
+                       s(PC3, bs = "cr", k = 3) + 
+                       s(PC4, bs = "cr", k = 3),
                      # method = "fREML",
                      # discrete = TRUE,
                      select = TRUE,
+                    family = "binomial",
                      data = dat_rf)
+         
+         # rf <- bam(y ~ s(PC1, bs = "cr") + 
+         #               s(PC2, bs = "cr") +
+         #               s(PC3, bs = "cr") +
+         #               s(PC4, bs = "cr"), 
+         #           method = "fREML",
+         #           discrete = TRUE,
+         #           select = TRUE,
+         #           data = dat_rf)
         
 
          # print(importance(rf))
@@ -997,7 +993,8 @@
           # cat("Class1 error rate: ", rf$confusion[2,3], "\n")
          
          rf_sum <- summary(rf)
-         
+        
+         print(table(y))
          print(rf_sum)
          
        #  pairs.panels(dat_rf)
@@ -1107,10 +1104,7 @@
          ## Predict across a raster and add to stack
   
              # Second column is positives
-        
-            # rf_rast_df_nona$pred = predict(rf, rf_rast_df_nona, type = "prob")[, 2]
-     
-             rf_rast_df_nona$pred = predict(rf, rf_rast_df_nona)
+             rf_rast_df_nona$pred = predict(rf, rf_rast_df_nona, type = "response")
 
 
              rf_rast_df_temp <- left_join(rf_rast_df, rf_rast_df_nona[, c("cell_id", "pred")])
@@ -1134,6 +1128,7 @@
   } # End mode loop ####################
      
 
+     
   ## Look at deviance explained
      
      dev_df %>%
@@ -1155,8 +1150,6 @@
        ggplot(., aes(x = mode, y = rsq_adj, fill = mode)) +
        geom_boxplot() + geom_jitter(width = .1) + theme_bw(15) +
        NULL
-     
-     
      
      
      
@@ -1304,17 +1297,17 @@
     stack_top
     
     ## Average across reps within each SNP
-    # Using stack apply - give indices of each raster that's a repition of a SNP - should go in order from 1-length(top_snps) and then repeat XX number of reps
-    stack_top_avg = stackApply(stack_top,
-                               indices = rep(1:length(top_snps_long$snp), 
-                                                        times = rep), 
-                               mean, na.rm = TRUE)
-    
-    
-    stack_bottom_avg = stackApply(stack_bottom, 
-                               indices = rep(1:length(bottom_snps_long$snp), 
-                                             times = rep), 
-                               mean, na.rm = TRUE)
+    # # Using stack apply - give indices of each raster that's a repition of a SNP - should go in order from 1-length(top_snps) and then repeat XX number of reps
+    # stack_top_avg = stackApply(stack_top,
+    #                            indices = rep(1:length(top_snps_long$snp), 
+    #                                                     times = rep), 
+    #                            mean, na.rm = TRUE)
+    # 
+    # 
+    # stack_bottom_avg = stackApply(stack_bottom, 
+    #                            indices = rep(1:length(bottom_snps_long$snp), 
+    #                                          times = rep), 
+    #                            mean, na.rm = TRUE)
     
     
      
@@ -1335,27 +1328,21 @@
  #    summarise_all(mean)
  #  summary(bottom_error)
  # 
-  top_snps_stack <- weighted.mean(stack_top_avg,
+        
+  ## Weighted means      
+  top_snps_stack <- weighted.mean(stack_top,
                                     w = dev_df$deviance[dev_df$mode == "top_snps"])
-  bottom_snps_stack <- weighted.mean(stack_bottom_avg,
+  bottom_snps_stack <- weighted.mean(stack_bottom,
                                   w = dev_df$deviance[dev_df$mode == "bottom_snps"])
- # 
- #  top_snps_stack <- weighted.mean(stack_top,
- #                                  w = 1 - error_df$OOB[error_df$mode == "top_snps"])
- #  bottom_snps_stack <- weighted.mean(stack_bottom_avg,
- #                                    w = 1 - bottom_err$OOB)
- #  random_snps_stack <- weighted.mean(stack_random_snps,
- #                                     w = 1 - error_df$OOB[error_df$mode == "random_snps"])
- #  random_env_stack <- weighted.mean(stack_random_env,
- #                                    w = 1 - error_df$OOB[error_df$mode == "random_env"])
-
-    top_snps_stack <- mean(stack_top_avg, na.rm = TRUE)
-    bottom_snps_stack <- mean(stack_bottom_avg, na.rm = TRUE)
-   # random_snps_stack <- mean(stack_random_snps, na.rm = TRUE)
+  # Regular means
+    top_snps_stack <- mean(stack_top, na.rm = TRUE)
+    bottom_snps_stack <- mean(stack_bottom, na.rm = TRUE)
     
-    top_snps_stack <- calc(stack_top_avg, median, na.rm = TRUE)
-    bottom_snps_stack <- calc(stack_bottom_avg, median, na.rm = TRUE)
+  # Medians  
+    top_snps_stack <- calc(stack_top, median, na.rm = TRUE)
+    bottom_snps_stack <- calc(stack_bottom, median, na.rm = TRUE)
     
+  # Crop to just lobata range  
     top_snps_stack <- mask(top_snps_stack,  lobata_range_rough)
     bottom_snps_stack <- mask(bottom_snps_stack,  lobata_range_rough)
     
@@ -1428,7 +1415,7 @@
    ggplot(., 
           aes(x = x_val,
           #    y = prob,
-          y = prob_centered,
+           y = prob_centered,
            #   y = prob_scaled,
               group = snp, col = mode, fill = mode), alpha = 0.75) + 
   #  geom_line(lwd = .25, alpha = 0.55) + # Plot individual lines
@@ -1446,10 +1433,10 @@
      NULL
   
   # # Save file
-  # ggsave(filename = paste0("./figs_tables/Figure 4 - partial plots ", Sys.Date(), ".pdf"),
-  #        units = "cm",
-  #        width = 10, height = 8, useDingbats = FALSE)
-  #  
+  ggsave(filename = paste0("./figs_tables/Figure 4 - partial plots ", Sys.Date(), ".pdf"),
+         units = "cm",
+         width = 10, height = 8, useDingbats = FALSE)
+
 
   
   
@@ -1483,6 +1470,9 @@
   
   
   ## Scale number of top and bottom snps 
+  
+  dat_snp_count_unscaled <- dat_snp_count
+  
   n_top_snps_mean <- mean(dat_snp_count$n_top_snps)
   n_top_snps_sd <- sd(dat_snp_count$n_top_snps)
   dat_snp_count$n_top_snps_unscaled <- dat_snp_count$n_top_snps
@@ -1523,6 +1513,12 @@
   
   ## Plot predictions
   
+  low <- c(0, max(dat_snp_count_unscaled$n_bottom_snps))
+  mid <- c(round(mean(dat_snp_count_unscaled$n_top_snps)),
+           round(mean(dat_snp_count_unscaled$n_bottom_snps)))
+  high <-c(max(dat_snp_count_unscaled$n_top_snps), 0)
+  
+  
   newdata <-  expand.grid(section_block = "IFG_1",
                           height_2014 = 0,
                           accession = "1",
@@ -1533,11 +1529,10 @@
                                                                 scaled_var_means_gbs_only,
                                                                 scaled_var_sds_gbs_only)),
                           PC1_gen = 0, PC2_gen = 0, PC3_gen = 0, 
-                       n_top_snps_unscaled = c(0, 10, 20),
-                     n_bottom_snps_unscaled = c(0, 10, 20))
+                       n_top_snps_unscaled = c(low[1], mid[1], high[1]),
+                       n_bottom_snps_unscaled = c(low[2], mid[2], high[2]))
   
-  table(newdata$n_top_snps_unscaled, newdata$n_bottom_snps_unscaled)
-  
+  table(newdata$n_bottom_snps_unscaled, newdata$n_top_snps_unscaled)
   
   newdata$n_top_snps <- forward_transform(x = newdata$n_top_snps_unscaled,
                                           var = 1,
@@ -1563,15 +1558,15 @@
     dplyr::mutate(type_count = paste0(n_top_snps_unscaled, ":", n_bottom_snps_unscaled)) %>%
     dplyr::mutate(tmax_sum_dif_unscaled = back_transform(tmax_sum_dif, var = "tmax_sum_dif",
                                                          means = scaled_var_means_gbs_only, sds = scaled_var_sds_gbs_only)) %>%
-    dplyr::filter(type_count %in% c("0:20", "10:10", "20:0")) %>%
+    dplyr::filter(type_count %in% c(paste0(low[1],":", low[2]), 
+                                    paste0(mid[1],":", mid[2]),
+                                    paste0(high[1],":",high[2]))) %>%
     ggplot(., aes(x = tmax_sum_dif_unscaled, y = pred)) +
     geom_vline(aes(xintercept = 0), lty = 2, size = .25) +
     geom_vline(xintercept = 4.8, size = .25) +
     
     geom_ribbon(aes(ymin = pred - 1.96*se, ymax = pred + 1.96 * se, fill = factor(type_count)), alpha = .25) +
     geom_line(aes(col = factor(type_count))) + 
-    theme_bw(10) +
-    
     scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
     # ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
     ylab("Relative growth rate") +
@@ -1579,23 +1574,18 @@
    # ylim(c(.20, .5)) +
     # scale_color_manual(values = c("#FF6633", "#6699CC")) +
     # scale_fill_manual(values = c("#FF6633", "#6699CC")) +
-    #theme_bw(8) + downsize version
-    theme_bw(10) +
+    theme_bw(8) + 
     theme(panel.border = element_blank(), 
           panel.grid.major = element_blank(),
           panel.grid.minor = element_blank(), 
           axis.line = element_line(colour = "black"),
-        #  legend.position = "none", 
-          plot.margin = ggplot2::margin(1.5,1.5,1.5,1.5, "cm")) +
+          legend.position = "none") +
     NULL
   
   
-  # ggsave(filename = paste0("./figs_tables/Figure 2 - outlier counts ", Sys.Date(), ".pdf"),
-  #        units = "cm", width = 6, height = 4)
-  
-  # ggsave(filename = paste0("./figs_tables/Figure 2 - outlier counts upsizes ", Sys.Date(), ".pdf"),
-  #        units = "cm", width = 12, height = 8)
-  
+  ggsave(filename = paste0("./figs_tables/Figure 2 - outlier counts ", Sys.Date(), ".pdf"),
+         units = "cm", width = 6, height = 4)
+
   
   ## Calculating differences in growth rates
  test =  newdata %>%
