@@ -650,41 +650,12 @@
     kruskal.test(dev_dif ~ has_outlier_snp, data = .)
   
   
-# Random forest on just beneficial alleles ------------------------
+# Modeling spatial distributions of outlier alleles ------------------------
    
-   library(randomForest)
    library(raster)
-  # library(pdp)
    library(factoextra)
   
-
-  ## For TOP SNPS
-     rf_top <- gen_dat_top[ , snp_col_names]
-     dim(rf_top)
-     
-     ## Count positives
-     pos_top <-  apply(rf_top[ ,top_snps_long$snp], 2, function(x) sum(x == 1, na.rm = TRUE) )
-     summary(pos_top)
-     hist(pos_top, breaks =20)
-
-       
-   ## For BOTTOM SNPS
-       rf_bottom <- gen_dat_bottom[ , snp_col_names]
-       dim(rf_bottom)
-       
-       
-       ## Count positives
-       pos_bottom <-  apply(rf_bottom[ , bottom_snps_long$snp], 2, function(x) sum(x == 1, na.rm = TRUE) )
-       summary(pos_bottom)
-       hist(pos_bottom, breaks =20)
-      
-    ## For mid snps
-       rf_mid<- gen_dat_mid[ , snp_col_names]
-       dim(rf_mid)
-       
-       
-
-   # Shape outlines
+  # Shape outlines
      cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
                                  proj4string = CRS("+proj=longlat +datum=WGS84"))
      
@@ -740,7 +711,7 @@
    # Find lat long points
      latlon <- xyFromCell(tmax_rast, 1:ncell(tmax_rast))
      
-     rf_rast_df <- data.frame(cell_id = 1:ncell(tmax_rast),
+     gam_dist_rast_df <- data.frame(cell_id = 1:ncell(tmax_rast),
                               longitude = latlon[, 1],
                               latitude = latlon[, 2],
                               tmax_sum = raster::extract(tmax_rast, 1:ncell(tmax_rast)),
@@ -753,23 +724,23 @@
                               bioclim_18 = raster::extract(bioclim_18, 1:ncell(bioclim_18)),
                               bioclim_19 = raster::extract(bioclim_19, 1:ncell(bioclim_19)),
                               random = rnorm(1:ncell(dem)))
-    # rf_rast_df
+    # gam_dist_rast_df
      
-     dim(rf_rast_df)
+     dim(gam_dist_rast_df)
      
      # Remove NAs from dataframe or random forest will complain
-     rf_rast_df_nona <-  rf_rast_df %>%
+     gam_dist_rast_df_nona <-  gam_dist_rast_df %>%
        dplyr::filter(!is.na(tmax_sum)) %>%
        dplyr::filter(!is.na(elevation)) %>%
        dplyr::filter(!is.na(aet)) %>%
        dplyr::filter(!is.na(bioclim_04))
      
-     summary(rf_rast_df_nona)
-     dim(rf_rast_df_nona)
+     summary(gam_dist_rast_df_nona)
+     dim(gam_dist_rast_df_nona)
    
 
   # Choose climate variables   
-     climate_vars_rf <-  c("tmax_sum", 
+     climate_vars_gam_dist <-  c("tmax_sum", 
                            "tmin_winter", 
                             "cwd",
                          #  "aet",
@@ -784,9 +755,9 @@
      
      # Check variance inflation factor
      car::vif(lm(snp_chr8_30946730 ~ . , 
-                 data = gen_dat_top[, c("snp_chr8_30946730", climate_vars_rf)]))
+                 data = gen_dat_top[, c("snp_chr8_30946730", climate_vars_gam_dist)]))
      
-     pairs.panels(gen_dat_top[, climate_vars_rf])
+     pairs.panels(gen_dat_top[, climate_vars_gam_dist])
      
      
    ## Calculate PCA on climate and spatial variables
@@ -794,33 +765,32 @@
      ## Scale climate variables based on GBS moms
      x = 1 # used in loop
      
-     scaled_var_means_rf <- NA
-     scaled_var_sds_rf <- NA
+     scaled_var_means_gam_dist <- NA
+     scaled_var_sds_gam_dist <- NA
      
      gen_dat_top_scaled <- gen_dat_top
 
-     for(var in climate_vars_rf){
+     for(var in climate_vars_gam_dist){
        
        # For all seedlings  
-       scaled_var_means_rf[x] <- mean(gen_dat_top[[var]], na.rm = TRUE)
-       scaled_var_sds_rf[x] <- sd(gen_dat_top[[var]], na.rm = TRUE)
-       gen_dat_top_scaled[var] <- (gen_dat_top_scaled[var] - scaled_var_means_rf[x]) / scaled_var_sds_rf[x]
+       scaled_var_means_gam_dist[x] <- mean(gen_dat_top[[var]], na.rm = TRUE)
+       scaled_var_sds_gam_dist[x] <- sd(gen_dat_top[[var]], na.rm = TRUE)
+       gen_dat_top_scaled[var] <- (gen_dat_top_scaled[var] - scaled_var_means_gam_dist[x]) / scaled_var_sds_gam_dist[x]
     
        x = x + 1
      }
      
      # Assign names  
-     names(scaled_var_means_rf) <- climate_vars_rf
-     names(scaled_var_sds_rf) <-  climate_vars_rf
+     names(scaled_var_means_gam_dist) <- climate_vars_gam_dist
+     names(scaled_var_sds_gam_dist) <-  climate_vars_gam_dist
 
-     summary(gen_dat_top_scaled[ , climate_vars_rf]) # make sure they are centered and scaled
+     summary(gen_dat_top_scaled[ , climate_vars_gam_dist]) # make sure they are centered and scaled
      
      ## Look at interaction in latlong
      gen_dat_top_scaled$latlong <- gen_dat_top_scaled$latitude * gen_dat_top_scaled$longitude
      
-     
      ## PCA on climate variables
-     pca_clim = prcomp(gen_dat_top_scaled[ , c(climate_vars_rf, "latlong")], center = FALSE, scale = FALSE) 
+     pca_clim = prcomp(gen_dat_top_scaled[ , c(climate_vars_gam_dist, "latlong")], center = FALSE, scale = FALSE) 
      
      biplot(pca_clim)
      summary(pca_clim)
@@ -848,45 +818,44 @@
     # Convert raster df to PC space
        
        ## Forward scale variables first
-       for(var in climate_vars_rf){
+       for(var in climate_vars_gam_dist){
          
          # For all seedlings  
-         rf_rast_df_nona[var] <- forward_transform(rf_rast_df_nona[var],
+         gam_dist_rast_df_nona[var] <- forward_transform(gam_dist_rast_df_nona[var],
                                                     var = var, 
-                                                    means = scaled_var_means_rf,
-                                                    sds = scaled_var_sds_rf)
+                                                    means = scaled_var_means_gam_dist,
+                                                    sds = scaled_var_sds_gam_dist)
        }
        
-      summary(rf_rast_df_nona)
+      summary(gam_dist_rast_df_nona)
       
       ## Makt lat long interaction
-      rf_rast_df_nona$latlong <- rf_rast_df_nona$latitude * rf_rast_df_nona$longitude
+      gam_dist_rast_df_nona$latlong <- gam_dist_rast_df_nona$latitude * gam_dist_rast_df_nona$longitude
        
       # Generate predictions
-      rf_rast_df_nona = bind_cols(rf_rast_df_nona,
-                                  data.frame(predict(pca_clim, rf_rast_df_nona[ , -1])))
+      gam_dist_rast_df_nona = bind_cols(gam_dist_rast_df_nona,
+                                  data.frame(predict(pca_clim, gam_dist_rast_df_nona[ , -1])))
       
-      head(rf_rast_df_nona)
+      head(gam_dist_rast_df_nona)
       
-      summary(rf_rast_df_nona)
+      summary(gam_dist_rast_df_nona)
       
-      climate_vars_rf <- c("PC1","PC2","PC3", "PC4")
+      climate_vars_gam_dist <- c("PC1","PC2","PC3", "PC4")
      
      
      
 # Initialize variables
-     
-     stack_top <- stack() # For Top SNPs
-     stack_bottom <- stack() # For Top SNPs
-     stack_random_snps <- stack() # For Random SNPs
-     stack_random_env <- stack() # For randomizing environmental variables
+   stack_top <- stack() # For Top SNPs
+   stack_bottom <- stack() # For Top SNPs
+   stack_random_snps <- stack() # For Random SNPs
+   stack_random_env <- stack() # For randomizing environmental variables
 
-     start_flag = FALSE
-     pp_df <- NULL # Initialize
-     
-     reps = 1
+   start_flag = FALSE
+   pp_df <- NULL # Initialize
+   
+   reps = 1
 
-## Begin Random forest loop         
+## Begin loop over outlier SNPs to predict distribution         
   for(mode in c("top_snps", "bottom_snps")){ # , random_env,  "random_snps"
     
     # Start rep loop
@@ -914,61 +883,32 @@
          
          # Get climate and snp data
          if(mode == "top_snps"){
-           X = gen_dat_top[, climate_vars_rf] # Save climate variables
+           X = gen_dat_top[, climate_vars_gam_dist] # Save climate variables
            y = pull(gen_dat_top, snp_name) # Pull out snp values
          }
          
          if(mode == "bottom_snps"){
-           X = gen_dat_bottom[, climate_vars_rf] # Save climate variables
+           X = gen_dat_bottom[, climate_vars_gam_dist] # Save climate variables
            y = pull(gen_dat_bottom, snp_name) # Pull out snp values
          }
          
          if(mode == "random_snps"){
-           X = gen_dat_mid[, climate_vars_rf] # Save climate variables
+           X = gen_dat_mid[, climate_vars_gam_dist] # Save climate variables
            y = pull(gen_dat_mid, snp_name) # Pull out snp values
          }
-
-         ## IF mode == random_env permute CLIMATE VARIABLES 
-         # if(mode == "random_env") {
-         #   for(col in 1:ncol(X)){
-         #     X[, col] <- X[sample(1:nrow(gen_dat_top)), col]
-         #   }
-         #   
-         # }
-
-        # Count number of precense / absence
-         # n1 <- sum(y == 1, na.rm = TRUE)
-         # n0 <- sum(y == 0, na.rm = TRUE)
-         # 
-         
-          not_NAs <- !is.na(y) # True if not NA
-         
-         # Convert to factor
-       #  y <- factor(y)
         
          # Error check 
-         # if(length(levels(y)) != 2){
-         #   warning("Length of levels of y not equal to 2- something is wrong")
-         #   next
-         # }
-          
           if(any(y == 2, na.rm = TRUE)){
             stop("Why is there a 2 in the genotype?")
           }
          
-        # Set up dataframe for random forest
-         dat_rf <- cbind(y = y[not_NAs], X[not_NAs, ])
- 
-         # Run random forest
-         # rf <- randomForest::randomForest(y ~.,
-         #                    data = dat_rf,
-         #                    importance = TRUE,
-         #                    sampsize = c(min(n0, n1), min(n0, n1)))
+        # Set up dataframe for model
+         dat_gam_dist <- cbind(y = y[!is.na(y)], X[!is.na(y), ])
+
+         ## Scale y?
+         # dat_gam_dist$y <- scale(dat_gam_dist$y)[, 1]
          
-         ## Scale y
-        # dat_rf$y <- scale(dat_rf$y)[, 1]
-         
-         rf <- gam(y ~ s(PC1, bs = "cr", k = 3) +
+         gam_dist <- gam(y ~ s(PC1, bs = "cr", k = 3) +
                        s(PC2, bs = "cr", k = 3) +
                        s(PC3, bs = "cr", k = 3) + 
                        s(PC4, bs = "cr", k = 3),
@@ -976,93 +916,38 @@
                      # discrete = TRUE,
                      select = TRUE,
                     family = "binomial",
-                     data = dat_rf)
-         
-         # rf <- bam(y ~ s(PC1, bs = "cr") + 
-         #               s(PC2, bs = "cr") +
-         #               s(PC3, bs = "cr") +
-         #               s(PC4, bs = "cr"), 
-         #           method = "fREML",
-         #           discrete = TRUE,
-         #           select = TRUE,
-         #           data = dat_rf)
-        
+                     data = dat_gam_dist)
 
-         # print(importance(rf))
-          # cat("OOB error rate: ", mean(rf$err.rate[, 1]), "\n")
-          # cat("Class1 error rate: ", rf$confusion[2,3], "\n")
-         
-         rf_sum <- summary(rf)
-        
-         print(table(y))
-         print(rf_sum)
-         
-       #  pairs.panels(dat_rf)
-       
-         
-         # ROC plot
-         # # The closer the curve follows the left-hand border and then the top border of the ROC space, the more accurate the test. The closer the curve comes to the 45-degree diagonal of the ROC space, the less accurate the test.
-         # roc0 <- roc(rf$votes[,1],factor(1 * (rf$y==0)))
-         # roc1 <- roc(rf$votes[,2],factor(1 * (rf$y==1)))
-         # 
-         # plot(roc0,
-         #      main= snp_name, col = "blue", lwd = 2)
-         # plot(roc1, add = TRUE, col = "green", lwd = 2)
-         # legend("topright", legend = c(0, 1), col = c("blue", "green"), lty = 1, lwd = 2)
-         # 
-         # 
-         
-         #  plot(rf)
-         
-         #  varImpPlot(rf)
-         
-         # Save importance and OOB error rates
-         if(start_flag == FALSE){
-
-           # importance_rf <- data.frame(mode = mode, rep = rep, snp = snp_name,
-           #                               climate_var =  rownames(randomForest::importance(rf, scale = FALSE)),
-           #                                 randomForest::importance(rf, scale = FALSE))
-           # 
-           # 
-           #  # Error rates
-           #   error_df <- data.frame(mode = mode,
-           #                            rep = rep,
-           #                            snp = snp_name,
-           #                            tail(rf$err.rate, 1)) # Last tree error rates
-           
-           dev_df <- data.frame(mode = mode,
-                                rep = rep,
-                                snp = snp_name,
-                                deviance = rf_sum$dev.expl,
-                                rsq_adj = rf_sum$r.sq
-                                )
-
-         } else {
-# 
-#          importance_rf <- rbind(importance_rf, data.frame(mode = mode, rep = rep,
-#                                                            snp = snp_name,
-#                                     climate_var =  rownames(randomForest::importance(rf,
-#                                                                             scale = FALSE)),
-#                                                randomForest::importance(rf, scale = FALSE)))
-# 
-#           error_df <- rbind(error_df, data.frame(mode = mode,
-#                                                  rep = rep,
-#                                                  snp = snp_name,
-#                                                  tail(rf$err.rate, 1)))
-#           
+         # Save and print summary
+           gam_dist_sum <- summary(gam_dist)
           
-          dev_df <- rbind(dev_df, data.frame(mode = mode,
-                               rep = rep,
-                               snp = snp_name,
-                               deviance = rf_sum$dev.expl,
-                               rsq_adj = rf_sum$r.sq))
-          
-         } # End else for start flag
+           print(table(y))
+           print(gam_dist_sum)
+         
+         
+         # Save deviance and rsquared from model
+           if(start_flag == FALSE){
+             dev_df <- data.frame(mode = mode,
+                                  rep = rep,
+                                  snp = snp_name,
+                                  deviance = gam_dist_sum$dev.expl,
+                                  rsq_adj = gam_dist_sum$r.sq
+                                  )
   
-         # Plot partial plot
-          for(climate_var in climate_vars_rf){
+           } else {
+            dev_df <- rbind(dev_df, data.frame(mode = mode,
+                                 rep = rep,
+                                 snp = snp_name,
+                                 deviance = gam_dist_sum$dev.expl,
+                                 rsq_adj = gam_dist_sum$r.sq))
+            
+           } # End else for start flag
+  
+         
+         # Plot partial plots
+          for(climate_var in climate_vars_gam_dist){
 
-            pp_out <- visreg(rf, xvar = climate_var, plot = FALSE)$fit
+            pp_out <- visreg(gam_dist, xvar = climate_var, plot = FALSE)$fit
             
             pp_df_temp <- data.frame(snp = snp_name,
                                      mode = mode,
@@ -1075,23 +960,6 @@
                                      x_val = pp_out[, climate_var],
                                      stringsAsFactors = FALSE)
             
-             #  Random forest version
-             # 
-             # pp_out <- pdp::partial(rf, pred.var = climate_var,
-             #                   plot = FALSE, which.class = 2L,
-             #                   prob = TRUE, smooth = FALSE)
-             # 
-             # pp_df_temp <- data.frame(snp = snp_name,
-             #                          mode = mode,
-             #                          rep = rep,
-             #                          var = climate_var,
-             #                          prob = pp_out[, 2],
-             #                          prob_centered = pp_out[, 2] - mean(pp_out[, 2]),
-             #                          prob_scaled = scale(pp_out[, 2]),
-             #                          x_val = pp_out[, 1],
-             #                          stringsAsFactors = FALSE)
-
-
              if(!exists("pp_df")){ # If pp_df doesn't exist yet
                pp_df = pp_df_temp
              } else {
@@ -1102,20 +970,18 @@
 
          
          ## Predict across a raster and add to stack
-         
-         ## TESTING
-  
-             # Second column is positives
-             rf_rast_df_nona$pred = predict(rf, rf_rast_df_nona, type = "response")
+           gam_dist_rast_df_nona$pred = predict(gam_dist,
+                                                gam_dist_rast_df_nona, 
+                                                type = "response")
 
+             gam_dist_rast_df_temp <- left_join(gam_dist_rast_df,
+                                                gam_dist_rast_df_nona[, c("cell_id", "pred")])
 
-             rf_rast_df_temp <- left_join(rf_rast_df, rf_rast_df_nona[, c("cell_id", "pred")])
-
-             rast <- tmax_rast
-             values(rast) <- rf_rast_df_temp$pred
+             rast <- tmax_rast # Initialize
+             values(rast) <- gam_dist_rast_df_temp$pred
              names(rast) <- snp_name # Name the raster
-
-             #  levelplot(rast, margin = FALSE)
+             
+          # Add to stack
           if(mode == "top_snps") stack_top <- stack(stack_top, rast)
           if(mode == "bottom_snps") stack_bottom <- stack(stack_bottom, rast)
           if(mode == "random_snps")   stack_random_snps <- stack(stack_random_snps, rast)
@@ -1132,7 +998,6 @@
 
      
   ## Look at deviance explained
-     
      dev_df %>%
        dplyr::select(-snp) %>%
        dplyr::group_by(mode) %>%
@@ -1152,185 +1017,32 @@
        ggplot(., aes(x = mode, y = rsq_adj, fill = mode)) +
        geom_boxplot() + geom_jitter(width = .1) + theme_bw(15) +
        NULL
-     
-     
-     
-   ## Importance
-     # 
-     # importance_rf_raw <- importance_rf
-     # pp_df_raw <- pp_df
-     # 
-     # head(importance_rf)
-     # dim(importance_rf)
-     # 
-     # ## Change variable names in importance and partial plots 
-     #   table(importance_rf$climate_var)
-     #   
-     #   importance_rf$climate_var <- as.character(importance_rf$climate_var)
-     #   
-     #   importance_rf$climate_var[importance_rf$climate_var == "aet"] <- "Actual Evap."
-     #   importance_rf$climate_var[importance_rf$climate_var == "bioclim_04"] <- "Temp. seasonality"
-     #   importance_rf$climate_var[importance_rf$climate_var == "bioclim_15"] <- "Precip. seasonality"
-     #   importance_rf$climate_var[importance_rf$climate_var == "bioclim_18"] <- "Summer precip."
-     #   importance_rf$climate_var[importance_rf$climate_var == "latitude"] <- "Latitude"
-     #   importance_rf$climate_var[importance_rf$climate_var == "longitude"] <- "Longitude"
-     #   importance_rf$climate_var[importance_rf$climate_var == "tmax_sum"] <- "Tmax"
-     #   importance_rf$climate_var[importance_rf$climate_var == "tmin_winter"] <- "Tmin"
-     #   importance_rf$climate_var[importance_rf$climate_var == "elevation"] <- "Elevation"
-     #   importance_rf$climate_var[importance_rf$climate_var == "random"] <- "Random variable"
-     #   importance_rf$climate_var <- factor(importance_rf$climate_var)
-     #   
-     #   table(importance_rf$climate_var)
-     #   
-     #   ## Reverse order of snps
-     #     importance_rf$mode
-     #     importance_rf$mode <- factor(importance_rf$mode, levels = c("bottom_snps", 
-     #                                                                 "random_snps",
-     #                                                                 "top_snps"))
-     #      table(importance_rf$mode)
-     #   
-       
-       # Partial plots
-         pp_df$var <- as.character(pp_df$var)
-         pp_df$var[pp_df$var == "aet"] <- "Actual Evap."
-         pp_df$var[pp_df$var == "bioclim_04"] <- "Temp. seasonality"
-         pp_df$var[pp_df$var == "bioclim_15"] <- "Precip. seasonality"
-         pp_df$var[pp_df$var == "bioclim_18"] <- "Summer precip."
-         pp_df$var[pp_df$var == "latitude"] <- "Latitude"
-         pp_df$var[pp_df$var == "longitude"] <- "Longitude"
-         pp_df$var[pp_df$var == "tmax_sum"] <- "Tmax"
-         pp_df$var[pp_df$var == "tmin_winter"] <- "Tmin"
-         pp_df$var[pp_df$var == "elevation"] <- "Elevation"
-         pp_df$var[pp_df$var == "random"] <- "Random variable"
-         pp_df$var <- factor(pp_df$var)
-         table(pp_df$var)
-         
-         ## Reverse order of snps
-         pp_df$mode
-         pp_df$mode <- factor(pp_df$mode, levels = c("bottom_snps", 
-                                                     "random_snps", 
-                                                     "top_snps"))
-        table(pp_df$mode)
-       
-    # ## rf importance 
-    #  # Find order of most important variables for TOP_SNPS
-    #  importance_rf_df_top <- importance_rf %>%
-    #    group_by(mode, snp, climate_var ) %>%
-    #    summarise_all(mean) %>% # Average across reps
-    #    ungroup() %>%
-    #    group_by(mode, climate_var) %>%
-    #    dplyr::select(-snp, -rep) %>%
-    #    group_by(mode, climate_var) %>%
-    #    summarise_all(median) %>%
-    #    arrange(mode, MeanDecreaseAccuracy) %>%
-    #    filter(mode == "top_snps") %>%
-    #    ungroup() %>%
-    #    dplyr::select(-MeanDecreaseAccuracy, -MeanDecreaseGini, -X0, -X1, -mode, -snp) %>%
-    #    dplyr::mutate(order = row_number()) 
-    #  
-    #  # Make a dataframe with mean importance values
-    #  
-    #  lwr <- function(x) {quantile(x, 0.05)} # To find lower and upper quantiles
-    #  upr <- function(x) {quantile(x, 0.95)}
-    #  se <- function(x) {sd(x)/sqrt(length(x))}
-    # 
-    #  importance_rf_means <- 
-    #              importance_rf %>%
-    #              group_by(mode, snp, climate_var) %>%  ## Average across reps by snp
-    #              summarise_all(mean) %>%
-    #               ungroup() %>%
-    #              dplyr::select(-snp) %>%
-    #              group_by(mode, climate_var) %>%
-    #             summarise_all(funs(mean, median, lwr, upr, sd, se))  %>% # Calculate means and upr and lower quantiles
-    #              left_join(., importance_rf_df_top, by = c("climate_var"))
-    # 
-    #  
-     
-  ## Figure 4 - rf variable importance    ####
-     # Make ggplot
-     # importance_rf %>%
-     # group_by(mode, snp, climate_var ) %>%
-     #   summarise_all(funs(mean, median, sd)) %>% # Average across reps
-     #   dplyr::filter(mode != "random_snps") %>%
-     #   dplyr::filter(climate_var != "Random variable") %>%
-     #   dplyr::mutate(climate_var = factor(climate_var,
-     #                                      levels = importance_rf_df_top$climate_var)) %>%
-     # ggplot(., aes(climate_var, MeanDecreaseAccuracy_mean, fill = mode)) + 
-     # #  geom_violin(draw_quantiles = c(0.25, 0.5, 0.75)) + 
-     #  
-     #   geom_hline(yintercept = 0, lty = 2, size = .25) +
-     #   geom_point(aes(col = mode),
-     #              position = position_jitterdodge(),
-     #              size = .55, alpha = .75, pch = 16) +
-     #   geom_boxplot(outlier.shape = NA, notch = TRUE, alpha = 0.45, size = .1) + 
-     #   # geom_point(data = importance_rf_means, 
-     #   #            aes(climate_var, MeanDecreaseAccuracy_mean, fill = mode),
-     #   #            position = position_dodge2(width = .65),
-     #   #            size = 3,
-     #   #            pch = 21) + 
-     #  
-     #   # geom_errorbar(aes(ymin = MeanDecreaseAccuracy_mean - MeanDecreaseAccuracy_sd,
-     #   #                   ymax = MeanDecreaseAccuracy_mean + MeanDecreaseAccuracy_sd),
-     #   #                    position = position_dodge(width = .5),
-     #   #               width = 0.1, alpha = 0.5) +
-     #   theme_bw(10) + 
-     # #  ggtitle("Variable importance") + 
-     #   #   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-     #   ylab("Mean decrease in accuracy") + xlab("") +
-     #   scale_x_discrete(limits = rev(levels(mode))) +
-     #   scale_fill_manual(values = c("#FF6633","#6699CC")) + 
-     #   scale_color_manual(values = c("#FF6633","#6699CC")) + 
-     #  coord_flip() + 
-     #   theme(panel.grid.major = element_blank(), 
-     #         panel.grid.minor = element_blank(),
-     #         legend.position = "none") + 
-     #   NULL
-     # 
-     # # Save file
-     # ggsave(filename = paste0("./figs_tables/Figure 4 - variable importance ", 
-     #                          Sys.Date(), ".pdf"),
-     #      units = "cm",
-     #      height = 8, width = 8,
-     #        
-     #        useDingbats = FALSE )
 
+   # Partial plots
+     pp_df$var <- as.character(pp_df$var)
+     pp_df$var[pp_df$var == "aet"] <- "Actual Evap."
+     pp_df$var[pp_df$var == "bioclim_04"] <- "Temp. seasonality"
+     pp_df$var[pp_df$var == "bioclim_15"] <- "Precip. seasonality"
+     pp_df$var[pp_df$var == "bioclim_18"] <- "Summer precip."
+     pp_df$var[pp_df$var == "latitude"] <- "Latitude"
+     pp_df$var[pp_df$var == "longitude"] <- "Longitude"
+     pp_df$var[pp_df$var == "tmax_sum"] <- "Tmax"
+     pp_df$var[pp_df$var == "tmin_winter"] <- "Tmin"
+     pp_df$var[pp_df$var == "elevation"] <- "Elevation"
+     pp_df$var[pp_df$var == "random"] <- "Random variable"
+     pp_df$var <- factor(pp_df$var)
+     table(pp_df$var)
      
+     ## Reverse order of snps
+     pp_df$mode
+     pp_df$mode <- factor(pp_df$mode, levels = c("bottom_snps", 
+                                                 "random_snps", 
+                                                 "top_snps"))
+    table(pp_df$mode)
+    
  # Looking at rasters
     stack_top
-    
-    ## Average across reps within each SNP
-    # # Using stack apply - give indices of each raster that's a repition of a SNP - should go in order from 1-length(top_snps) and then repeat XX number of reps
-    # stack_top_avg = stackApply(stack_top,
-    #                            indices = rep(1:length(top_snps_long$snp), 
-    #                                                     times = rep), 
-    #                            mean, na.rm = TRUE)
-    # 
-    # 
-    # stack_bottom_avg = stackApply(stack_bottom, 
-    #                            indices = rep(1:length(bottom_snps_long$snp), 
-    #                                          times = rep), 
-    #                            mean, na.rm = TRUE)
-    
-    
-     
-  ## Take mean of rasters, weighted by class1 error - higher weights to lower error
-    
-# Top snps
- #  top_error <-   error_df %>%
- #      dplyr::filter(mode == "top_snps") %>%
- #      dplyr::group_by(mode, snp) %>%
- #      summarise_all(mean)
- # 
- #  summary(top_error)
- # 
- # # Bottom snps
- #  bottom_error <-   error_df %>%
- #    dplyr::filter(mode == "bottom_snps") %>%
- #    dplyr::group_by(mode, snp) %>%
- #    summarise_all(mean)
- #  summary(bottom_error)
- # 
-        
+  
   ## Weighted means      
   top_snps_stack <- weighted.mean(stack_top,
                                     w = dev_df$deviance[dev_df$mode == "top_snps"])
@@ -1351,7 +1063,7 @@
     
   ## Figure 4 - spatial maps of outlier genotypes ####  
     
-    # Set breaks for color palette
+  # Set breaks for color palette
     color_breaks <-  seq(from = min(c(values(top_snps_stack), values(bottom_snps_stack)),
                                     na.rm = TRUE),
                          to = max(c(values(top_snps_stack), values(bottom_snps_stack)),
@@ -1440,12 +1152,6 @@
          width = 10, height = 8, useDingbats = FALSE)
 
 
-  
-  
-  
-  
-  
-  
   
   
 # Figure 2 - growth vs copies of alleles ##################

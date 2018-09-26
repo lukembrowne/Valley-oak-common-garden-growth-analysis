@@ -115,8 +115,7 @@ back_transform <- function(x, var, means, sds){
                control = list(trace = FALSE))
   
   summary(gam_all)
-  
-  
+
   
   test = summary(gam_all)
   

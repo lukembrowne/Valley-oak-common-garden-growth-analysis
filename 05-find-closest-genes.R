@@ -23,6 +23,7 @@
   closest_genes <- read_tsv("./output/temp/closest_genes.txt", col_names = FALSE)
   
   head(closest_genes)
+  dim(closest_genes)
   
   
   ## Read in BLAST hits to arabidopsis
