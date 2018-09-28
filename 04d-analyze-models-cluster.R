@@ -239,7 +239,7 @@
   train_test_cor_thresh <- 0.6
   
  top_snps_long <-  sum_df_long %>%
-    dplyr::filter(p_val_adj <= p_val_adj_thresh) %>%
+    dplyr::filter(p_val_adj < p_val_adj_thresh) %>%
     dplyr::filter(train_test_cor >= train_test_cor_thresh) %>%
     dplyr::filter(height_change_warmer_base0 >= median(height_change_warmer_base0) +
                    mad_thresh * mad(height_change_warmer_base0)) %>%
@@ -288,7 +288,7 @@
  
  ## Bottom SNPs
  bottom_snps_long <- sum_df_long %>%
-   dplyr::filter(p_val_adj <= p_val_adj_thresh) %>%
+   dplyr::filter(p_val_adj < p_val_adj_thresh) %>%
    dplyr::filter(train_test_cor >= train_test_cor_thresh) %>%
    dplyr::filter(height_change_warmer_base0 <= median(height_change_warmer_base0) - 
                    mad_thresh * mad(height_change_warmer_base0))
@@ -306,7 +306,7 @@
 
  # Also make a comparable dataframe of 'random snps'
  
-  # set.seed(129) # To make sure same SNPs are chosen everytime - reproducible
+   set.seed(129) # To make sure same SNPs are chosen everytime - reproducible
    
    mid_snps_long <- sum_df_long %>%
      dplyr::filter(p_val_adj <= p_val_adj_thresh) %>%
@@ -449,8 +449,7 @@
      # Vertical lines
      geom_vline(xintercept = chrom_breaks$index, col = "grey50", alpha = 0.8, size = .2) + 
      
-     # Horizontal line
-     geom_hline(yintercept = 0, lty = 2, size = .25) +
+    
      
      # Add points
      geom_point(pch = man_df$pch, 
@@ -469,7 +468,8 @@
                     pch = man_df[man_df$top_snp | man_df$bottom_snp, ]$pch,
                     size = .65 + .35) +
      
-     
+     # Horizontal line
+     geom_hline(yintercept = mean(man_df$height_change_warmer_base0, na.rm = TRUE), lty = 2, size = .25) +
      
      # # Add snp names
      #   geom_text_repel(
@@ -545,7 +545,7 @@
     gen_dat_top[, snp] <- apply(gen_dat_clim_all[, snp], 1, function(x) {
                 if(is.na(x)){ NA
                 } else if(x == ben_gen){ 1
-                } else if(x == 1){ .5 # Set heterozygotes to presence
+           #     } else if(x == 1){ .5 # Set heterozygotes to presence
                 } else {  0
                 }
               }) # End apply
@@ -573,7 +573,7 @@
     gen_dat_bottom[, snp] <- apply(gen_dat_clim_all[, snp], 1, function(x) {
       if(is.na(x)){ NA
       } else if(x == ben_gen){ 1
-      } else if(x == 1){ .5 # Set heterozygotes to presence
+    #  } else if(x == 1){ .5 # Set heterozygotes to presence
       } else {  0
       }
     }) # End apply
@@ -683,7 +683,7 @@
      
     # Function to downscale and project raster 
      process_raster <- function(rast){
-       rast <- aggregate(rast, fact = 5) # Make smaller by averaging across cells
+       rast <- aggregate(rast, fact = 10) # Make smaller by averaging across cells
        rast_latlon <- projectRaster(rast, crs = CRS("+proj=longlat +datum=WGS84"))
        plot(rast_latlon)
        return(rast_latlon)
@@ -746,7 +746,7 @@
                          #  "aet",
                            "bioclim_04",
                            "bioclim_15",
-                           "bioclim_18",
+                        #   "bioclim_18",
                           # "bioclim_19", # R = 0.79 with aet; R = 0.84 with bioclim_18
                            "elevation",
                            "latitude",
@@ -789,23 +789,35 @@
      ## Look at interaction in latlong
      gen_dat_top_scaled$latlong <- gen_dat_top_scaled$latitude * gen_dat_top_scaled$longitude
      
+     
      ## PCA on climate variables
-     pca_clim = prcomp(gen_dat_top_scaled[ , c(climate_vars_gam_dist, "latlong")], center = FALSE, scale = FALSE) 
+     pca_clim = prcomp(gen_dat_top_scaled[ , climate_vars_gam_dist], center = FALSE, scale = FALSE) 
      
      biplot(pca_clim)
      summary(pca_clim)
      screeplot(pca_clim, bstick = TRUE)
      
-     ## Visualize results
-     fviz_contrib(pca_clim, choice = "var", axes = 1)
-     fviz_contrib(pca_clim, choice = "var", axes = 2)
-     fviz_contrib(pca_clim, choice = "var", axes = 3)
-     fviz_contrib(pca_clim, choice = "var", axes = 4)
-     
-     fviz_pca_var(pca_clim, col.var="contrib")
-     
-     fviz_pca_var(pca_clim, axes = c(1, 2), col.var="contrib")
-     fviz_pca_var(pca_clim, axes = c(3, 4), col.var="contrib")
+     ## Visualize PCA results
+       fviz_contrib(pca_clim, choice = "var", axes = 1)
+       fviz_contrib(pca_clim, choice = "var", axes = 2)
+       fviz_contrib(pca_clim, choice = "var", axes = 3)
+       fviz_contrib(pca_clim, choice = "var", axes = 4)
+       
+  
+       fviz_pca_var(pca_clim, axes = c(1, 2), col.var="contrib")
+       fviz_pca_var(pca_clim, axes = c(3, 4), col.var="contrib")
+       
+       
+       ## PC1 - cwd, long, lat, bioclim_18
+       ## PC2 - bioclim4, bioclim15, tmin winter
+       ## PC3 - latlong, elevation, tmax_sum,
+       ## PC4 - latlong, tmax_sum, elevation
+       
+       sort(pca_clim$rotation[, 1])
+       sort(pca_clim$rotation[, 2])
+       sort(pca_clim$rotation[, 3])
+       sort(pca_clim$rotation[, 4])
+       
        
      pcs <- as.data.frame(pca_clim$x[, 1:7])
        
@@ -909,15 +921,15 @@
          # dat_gam_dist$y <- scale(dat_gam_dist$y)[, 1]
          
          gam_dist <- gam(y ~ s(PC1, bs = "cr", k = 3) +
-                       s(PC2, bs = "cr", k = 3) +
-                       s(PC3, bs = "cr", k = 3) + 
-                       s(PC4, bs = "cr", k = 3),
+                             s(PC2, bs = "cr", k = 3) +
+                             s(PC3, bs = "cr", k = 3) + 
+                             s(PC4, bs = "cr", k = 3),
                      # method = "fREML",
                      # discrete = TRUE,
                      select = TRUE,
                     family = "binomial",
                      data = dat_gam_dist)
-
+      
          # Save and print summary
            gam_dist_sum <- summary(gam_dist)
           
@@ -1048,6 +1060,11 @@
                                     w = dev_df$deviance[dev_df$mode == "top_snps"])
   bottom_snps_stack <- weighted.mean(stack_bottom,
                                   w = dev_df$deviance[dev_df$mode == "bottom_snps"])
+  
+  # Sum
+    top_snps_stack <- sum(stack_top)
+    bottom_snps_stack <- sum(stack_bottom)
+  
   # Regular means
     top_snps_stack <- mean(stack_top, na.rm = TRUE)
     bottom_snps_stack <- mean(stack_bottom, na.rm = TRUE)
@@ -1064,11 +1081,11 @@
   ## Figure 4 - spatial maps of outlier genotypes ####  
     
   # Set breaks for color palette
-    color_breaks <-  seq(from = min(c(values(top_snps_stack), values(bottom_snps_stack)),
-                                    na.rm = TRUE),
-                         to = max(c(values(top_snps_stack), values(bottom_snps_stack)),
-                             na.rm = TRUE), 
-                         length.out = 9)
+    # color_breaks <-  seq(from = min(c(values(top_snps_stack), values(bottom_snps_stack)),
+    #                                 na.rm = TRUE),
+    #                      to = max(c(values(top_snps_stack), values(bottom_snps_stack)),
+    #                          na.rm = TRUE), 
+    #                      length.out = 9)
     
   ## Plot beneficial raster
      levelplot(top_snps_stack, margin = FALSE,
@@ -1080,52 +1097,55 @@
      #  latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
        latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
      
-     # # Save plot
-     # dev.copy(png, paste0("./figs_tables/Figure 4 - beneficial alleles map ", Sys.Date(), ".png"),
-     #          res = 300, units = "cm", width = 16, height = 16)
-     # dev.off()
-     # 
+     # Save plot
+     dev.copy(png, paste0("./figs_tables/Figure 3 - beneficial alleles map ", Sys.Date(), ".png"),
+              res = 300, units = "cm", width = 16, height = 16)
+     dev.off()
+
      
      
    # Save a quick PDF version for the legend
-       # pdf(paste0("./figs_tables/Figure 4 - beneficial alleles map LEGEND ", Sys.Date(), ".pdf"),
-       #    width = 4, height = 3)
-       #   levelplot(top_snps_stack, margin = FALSE,
-       #           #  main = "Probability of finding beneficial genotype",
-       #             maxpixels = 1e3,
-       #             par.settings =  rasterTheme(region = brewer.pal('PRGn', n = 9)),
-       #             at = color_breaks)
-       # dev.off()
+       pdf(paste0("./figs_tables/Figure 3 - beneficial alleles map LEGEND ", Sys.Date(), ".pdf"),
+          width = 4, height = 3)
+         levelplot(top_snps_stack, margin = FALSE,
+                 #  main = "Probability of finding beneficial genotype",
+                   maxpixels = 1e3,
+                   par.settings =  rasterTheme(region = brewer.pal('PRGn', n = 9)))
+       dev.off()
      
      
      
      ## Maybe make a PDF version that will only have the scale
      
-     ## Plot raster
+     ## Plot Detrimental SNPS
      levelplot(bottom_snps_stack, margin = FALSE,
             #   main = "Probability of finding detrimental genotype",
                maxpixels = 1e6,
                par.settings =  rasterTheme(region = brewer.pal('PRGn', n = 9))) +
        latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
-     #  latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
+       latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
        latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
      
    # Save plot
-     #   dev.copy(png, paste0("./figs_tables/Figure 4 - detrimental alleles map ", Sys.Date(), ".png"),
-     #        res = 300, units = "cm", width = 16, height = 16)
-     # dev.off()
+       dev.copy(png, paste0("./figs_tables/Figure 3 - detrimental alleles map ", Sys.Date(), ".png"),
+            res = 300, units = "cm", width = 16, height = 16)
+     dev.off()
+     
+     pdf(paste0("./figs_tables/Figure 3 - detrimental alleles map LEGEND ", Sys.Date(), ".pdf"),
+         width = 4, height = 3)
+     levelplot(bottom_snps_stack, margin = FALSE,
+               #  main = "Probability of finding beneficial genotype",
+               maxpixels = 1e3,
+               par.settings =  rasterTheme(region = brewer.pal('PRGn', n = 9)))
+     dev.off()
    
      
   
- # Figure 4 - partial dependence plots ####
+ # Figure 3 - partial dependence plots ####
 
   pp_df %>%
     dplyr::filter(mode != "random_snps") %>%
     dplyr::filter(var != "Random variable") %>%
-    # dplyr::mutate(var = factor(var, # Reorder based on importance
-    #                            levels = rev(importance_rf_df_top$climate_var))) %>%
-    group_by(mode, snp, var, x_val) %>% # Average across reps
-    summarise_all(mean) %>%
    ggplot(., 
           aes(x = x_val,
           #    y = prob,
@@ -1133,12 +1153,12 @@
            #   y = prob_scaled,
               group = snp, col = mode, fill = mode), alpha = 0.75) + 
   #  geom_line(lwd = .25, alpha = 0.55) + # Plot individual lines
-    ylab("Probablity of occurrence") + xlab("") + 
+    ylab("Scaled allele frequency") + xlab("") + 
     theme_bw(8) + 
     # theme(legend.position="none") +
        scale_color_manual(values = c("#FF6633", "#6699CC")) + 
      geom_smooth(aes(group = mode), lwd = .75) +
-     facet_wrap(~var, scales = "free_x") +
+     facet_wrap(~var, scales = "free_x", ncol = 4) +
     theme(panel.grid.major = element_blank(),
           panel.grid.minor = element_blank(),
           legend.position = "none",
@@ -1147,9 +1167,26 @@
      NULL
   
   # # Save file
-  ggsave(filename = paste0("./figs_tables/Figure 4 - partial plots ", Sys.Date(), ".pdf"),
+  ggsave(filename = paste0("./figs_tables/Figure 3 - partial plots ", Sys.Date(), ".pdf"),
          units = "cm",
-         width = 10, height = 8, useDingbats = FALSE)
+         width = 16, height = 4, useDingbats = FALSE)
+  
+  
+  ## Correlate with climate variables
+  
+  # gam_dist_rast_df2 <- gam_dist_rast_df
+  # gam_dist_rast_df2$n_top_snps <- values(top_snps_stack)
+  # gam_dist_rast_df2$n_bottom_snps <- values(bottom_snps_stack)
+  # 
+  # gam_dist_rast_df2 <-  gam_dist_rast_df2 %>%
+  #   dplyr::select(-cell_id) %>%
+  #   dplyr::filter(!is.na(tmax_sum))
+  # 
+  #   ggplot(gam_dist_rast_df2, aes(x = tmax_sum, y = n_top_snps)) + 
+  #            geom_point(alpha = .5, size = .15) + 
+  #            geom_smooth() +
+  #            theme_bw()
+  
 
 
   
@@ -1209,7 +1246,7 @@
   
   ## Save output
   
-  ## Save gam summary to file
+  # Save gam summary to file
   # sink(file = paste0("./figs_tables/Table S2 - outlier_count_gam_model_summary_",
   #                    Sys.Date(), ".txt"))
   # summary(gam_snp)
@@ -1217,16 +1254,13 @@
   # sink()
   
   
-  
-  
-  ## Plot predictions
-  
+## Plot predictions
   low <- c(0, max(dat_snp_count_unscaled$n_bottom_snps))
   mid <- c(round(mean(dat_snp_count_unscaled$n_top_snps)),
            round(mean(dat_snp_count_unscaled$n_bottom_snps)))
   high <-c(max(dat_snp_count_unscaled$n_top_snps), 0)
   
-  
+  # Set up dataframe for prediction
   newdata <-  expand.grid(section_block = "IFG_1",
                           height_2014 = 0,
                           accession = "1",
@@ -1242,6 +1276,7 @@
   
   table(newdata$n_bottom_snps_unscaled, newdata$n_top_snps_unscaled)
   
+  # Transform variables
   newdata$n_top_snps <- forward_transform(x = newdata$n_top_snps_unscaled,
                                           var = 1,
                                           means = n_top_snps_mean,
@@ -1252,6 +1287,7 @@
                                              means = n_bottom_snps_mean,
                                              sd = n_bottom_snps_sd)
   
+  # Make predictions
   newdata$pred <- predict(gam_snp,
                           newdata = newdata,
                           se.fit = TRUE, type = "response")$fit
@@ -1260,7 +1296,7 @@
                         newdata = newdata,
                         se.fit = TRUE, type = "response")$se
   
-  
+  # Plot predictions
   newdata %>%
     # dplyr::select(tmax_sum_dif, n_top_snps, n_bottom_snps, pred) %>%
     dplyr::mutate(type_count = paste0(n_top_snps_unscaled, ":", n_bottom_snps_unscaled)) %>%
@@ -1280,8 +1316,8 @@
     ylab("Relative growth rate") +
     xlab("Tmax transfer distance") +
    # ylim(c(.20, .5)) +
-    # scale_color_manual(values = c("#FF6633", "#6699CC")) +
-    # scale_fill_manual(values = c("#FF6633", "#6699CC")) +
+     scale_color_manual(values = c("#FF6633", "#6699CC", "grey50")) +
+     scale_fill_manual(values =  c("#FF6633", "#6699CC", "grey50")) +
     theme_bw(8) + 
     theme(panel.border = element_blank(), 
           panel.grid.major = element_blank(),
@@ -1290,31 +1326,30 @@
           legend.position = "none") +
     NULL
   
-  
+  # Save plot output
   ggsave(filename = paste0("./figs_tables/Figure 2 - outlier counts ", Sys.Date(), ".pdf"),
          units = "cm", width = 6, height = 4)
 
   
   ## Calculating differences in growth rates
- test =  newdata %>%
+  growth_dif =  newdata %>%
     # dplyr::select(tmax_sum_dif, n_top_snps, n_bottom_snps, pred) %>%
     dplyr::mutate(type_count = paste0(n_top_snps_unscaled, ":", n_bottom_snps_unscaled)) %>%
     dplyr::mutate(tmax_sum_dif_unscaled = back_transform(tmax_sum_dif, var = "tmax_sum_dif",
-                                                         means = scaled_var_means_gbs_only, sds = scaled_var_sds_gbs_only)) %>%
-    dplyr::filter(type_count %in% c("20:0", "10:10", "0:20"))
+                                                         means = scaled_var_means_gbs_only, sds = scaled_var_sds_gbs_only))
  
- (test$pred[test$type_count == "20:0" & test$tmax_sum_dif_unscaled == 4.8] - 
-   test$pred[test$type_count == "10:10" & test$tmax_sum_dif_unscaled == 4.8]) / 
-   test$pred[test$type_count == "10:10" & test$tmax_sum_dif_unscaled == 4.8] * 100
+ (growth_dif$pred[growth_dif$type_count == paste0(high[1],":",high[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] - 
+  growth_dif$pred[growth_dif$type_count == paste0(mid[1],":", mid[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8]) / 
+  growth_dif$pred[growth_dif$type_count == paste0(mid[1],":", mid[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] * 100
  
  
- (test$pred[test$type_count == "20:0" & test$tmax_sum_dif_unscaled == 4.8] - 
-     test$pred[test$type_count == "0:20" & test$tmax_sum_dif_unscaled == 4.8]) / 
-   test$pred[test$type_count == "0:20" & test$tmax_sum_dif_unscaled == 4.8] * 100
+ (growth_dif$pred[growth_dif$type_count == paste0(high[1],":",high[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] - 
+  growth_dif$pred[growth_dif$type_count == paste0(low[1],":", low[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8]) / 
+  growth_dif$pred[growth_dif$type_count == paste0(low[1],":", low[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] * 100
  
- (test$pred[test$type_count == "10:10" & test$tmax_sum_dif_unscaled == 4.8] - 
-     test$pred[test$type_count == "0:20" & test$tmax_sum_dif_unscaled == 4.8]) / 
-   test$pred[test$type_count == "0:20" & test$tmax_sum_dif_unscaled == 4.8] * 100
+ (growth_dif$pred[growth_dif$type_count == paste0(mid[1],":", mid[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] - 
+  growth_dif$pred[growth_dif$type_count == paste0(low[1],":", low[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8]) / 
+  growth_dif$pred[growth_dif$type_count == paste0(low[1],":", low[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] * 100
   
   
   
@@ -1322,7 +1357,6 @@
 # Make spatial predictions across landscape -------------------------------
   
   # Load libraries ----------------------------------------------------------
-  
   library(raster)
   library(rasterVis)
   
@@ -1330,39 +1364,38 @@
   # Loading in rasters ------------------------------------------------------
   
   ## Read in elevation dem and create a hillshade for mapping
-  dem <- raster("./data/gis/dem/ClimateNA_DEM_cropped.tif")
-  
-  slope = raster::terrain(dem, opt='slope')
-  aspect = raster::terrain(dem, opt='aspect')
-  hill = hillShade(slope, aspect, 40, 270)
+    dem <- raster("./data/gis/dem/ClimateNA_DEM_cropped.tif")
+    
+    slope = raster::terrain(dem, opt='slope')
+    aspect = raster::terrain(dem, opt='aspect')
+    hill = hillShade(slope, aspect, 40, 270)
   
   ## Load in california outline
-  cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
-                                proj4string = CRS("+proj=longlat +datum=WGS84"))
-  
-  lobata_range <- readShapePoly("./data/gis/valley_oak_range/qlobata_refined_grouped.shp",
-                                proj4string = CRS("+proj=longlat +datum=WGS84"))
-  
-  lobata_range_rough <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
-                                      proj4string = CRS("+proj=longlat +datum=WGS84"))
+    cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
+                                  proj4string = CRS("+proj=longlat +datum=WGS84"))
+    
+    lobata_range <- readShapePoly("./data/gis/valley_oak_range/qlobata_refined_grouped.shp",
+                                  proj4string = CRS("+proj=longlat +datum=WGS84"))
+    
+    lobata_range_rough <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
+                                        proj4string = CRS("+proj=longlat +datum=WGS84"))
   
   ## Creates vector with list of file paths to all .tif raster files
   ## Directory path where future climate scenarios are located
-  dir_name <- "./data/gis/climate_data/BCM/future/"
-  raster_files <- list.files(dir_name, full.names = TRUE, recursive = TRUE)
-  raster_files <- raster_files[grep("*[[:digit:]].tif$", raster_files)] # Only those with .tif extension
-  raster_files <- raster_files[grep("jja_ave", raster_files)] # Only tmax sum files
-  
-  raster_files
+    dir_name <- "./data/gis/climate_data/BCM/future/"
+    raster_files <- list.files(dir_name, full.names = TRUE, recursive = TRUE)
+    raster_files <- raster_files[grep("*[[:digit:]].tif$", raster_files)] # Only those with .tif extension
+    raster_files <- raster_files[grep("jja_ave", raster_files)] # Only tmax sum files
+    
+    raster_files
   
   ## Select only 85 scenario
-  raster_files <- raster_files[grep("rcp85", raster_files)]
+    raster_files <- raster_files[grep("rcp85", raster_files)]
+    
+    future_stack <- stack()
+    x = 1
   
-  
-  future_stack <- stack()
-  x = 1
-  
-  ## Loop through raster files and add climate values to dat_mom dataframe
+  ## Loop through raster files and add to stack
   for(file in raster_files){
     
     # Load in raster
@@ -1403,7 +1436,7 @@
                                  height_2014 = 0,
                                  accession = "1",
                                  PC1_gen = 0, PC2_gen = 0, PC3_gen = 0, 
-                                 n_top_snps = forward_transform(x = 20,
+                                 n_top_snps = forward_transform(x = high[1],
                                                                 var = 1,
                                                                 means = n_top_snps_mean,
                                                                 sd = n_top_snps_sd),
@@ -1412,6 +1445,20 @@
                                                                    means = n_bottom_snps_mean,
                                                                    sd = n_bottom_snps_sd))
   
+  
+  newdata_rast_mid <- data.frame(section_block = "IFG_1",
+                                 height_2014 = 0,
+                                 accession = "1",
+                                 PC1_gen = 0, PC2_gen = 0, PC3_gen = 0, 
+                                 n_top_snps = forward_transform(x = mid[1],
+                                                                var = 1,
+                                                                means = n_top_snps_mean,
+                                                                sd = n_top_snps_sd),
+                                 n_bottom_snps = forward_transform(x = mid[2],
+                                                                   var = 1,
+                                                                   means = n_bottom_snps_mean,
+                                                                   sd = n_bottom_snps_sd))
+
   newdata_rast_bottom <- data.frame(section_block = "IFG_1",
                                     height_2014 = 0,
                                     accession = "1",
@@ -1420,7 +1467,7 @@
                                                                    var = 1,
                                                                    means = n_top_snps_mean,
                                                                    sd = n_top_snps_sd),
-                                    n_bottom_snps = forward_transform(x = 20,
+                                    n_bottom_snps = forward_transform(x = low[2],
                                                                       var = 1,
                                                                       means = n_bottom_snps_mean,
                                                                       sd = n_bottom_snps_sd))
@@ -1444,6 +1491,17 @@
   future_null_height_top
   summary(future_null_height_top)
   
+  # Mid snps
+  future_null_height_mid <- predict(future_null,
+                                       model = gam_snp,
+                                       const = newdata_rast_mid,
+                                       progress = "text",
+                                       type = "response")
+  
+  future_null_height_mid
+  summary(future_null_height_mid)
+
+  
   # Bottom snps
   future_null_height_bottom <- predict(future_null,
                                        model = gam_snp,
@@ -1459,6 +1517,7 @@
   # Initialize stack for height changes
   future_stack_height_change_top <- future_stack_tmax_dif
   future_stack_height_change_bottom <- future_stack_tmax_dif
+  future_stack_height_change_mid <- future_stack_tmax_dif
   future_stack_height_change_topbottom <- future_stack_tmax_dif
   
   # Loop over scenarios
@@ -1476,6 +1535,12 @@
                                     progress = "text",
                                     type = "response")
     
+    rast_temp_height_mid <- predict(rast_temp,
+                                    model = gam_snp,
+                                    const = newdata_rast_mid,
+                                    progress = "text",
+                                    type = "response")
+    
     
     rast_temp_height_bottom <- predict(rast_temp,
                                        model = gam_snp,
@@ -1489,6 +1554,11 @@
     future_stack_height_change_top[[scenario]] <- rast_temp_height_change_top
     names(future_stack_height_change_top)[scenario] <- names(future_stack_tmax_dif)[scenario] # Reassign name
     
+    # Dif bw mid and null 
+    rast_temp_height_change_mid <- (rast_temp_height_mid - future_null_height_mid) / future_null_height_mid * 100
+    future_stack_height_change_mid[[scenario]] <- rast_temp_height_change_mid
+    names(future_stack_height_change_mid)[scenario] <- names(future_stack_tmax_dif)[scenario] # Reassign name
+    
     
     # Dif bw bottom and null 
     rast_temp_height_change_bottom <- (rast_temp_height_bottom - future_null_height_bottom) / future_null_height_bottom * 100
@@ -1497,9 +1567,9 @@
     
     
     # Dif bw top and bottom
-    rast_temp_height_change_topbottom <- (rast_temp_height_top - rast_temp_height_bottom) / rast_temp_height_bottom * 100
-    future_stack_height_change_topbottom[[scenario]] <- rast_temp_height_change_topbottom
-    names(future_stack_height_change_topbottom)[scenario] <- names(future_stack_tmax_dif)[scenario] # Reassign name
+    # rast_temp_height_change_topbottom <- (rast_temp_height_top - rast_temp_height_bottom) / rast_temp_height_bottom * 100
+    # future_stack_height_change_topbottom[[scenario]] <- rast_temp_height_change_topbottom
+    # names(future_stack_height_change_topbottom)[scenario] <- names(future_stack_tmax_dif)[scenario] # Reassign name
     
   } # End scenario loop
   
@@ -1511,41 +1581,45 @@
   
   ## Average across emissions scenarios
   future_stack_height_change_top_avg <- mean(future_stack_height_change_top, na.rm = TRUE)
+  future_stack_height_change_mid_avg <- mean(future_stack_height_change_mid, na.rm = TRUE)
   future_stack_height_change_bottom_avg <- mean(future_stack_height_change_bottom, na.rm = TRUE)
-  future_stack_height_change_topbottom_avg <- mean(future_stack_height_change_topbottom, na.rm = TRUE)
+  #future_stack_height_change_topbottom_avg <- mean(future_stack_height_change_topbottom, na.rm = TRUE)
   
   ## Project to latlong
   future_stack_height_change_top_avg <- projectRaster(future_stack_height_change_top_avg, 
                                                       crs = CRS("+proj=longlat +datum=WGS84"))
+  future_stack_height_change_mid_avg <- projectRaster(future_stack_height_change_mid_avg, 
+                                                      crs = CRS("+proj=longlat +datum=WGS84"))
   future_stack_height_change_bottom_avg <- projectRaster(future_stack_height_change_bottom_avg, 
                                                          crs = CRS("+proj=longlat +datum=WGS84"))
-  future_stack_height_change_topbottom_avg <- projectRaster(future_stack_height_change_topbottom_avg, 
-                                                            crs = CRS("+proj=longlat +datum=WGS84"))
+  # future_stack_height_change_topbottom_avg <- projectRaster(future_stack_height_change_topbottom_avg, 
+  #                                                           crs = CRS("+proj=longlat +datum=WGS84"))
   
   ## Crop them
   future_stack_height_change_top_avg <- mask(future_stack_height_change_top_avg, 
                                              cali_outline)
+  future_stack_height_change_mid_avg <- mask(future_stack_height_change_mid_avg, 
+                                             cali_outline)
   future_stack_height_change_bottom_avg <- mask(future_stack_height_change_bottom_avg, 
                                                 cali_outline)
-  future_stack_height_change_topbottom_avg <- mask(future_stack_height_change_topbottom_avg, 
-                                                   cali_outline)
+  # future_stack_height_change_topbottom_avg <- mask(future_stack_height_change_topbottom_avg, 
+  #                                                  cali_outline)
   
   
-  
-  summary(future_stack_height_change_topbottom)
   quantile(future_stack_height_change_top_avg, probs = c(0.005, 0.995))
+  quantile(future_stack_height_change_mid_avg, probs = c(0.005, 0.995))
   quantile(future_stack_height_change_bottom_avg, probs = c(0.005, 0.995))
-  quantile(future_stack_height_change_topbottom_avg, probs = c(0.01, 0.99))
+ # quantile(future_stack_height_change_topbottom_avg, probs = c(0.01, 0.99))
   
   
-  ## Figure 2 - spatial predictions ####
+## Figure 2 - spatial predictions ####
   
-  ## Plots of changes in height - RCP 85
+  ## Plots of changes in height - RCP 85 top
   levelplot(future_stack_height_change_top_avg,
             margin = FALSE,
             maxpixels = 1000000,
             par.settings = rasterTheme(region = brewer.pal('RdYlBu', n = 9)),
-            at = seq(-3, 2, length.out = 18),
+            at = seq(-6, 7.5, length.out = 18),
             main = "Top genotypes") + 
     latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
     latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
@@ -1562,13 +1636,34 @@
   dev.off()
   
   
+  ## Plots of changes in height - RCP 85 mid
+  levelplot(future_stack_height_change_mid_avg,
+            margin = FALSE,
+            maxpixels = 1000000,
+            par.settings = rasterTheme(region = brewer.pal('RdYlBu', n = 9)),
+            at = seq(-9.1, -6.2, length.out = 18),
+            main = "Mid genotypes") + 
+    latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
+    latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
+    latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
   
-  ## Plots of changes in height - RCP 85
+  # Main plot
+  dev.copy(png, paste0("./figs_tables/Figure 2 - mid genotypes map ", Sys.Date(), ".png"),
+           res = 300, units = "cm", width = 16, height = 16)
+  dev.off()
+  
+  # For legend
+  dev.copy(pdf, paste0("./figs_tables/Figure 2 - mid genotypes legend ", Sys.Date(), ".pdf"),
+           width = 5, height = 3)
+  dev.off()
+  
+
+  ## Plots of changes in height - RCP 85 - bottom
   levelplot(future_stack_height_change_bottom_avg,
             margin = FALSE,
             maxpixels = 1000000,
             par.settings = rasterTheme(region = brewer.pal('RdYlBu', n = 9)),
-            at = seq(-4, -9, length.out = 18),
+            at = seq(-19, -26, length.out = 18),
             main = "Bottom genotypes") + 
     latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
     latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
@@ -1586,21 +1681,21 @@
   
   
   ## Compare histograms of heights
-  
-  
-  height_change_vals <-   rbind(data.frame(type = "top_snps",
+  height_change_vals <- rbind(data.frame(type = "top_snps",
                                            height_change = na.omit(values(future_stack_height_change_top_avg))),
-                                data.frame(type = "bottom_snps", 
-                                           height_change = na.omit(values(future_stack_height_change_bottom_avg))))
-  
+                              data.frame(type = "bottom_snps", 
+                                         height_change = na.omit(values(future_stack_height_change_bottom_avg))),
+                              data.frame(type = "mid_snps", 
+                                         height_change = na.omit(values(future_stack_height_change_mid_avg))))
+
   ggplot(height_change_vals, aes(height_change)) + 
-    geom_histogram(aes(fill = type), col = "white", bins = 50, size = .01) + 
+    geom_histogram(aes(fill = type), col = "white", bins = 50, size = .01, position = "identity", alpha  = 0.8) + 
     # geom_density(aes(fill = type, col = type), alpha = 0.5) +
     xlab("% change in relative growth rate") + ylab("Frequency") +
-    scale_x_continuous(breaks = c(seq(-10, 5, 2.5)),
-                       limits = c(-10, 5)) +
-    scale_fill_manual(values = c("#6699CC", "#FF6633")) + # Flipped from normal order
-    scale_color_manual(values = c("#6699CC", "#FF6633")) + # Flipped from normal order
+    # scale_x_continuous(breaks = c(seq(-10, 5, 2.5)),
+    #                    limits = c(-10, 5)) +
+    scale_fill_manual(values = c("#6699CC", "#FF6633", "grey50")) + # Flipped from normal order
+    scale_color_manual(values = c("#6699CC", "#FF6633", "grey50")) + # Flipped from normal order
     theme_bw(8) + 
     theme(panel.border = element_blank(), 
           panel.grid.major = element_blank(),
@@ -1623,486 +1718,486 @@
      
 
 # Gradient forest test ----------------------------------------------------
-  
-  library(gradientForest)
-  
-  climate_vars_gf <- c("tmax_sum", 
-                      # "tmax_sum_lgm",
-                      # "tmin_winter", 
-                     # "bioclim_04",
-                       #"tmin_winter_lgm", 
-                       #  "DD5",
-                     #  "DD5_lgm",
-                       "random", 
-                      "latitude",
-                     # "mem1",
-                    #  "mem2",
-                    #  "mem3",
-                    #  "mem4",
-                      "longitude", 
-                      "elevation")
-  
-  pairs.panels(gen_dat_clim[, climate_vars_gf])
-  
-  
-  ## RANDOM SUBSAMPLE OF SNPS
-  # gf_sample <- sample(snp_col_names, length(top_snps$snp))
-  
-  
-  gf_scaled <- flashpcaR::scale2(gen_dat_clim[, gf_sample], impute = 2)
-  
-  
-  gen_dat_clim_randomized <- gen_dat_clim[, climate_vars_gf]
-  
-
-  ## Factors
-  gf_factor <- gen_dat_top[ ,top_snps$snp]
-  gf_factor <- gf_factor %>%
-                 replace(is.na(.), 0) %>%
-                mutate_all(as.factor) 
-  
-  ## Count number of positives
-  pos_thresh <- 20
-  gf_factor <- gf_factor[, -which(apply(gf_factor, 2, function(x) sum(x == 1)) < pos_thresh)]
-  gf_factor <- gf_factor[, -which(apply(gf_factor, 2, function(x) sum(x == 0)) < pos_thresh)]
-  
-  dim(gf_factor)
-  summary(gf_factor)
-              
-  
-  x = 1
-  r2_ran <- NULL
-  num_pos <- NULL
-  
-  
-  maxLevel <- log2(0.368*nrow(gen_dat_clim_randomized)/2) #account for correlations, see ?gradientForest 
-  
-  
-  while(x < 10){
-    
-    cat("working on:", x, "...\n")
-    
-  #  gen_dat_clim_randomized <- gen_dat_clim_randomized[sample(1:nrow(gen_dat_clim_randomized)),]
-    
-      gf <- gradientForest(cbind(gen_dat_clim_randomized,
-                                       gf_factor ),
-                           predictor.vars = climate_vars_gf, 
-                          response.vars = colnames(gf_factor),
-                         #response.vars = gsub("snp_", "", sum_df$snp),
-                          trace = TRUE,
-                         ntree = 100, mtry = 3,
-                         maxLevel = maxLevel, # From Fitzpatrick R script
-                         corr.threshold = 0.5)
-  
-      gf$result # Rsquared of positive loci
-      gf$species.pos.rsq
-      
-      cat("\n", mean(gf$result), "\n")
-      
-      importance(gf)
-      
-      # IF NULL
-      if(length(gf) == 0){
-        if(x == 1) {next}
-        num_pos[x] <- 0
-        r2_ran[x] <- 0
-        importance_df <- rbind(importance_df, 0)
-        x = x+1
-        next
-      }
-      
-      num_pos[x] <- gf$species.pos.rsq
-      r2_ran[x] <- mean(gf$result)
-      if(x == 1) {importance_df <- importance(gf)}
-      importance_df <- rbind(importance_df, importance(gf))
-      x = x +1
-  }
-  
-  r2_ran
-  mean(r2_ran)
-  
-  num_pos
-  mean(num_pos)
-  
-  importance_df
-  sort(colMeans(importance_df), decreasing = TRUE)
-  
-  plot(gf, plot.type = "O")
-  
-  
-  ## Need to make rasters with each environmental variable
-  ## And then extract this data to a dataframe to use for predictions in GF
-  
-  library(raster)
-  
-  tmax_rast <- raster("./data/gis/climate_data/BCM/historical/1951-1980/tmx1951_1980jja_ave_HST_1513103038/tmx1951_1980jja_ave_HST_1513103038.tif")
-  tmin_rast <- raster("./data/gis/climate_data/BCM/historical/1951-1980/tmn1951_1980djf_ave_HST_1513102910/tmn1951_1980djf_ave_HST_1513102910.tif")
-  
-  process_raster <- function(rast){
-    rast_temp <- aggregate(rast, fact = 10) # Make smaller
-    rast_latlon <- projectRaster(rast_temp, crs = CRS("+proj=longlat +datum=WGS84"))
-    plot(rast_latlon)
-    return(rast_latlon)
-  }
-  
-  tmax_rast <- process_raster(tmax_rast)
-  tmin_rast <- process_raster(tmin_rast)
-  
-  # Find lat long points
-  latlon <- xyFromCell(tmax_rast, 1:ncell(tmax_rast))
-  
-  gf_rast_df <- data.frame(cell_id = 1:ncell(tmax_rast),
-                        longitude = latlon[, 1],
-                        latitude = latlon[, 2],
-                        tmax_sum = raster::extract(tmax_rast, 1:ncell(tmax_rast)),
-                        tmin_winter = raster::extract(tmin_rast, 1:ncell(tmin_rast)))
-  gf_rast_df
-  
-  gf_rast_nona <-  gf_rast_df %>%
-    filter(!is.na(tmax_sum))
-
-  
-  # transform env using gf models, see ?predict.gradientForest
-  gf_pred <- predict(gf, gf_rast_nona[, colnames(gf_rast_nona) %in% climate_vars_gf]) # remove cell column before transforming
-  
-  
-  # map continuous variation - reference SNPs
-  refRGBmap <- pcaToRaster(gf_pred, gf_rast_df, tmax_rast, gf_rast_nona$cell_id)
-  plotRGB(refRGBmap)
-
-  # Mapping spatial genetic variation --------------------------------------------
-  ###### functions to support mapping #####
-  # builds RGB raster from transformed environment
-  # snpPreds = dataframe of transformed variables from gf or gdm model
-  # rast = a raster mask to which RGB values are to be mapped
-  # cellNums = cell IDs to which RGB values should be assigned
-  pcaToRaster <- function(gf_pred, gf_pred_wna, rast, mapCells){
-    require(raster)
-    
-    pca <- prcomp(gf_pred, center=TRUE, scale.=FALSE)
-    
-    ##assigns to colors, edit as needed to maximize color contrast, etc.
-    a1 <- pca$x[,1]; a2 <- pca$x[,2]; a3 <- pca$x[,3]
-    r <- a1+a2; g <- -a2; b <- a3+a2-a1
-    
-    ##scales colors
-    scalR <- (r-min(r))/(max(r)-min(r))*255
-    scalG <- (g-min(g))/(max(g)-min(g))*255
-    scalB <- (b-min(b))/(max(b)-min(b))*255
-    
-    ## Join back into data frame that includes NAs
-    temp <- data.frame(cell_id = mapCells,
-               scalR = scalR,
-               scalG = scalG, 
-               scalB = scalB)
-    
-    temp_wna <- left_join(gf_pred_wna, temp, by = "cell_id")
-    
-    
-    ## Check to make sure lengths match up
-    if(nrow(temp_wna) != ncell(rast)){
-      stop("Error: length of raster and of PCA predictions do not match")
-    }
-    
-    ##assigns color to raster
-    rast1 <- rast2 <- rast3 <- rast
-    values(rast1) <- temp_wna$scalR
-    values(rast2) <- temp_wna$scalG
-    values(rast3) <- temp_wna$scalB
-    ##stacks color rasters
-    outRast <- stack(rast1, rast2, rast3)
-    return(outRast)
-  }
-  
-  # Function to map difference between spatial genetic predictions
-  # predMap1 = dataframe of transformed variables from gf or gdm model for first set of SNPs
-  # predMap2 = dataframe of transformed variables from gf or gdm model for second set of SNPs
-  # rast = a raster mask to which Procrustes residuals are to be mapped
-  # mapCells = cell IDs to which Procrustes residuals values should be assigned
-  RGBdiffMap <- function(predMap1, predMap2, rast, mapCells){
-    require(vegan)
-    PCA1 <- prcomp(predMap1, center=TRUE, scale.=FALSE)
-    PCA2 <- prcomp(predMap2, center=TRUE, scale.=FALSE)
-    diffProcrust <- procrustes(PCA1, PCA2, scale=TRUE, symmetrical=FALSE)
-    residMap <- residuals(diffProcrust)
-    rast[mapCells] <- residMap
-    return(list(max(residMap), rast))
-  }
-  
-  # OK, on to mapping. Script assumes:
-  # (1) a dataframe named env_trns containing extracted raster data (w/ cell IDs)
-  # and env. variables used in the models & with columns as follows: cell, bio1, bio2, etc.
-  #
-  # (2) a raster mask of the study region to which the RGB data will be written
-  
-  # transform env using gf models, see ?predict.gradientForest
-  predRef <- predict(gfRef, env_trns[,-1]) # remove cell column before transforming
-  predGI5 <- predict(gfGI5, env_trns[,-1])
-  
-  # map continuous variation - reference SNPs
-  refRGBmap <- pcaToRaster(predRef, mask, env_trns$cell)
-  plotRGB(refRGBmap)
-  writeRaster(refRGBmap, "/.../refSNPs_map.tif", format="GTiff", overwrite=TRUE)
-  
-  # map continuous variation - GI5 SNPs
-  GI5RGBmap <- pcaToRaster(predGI5, mask, env_trns$cell)
-  plotRGB(refRGBmap)
-  writeRaster(refRGBmap, "/.../GI5SNPs_map.tif", format="GTiff", overwrite=TRUE)
-  
-  # Difference between maps (GI5 and reference) 
-  diffGI5 <- RGBdiffMap(predRef, predGI5, rast=mask, mapCells=env_trns$cell)
-  plot(diffGI5[[2]])
-  writeRaster(diffGI5[[2]], "/.../diffRef_GI5.tif", format="GTiff", overwrite=TRUE)
-  ################################################################################
-  
-  
-  # Calculate and map "genetic offset" under climate change ----------------------
-  # Script assumes:
-  # (1) a dataframe of transformed env. variables for CURRENT climate 
-  # (e.g., predGI5 from above).
-  #
-  # (2) a dataframe named env_trns_future containing extracted raster data of 
-  # env. variables for FUTURE a climate scenario, same structure as env_trns
-  
-  # first transform FUTURE env. variables
-  projGI5 <- predict(gfGI5, env_trns_future[,-1])
-  
-  # calculate euclidean distance between current and future genetic spaces  
-  genOffsetGI5 <- sqrt((projGI5[,1]-predGI5[,1])^2+(projGI5[,2]-predGI5[,2])^2
-                       +(projGI5[,3]-predGI5[,3])^2+(projGI5[,4]-predGI5[,4])^2
-                       +(projGI5[,5]-predGI5[,5])^2+(projGI5[,6]-predGI5[,6])^2
-                       +(projGI5[,7]-predGI5[,7])^2)
-  
-  # assign values to raster - can be tricky if current/future climate
-  # rasters are not identical in terms of # cells, extent, etc.
-  mask[env_trns_future$cell] <- genOffsetGI5
-  plot(mask)
-  
-  
-  
-  ################################################################################
-  # END SCRIPTS FOR GRADIENT FOREST MODELING
-  ################################################################################
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-    plot(gf, plot.type = "O")
-    
-    most_important <- names(importance(gf))
-    
-    pred <- expand.grid(latitude = seq(31, 45, by = .1))
-    pred$pred <- predict(gf, newdata = pred)
-    
-    pred
-    
-    plot(pred$latitude, pred$pred$latitude)
-  
-    
-    plot(gf, plot.type = "S", imp.vars = most_important,
-          leg.posn = "topright", cex.legend = 0.4, cex.axis = 0.6,
-          cex.lab = 0.7, line.ylab = 0.9, par.args = list(mgp = c(1.5,
-          0.5, 0), mar = c(3.1, 1.5, 0.1, 1)))
-    
-    plot(gf, plot.type = "C", imp.vars = most_important,
-     show.overall = F, legend = T, leg.posn = "topleft",
-     leg.nspecies = 5, cex.lab = 0.7, cex.legend = 0.4,
-     cex.axis = 0.6, line.ylab = 0.9, par.args = list(mgp = c(1.5,
-     0.5, 0), mar = c(2.5, 1, 0.1, 0.5), omi = c(0, + 0.3, 0, 0)))
-    
-    plot(gf, plot.type = "C", imp.vars = most_important,
-         show.species = F, common.scale = T, cex.axis = 0.6,
-        cex.lab = 0.7, line.ylab = 0.9, par.args = list(mgp = c(1.5,
-       + 0.5, 0), mar = c(2.5, 1, 0.1, 0.5), omi = c(0,  0.3, 0, 0)))
-    
-    plot(gf, plot.type = "P", show.names = T, horizontal = F,
-         cex.axis = 1, cex.labels = 0.7, line = 2.5)
-
-    
-
-
-# RDA on top snps ---------------------------------------------------------
-    
-    rda_scaled <- flashpcaR::scale2(gen_dat_clim[, top_snps$snp], impute = 2)
-    
-    # rda_scaled <- flashpcaR::scale2(gen_dat_clim[, snp_col_names], impute = 2)
-    
-    rda_full <- vegan::rda(rda_scaled ~ latitude + 
-                             longitude + elevation +
-                             tmax_sum + tmin_winter,
-                           data = gen_dat_clim)
-    
-    rda_full
-    summary(rda_full)
-    
-    anova(rda_full)
-    
-    anova(rda_full, by="axis", permutations = 100)
-    
-    anova(rda_full, 
-          by = "margin",
-          permutations = 100)
-    
-    round(summary(rda_full)$biplot[, c(1,2)], 2)
-    
-    plot(rda_full)
-    
-    
-    loadings <- summary(rda_full)$species # Extracts loadings for each SNP (named species here)
-    head(loadings)
-    
-    # Plot histogram of the loadings
-    hist(loadings[, 1], xlab = "RDA1", breaks = 30, col = "skyblue2", main = "RDA1")
-    
-    # Outliers function from Forester et al.
-    outliers <- function(loadings, sd_cutoff){
-      # find loadings +/-z sd from mean loading
-      lims <- mean(loadings) + c(-1, 1) * sd_cutoff * sd(loadings)
-      loadings[loadings < lims[1] | loadings > lims[2]] # locus names in these tails
-    }
-    
-    cand_rda1 <- outliers(loadings[, 1], sd_cutoff = 2) 
-    cand_rda1
-    
-    cand_rda2 <- outliers(loadings[, 2], sd_cutoff = 2)
-    cand_rda2
-    
-    outlier_snps_names <- c(names(cand_rda1), names(cand_rda2))
-    
-    # Extract row indices of outlier snps
-    sig_snps <- which(rownames(loadings) %in% outlier_snps_names) 
-    
-    sig_snps <- which(rownames(loadings) %in% top_snps$snp)
-    
-    # Color of outlier SNPs
-    snp_cols <- rep("grey90",  times = nrow(loadings)) # Set default color
-    snp_cols[sig_snps] <- "red"
-    
-    # Labels of outlier SNPs
-    snp_labels <- rep("", times = nrow(loadings))
-    snp_labels[sig_snps] <- outlier_snps_names
-    
-    # Make biplot
-    plot(rda_full, type = "n", scaling = 3, xlim = c(-1, 1), ylim = c(-1,1)) # Create empty plot 
-    points(rda_full, display = "species", pch = 21,
-           col = "black", bg = snp_cols, scaling = 3)
-    
-    points(rda_full, display = "species", pch = 21, # Overplot sig snps
-           col = "black", select = sig_snps, bg = "red", scaling = 3)
-    # text(rda_full, display = "species", labels = snp_labels, cex = .75, scaling = 3)
-    text(rda_full, scaling = 3, display = "bp", col="black") # Environmental vectors  
-    
-    
-    
-    
-    # Plot onto map
-    
-    
-    # Get map of California - already loaded in ggplot2 package
-    ca_map <- dplyr::filter(ggplot2::map_data("state"), region == "california")
-    
-    
-    # Get loadings for each individual
-    ind_loadings <- summary(rda_full)$sites
-    head(ind_loadings)
-    
-    
-    # Plot values for first RDA axis
-    ggplot(ca_map, aes(x = long, y = lat)) +
-      geom_polygon(color = "black", fill = "grey80") +
-      geom_point(data = gen_dat_clim, aes(x = longitude, y = latitude, 
-                                          fill = ind_loadings[, 1]), # Color by first RDA axis
-                 color = "black", pch = 21, size = 5) +
-      scale_fill_gradientn(colours = terrain.colors(10), 
-                           name = "RDA1") +
-      theme_bw() + coord_equal(ratio = 1)
-    
-    
-    
-    ## Calculate correlation between prob of finding beneficial allele and future climate change
-    
-    # Read in future tmax scenarios
-    tmax_CCSM4 <- raster("./data/gis/climate_data/BCM/future/CCSM4_rcp85/tmx2070_2099jja_ave_CCSM4_rcp85_1529358915/tmx2070_2099jja_ave_CCSM4_rcp85_1529358915.tif")
-    tmax_CCSM4 <- projectRaster(tmax_CCSM4, crs = CRS("+proj=longlat +datum=WGS84"))
-    tmax_CCSM4 <- resample(tmax_CCSM4, tmax_rast)
-    compareRaster(tmax_CCSM4, tmax_rast)
-    levelplot(tmax_CCSM4, margin = FALSE)
-    
-    
-    tmax_CNRM <- raster("./data/gis/climate_data/BCM/future/CNRM_rcp85/tmx2070_2099jja_ave_CNRM_rcp85_1529358976/tmx2070_2099jja_ave_CNRM_rcp85_1529358976.tif")
-    tmax_CNRM <- projectRaster(tmax_CNRM, crs = CRS("+proj=longlat +datum=WGS84"))
-    tmax_CNRM <- resample(tmax_CNRM, tmax_rast)
-    compareRaster(tmax_CNRM, tmax_rast)
-    levelplot(tmax_CNRM, margin = FALSE)
-    
-    tmax_IPSL <- raster("./data/gis/climate_data/BCM/future/IPSL_rcp85/tmx2070_2099jja_ave_IPSL_rcp85_1529358959/tmx2070_2099jja_ave_IPSL_rcp85_1529358959.tif")
-    tmax_IPSL <- projectRaster(tmax_IPSL, crs = CRS("+proj=longlat +datum=WGS84"))
-    tmax_IPSL <- resample(tmax_IPSL, tmax_rast)
-    compareRaster(tmax_IPSL, tmax_rast)
-    levelplot(tmax_IPSL, margin = FALSE)
-    
-    tmax_MIROC <- raster("./data/gis/climate_data/BCM/future/MIROC_rcp85/tmx2070_2099jja_ave_MIROC_rcp85_1529357403/tmx2070_2099jja_ave_MIROC_rcp85_1529357403.tif")
-    tmax_MIROC <- projectRaster(tmax_MIROC, crs = CRS("+proj=longlat +datum=WGS84"))
-    tmax_MIROC <- resample(tmax_MIROC, tmax_rast)
-    compareRaster(tmax_MIROC, tmax_rast)
-    levelplot(tmax_MIROC, margin = FALSE)
-    
-    # Stack rasters
-    future_stack <- stack(tmax_CCSM4) 
-    tmax_CNRM,
-    tmax_IPSL, 
-    tmax_MIROC)
-
-levelplot(future_stack, margin = FALSE)
-
-# Calculate future differences in temperature
-future_stack_dif <- future_stack - tmax_rast 
-
-future_stack_dif <- mean(future_stack_dif)
-levelplot(future_stack_dif, margin = FALSE)
-
-
-# Correlations in future temp differences and probability of finding allele
-data.frame(tmax_sum_dif = values(future_stack_dif),
-           prob_bene = values(top_snps_stack)) %>%
-  ggplot(., aes(tmax_sum_dif, prob_bene)) + geom_point(size = 0.15, alpha = 0.25) +
-  geom_smooth(method = "lm") + theme_bw(15) +
-  geom_smooth(col = "forestgreen") 
-
-cor(values(future_stack_dif), values(bene_stack),
-    use = "na.or.complete")
-
-
-# Just lobata range
-future_stack_dif_range <- mask(future_stack_dif, lobata_range_rough)
-
-plot(future_stack_dif_range, bene_stack_range,
-     las = 1, ylab = "Probability of finding beneficial allele",
-     xlab = "Tmax_sum_dif")
-
-cor(values(future_stack_dif_range), values(bene_stack_range),
-    use = "na.or.complete")
-
-data.frame(tmax_sum_dif = values(future_stack_dif_range),
-           prob_bene = values(bene_stack_range)) %>%
-  ggplot(., aes(tmax_sum_dif, prob_bene)) + geom_point(size = 0.15, alpha = 0.25) +
-  geom_smooth(method = "lm") + geom_smooth(col = "forestgreen") + theme_bw(15)
-
-
-
-rasterCo  
-
-library(spatialEco)
-
-test <-  rasterCorrelation(future_stack_dif, bene_stack, s = 7)
-test
-levelplot(test, margin = FALSE)
+#   
+#   library(gradientForest)
+#   
+#   climate_vars_gf <- c("tmax_sum", 
+#                       # "tmax_sum_lgm",
+#                       # "tmin_winter", 
+#                      # "bioclim_04",
+#                        #"tmin_winter_lgm", 
+#                        #  "DD5",
+#                      #  "DD5_lgm",
+#                        "random", 
+#                       "latitude",
+#                      # "mem1",
+#                     #  "mem2",
+#                     #  "mem3",
+#                     #  "mem4",
+#                       "longitude", 
+#                       "elevation")
+#   
+#   pairs.panels(gen_dat_clim[, climate_vars_gf])
+#   
+#   
+#   ## RANDOM SUBSAMPLE OF SNPS
+#   # gf_sample <- sample(snp_col_names, length(top_snps$snp))
+#   
+#   
+#   gf_scaled <- flashpcaR::scale2(gen_dat_clim[, gf_sample], impute = 2)
+#   
+#   
+#   gen_dat_clim_randomized <- gen_dat_clim[, climate_vars_gf]
+#   
+# 
+#   ## Factors
+#   gf_factor <- gen_dat_top[ ,top_snps$snp]
+#   gf_factor <- gf_factor %>%
+#                  replace(is.na(.), 0) %>%
+#                 mutate_all(as.factor) 
+#   
+#   ## Count number of positives
+#   pos_thresh <- 20
+#   gf_factor <- gf_factor[, -which(apply(gf_factor, 2, function(x) sum(x == 1)) < pos_thresh)]
+#   gf_factor <- gf_factor[, -which(apply(gf_factor, 2, function(x) sum(x == 0)) < pos_thresh)]
+#   
+#   dim(gf_factor)
+#   summary(gf_factor)
+#               
+#   
+#   x = 1
+#   r2_ran <- NULL
+#   num_pos <- NULL
+#   
+#   
+#   maxLevel <- log2(0.368*nrow(gen_dat_clim_randomized)/2) #account for correlations, see ?gradientForest 
+#   
+#   
+#   while(x < 10){
+#     
+#     cat("working on:", x, "...\n")
+#     
+#   #  gen_dat_clim_randomized <- gen_dat_clim_randomized[sample(1:nrow(gen_dat_clim_randomized)),]
+#     
+#       gf <- gradientForest(cbind(gen_dat_clim_randomized,
+#                                        gf_factor ),
+#                            predictor.vars = climate_vars_gf, 
+#                           response.vars = colnames(gf_factor),
+#                          #response.vars = gsub("snp_", "", sum_df$snp),
+#                           trace = TRUE,
+#                          ntree = 100, mtry = 3,
+#                          maxLevel = maxLevel, # From Fitzpatrick R script
+#                          corr.threshold = 0.5)
+#   
+#       gf$result # Rsquared of positive loci
+#       gf$species.pos.rsq
+#       
+#       cat("\n", mean(gf$result), "\n")
+#       
+#       importance(gf)
+#       
+#       # IF NULL
+#       if(length(gf) == 0){
+#         if(x == 1) {next}
+#         num_pos[x] <- 0
+#         r2_ran[x] <- 0
+#         importance_df <- rbind(importance_df, 0)
+#         x = x+1
+#         next
+#       }
+#       
+#       num_pos[x] <- gf$species.pos.rsq
+#       r2_ran[x] <- mean(gf$result)
+#       if(x == 1) {importance_df <- importance(gf)}
+#       importance_df <- rbind(importance_df, importance(gf))
+#       x = x +1
+#   }
+#   
+#   r2_ran
+#   mean(r2_ran)
+#   
+#   num_pos
+#   mean(num_pos)
+#   
+#   importance_df
+#   sort(colMeans(importance_df), decreasing = TRUE)
+#   
+#   plot(gf, plot.type = "O")
+#   
+#   
+#   ## Need to make rasters with each environmental variable
+#   ## And then extract this data to a dataframe to use for predictions in GF
+#   
+#   library(raster)
+#   
+#   tmax_rast <- raster("./data/gis/climate_data/BCM/historical/1951-1980/tmx1951_1980jja_ave_HST_1513103038/tmx1951_1980jja_ave_HST_1513103038.tif")
+#   tmin_rast <- raster("./data/gis/climate_data/BCM/historical/1951-1980/tmn1951_1980djf_ave_HST_1513102910/tmn1951_1980djf_ave_HST_1513102910.tif")
+#   
+#   process_raster <- function(rast){
+#     rast_temp <- aggregate(rast, fact = 10) # Make smaller
+#     rast_latlon <- projectRaster(rast_temp, crs = CRS("+proj=longlat +datum=WGS84"))
+#     plot(rast_latlon)
+#     return(rast_latlon)
+#   }
+#   
+#   tmax_rast <- process_raster(tmax_rast)
+#   tmin_rast <- process_raster(tmin_rast)
+#   
+#   # Find lat long points
+#   latlon <- xyFromCell(tmax_rast, 1:ncell(tmax_rast))
+#   
+#   gf_rast_df <- data.frame(cell_id = 1:ncell(tmax_rast),
+#                         longitude = latlon[, 1],
+#                         latitude = latlon[, 2],
+#                         tmax_sum = raster::extract(tmax_rast, 1:ncell(tmax_rast)),
+#                         tmin_winter = raster::extract(tmin_rast, 1:ncell(tmin_rast)))
+#   gf_rast_df
+#   
+#   gf_rast_nona <-  gf_rast_df %>%
+#     filter(!is.na(tmax_sum))
+# 
+#   
+#   # transform env using gf models, see ?predict.gradientForest
+#   gf_pred <- predict(gf, gf_rast_nona[, colnames(gf_rast_nona) %in% climate_vars_gf]) # remove cell column before transforming
+#   
+#   
+#   # map continuous variation - reference SNPs
+#   refRGBmap <- pcaToRaster(gf_pred, gf_rast_df, tmax_rast, gf_rast_nona$cell_id)
+#   plotRGB(refRGBmap)
+# 
+#   # Mapping spatial genetic variation --------------------------------------------
+#   ###### functions to support mapping #####
+#   # builds RGB raster from transformed environment
+#   # snpPreds = dataframe of transformed variables from gf or gdm model
+#   # rast = a raster mask to which RGB values are to be mapped
+#   # cellNums = cell IDs to which RGB values should be assigned
+#   pcaToRaster <- function(gf_pred, gf_pred_wna, rast, mapCells){
+#     require(raster)
+#     
+#     pca <- prcomp(gf_pred, center=TRUE, scale.=FALSE)
+#     
+#     ##assigns to colors, edit as needed to maximize color contrast, etc.
+#     a1 <- pca$x[,1]; a2 <- pca$x[,2]; a3 <- pca$x[,3]
+#     r <- a1+a2; g <- -a2; b <- a3+a2-a1
+#     
+#     ##scales colors
+#     scalR <- (r-min(r))/(max(r)-min(r))*255
+#     scalG <- (g-min(g))/(max(g)-min(g))*255
+#     scalB <- (b-min(b))/(max(b)-min(b))*255
+#     
+#     ## Join back into data frame that includes NAs
+#     temp <- data.frame(cell_id = mapCells,
+#                scalR = scalR,
+#                scalG = scalG, 
+#                scalB = scalB)
+#     
+#     temp_wna <- left_join(gf_pred_wna, temp, by = "cell_id")
+#     
+#     
+#     ## Check to make sure lengths match up
+#     if(nrow(temp_wna) != ncell(rast)){
+#       stop("Error: length of raster and of PCA predictions do not match")
+#     }
+#     
+#     ##assigns color to raster
+#     rast1 <- rast2 <- rast3 <- rast
+#     values(rast1) <- temp_wna$scalR
+#     values(rast2) <- temp_wna$scalG
+#     values(rast3) <- temp_wna$scalB
+#     ##stacks color rasters
+#     outRast <- stack(rast1, rast2, rast3)
+#     return(outRast)
+#   }
+#   
+#   # Function to map difference between spatial genetic predictions
+#   # predMap1 = dataframe of transformed variables from gf or gdm model for first set of SNPs
+#   # predMap2 = dataframe of transformed variables from gf or gdm model for second set of SNPs
+#   # rast = a raster mask to which Procrustes residuals are to be mapped
+#   # mapCells = cell IDs to which Procrustes residuals values should be assigned
+#   RGBdiffMap <- function(predMap1, predMap2, rast, mapCells){
+#     require(vegan)
+#     PCA1 <- prcomp(predMap1, center=TRUE, scale.=FALSE)
+#     PCA2 <- prcomp(predMap2, center=TRUE, scale.=FALSE)
+#     diffProcrust <- procrustes(PCA1, PCA2, scale=TRUE, symmetrical=FALSE)
+#     residMap <- residuals(diffProcrust)
+#     rast[mapCells] <- residMap
+#     return(list(max(residMap), rast))
+#   }
+#   
+#   # OK, on to mapping. Script assumes:
+#   # (1) a dataframe named env_trns containing extracted raster data (w/ cell IDs)
+#   # and env. variables used in the models & with columns as follows: cell, bio1, bio2, etc.
+#   #
+#   # (2) a raster mask of the study region to which the RGB data will be written
+#   
+#   # transform env using gf models, see ?predict.gradientForest
+#   predRef <- predict(gfRef, env_trns[,-1]) # remove cell column before transforming
+#   predGI5 <- predict(gfGI5, env_trns[,-1])
+#   
+#   # map continuous variation - reference SNPs
+#   refRGBmap <- pcaToRaster(predRef, mask, env_trns$cell)
+#   plotRGB(refRGBmap)
+#   writeRaster(refRGBmap, "/.../refSNPs_map.tif", format="GTiff", overwrite=TRUE)
+#   
+#   # map continuous variation - GI5 SNPs
+#   GI5RGBmap <- pcaToRaster(predGI5, mask, env_trns$cell)
+#   plotRGB(refRGBmap)
+#   writeRaster(refRGBmap, "/.../GI5SNPs_map.tif", format="GTiff", overwrite=TRUE)
+#   
+#   # Difference between maps (GI5 and reference) 
+#   diffGI5 <- RGBdiffMap(predRef, predGI5, rast=mask, mapCells=env_trns$cell)
+#   plot(diffGI5[[2]])
+#   writeRaster(diffGI5[[2]], "/.../diffRef_GI5.tif", format="GTiff", overwrite=TRUE)
+#   ################################################################################
+#   
+#   
+#   # Calculate and map "genetic offset" under climate change ----------------------
+#   # Script assumes:
+#   # (1) a dataframe of transformed env. variables for CURRENT climate 
+#   # (e.g., predGI5 from above).
+#   #
+#   # (2) a dataframe named env_trns_future containing extracted raster data of 
+#   # env. variables for FUTURE a climate scenario, same structure as env_trns
+#   
+#   # first transform FUTURE env. variables
+#   projGI5 <- predict(gfGI5, env_trns_future[,-1])
+#   
+#   # calculate euclidean distance between current and future genetic spaces  
+#   genOffsetGI5 <- sqrt((projGI5[,1]-predGI5[,1])^2+(projGI5[,2]-predGI5[,2])^2
+#                        +(projGI5[,3]-predGI5[,3])^2+(projGI5[,4]-predGI5[,4])^2
+#                        +(projGI5[,5]-predGI5[,5])^2+(projGI5[,6]-predGI5[,6])^2
+#                        +(projGI5[,7]-predGI5[,7])^2)
+#   
+#   # assign values to raster - can be tricky if current/future climate
+#   # rasters are not identical in terms of # cells, extent, etc.
+#   mask[env_trns_future$cell] <- genOffsetGI5
+#   plot(mask)
+#   
+#   
+#   
+#   ################################################################################
+#   # END SCRIPTS FOR GRADIENT FOREST MODELING
+#   ################################################################################
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#   
+#     plot(gf, plot.type = "O")
+#     
+#     most_important <- names(importance(gf))
+#     
+#     pred <- expand.grid(latitude = seq(31, 45, by = .1))
+#     pred$pred <- predict(gf, newdata = pred)
+#     
+#     pred
+#     
+#     plot(pred$latitude, pred$pred$latitude)
+#   
+#     
+#     plot(gf, plot.type = "S", imp.vars = most_important,
+#           leg.posn = "topright", cex.legend = 0.4, cex.axis = 0.6,
+#           cex.lab = 0.7, line.ylab = 0.9, par.args = list(mgp = c(1.5,
+#           0.5, 0), mar = c(3.1, 1.5, 0.1, 1)))
+#     
+#     plot(gf, plot.type = "C", imp.vars = most_important,
+#      show.overall = F, legend = T, leg.posn = "topleft",
+#      leg.nspecies = 5, cex.lab = 0.7, cex.legend = 0.4,
+#      cex.axis = 0.6, line.ylab = 0.9, par.args = list(mgp = c(1.5,
+#      0.5, 0), mar = c(2.5, 1, 0.1, 0.5), omi = c(0, + 0.3, 0, 0)))
+#     
+#     plot(gf, plot.type = "C", imp.vars = most_important,
+#          show.species = F, common.scale = T, cex.axis = 0.6,
+#         cex.lab = 0.7, line.ylab = 0.9, par.args = list(mgp = c(1.5,
+#        + 0.5, 0), mar = c(2.5, 1, 0.1, 0.5), omi = c(0,  0.3, 0, 0)))
+#     
+#     plot(gf, plot.type = "P", show.names = T, horizontal = F,
+#          cex.axis = 1, cex.labels = 0.7, line = 2.5)
+# 
+#     
+# 
+# 
+# # RDA on top snps ---------------------------------------------------------
+#     
+#     rda_scaled <- flashpcaR::scale2(gen_dat_clim[, top_snps$snp], impute = 2)
+#     
+#     # rda_scaled <- flashpcaR::scale2(gen_dat_clim[, snp_col_names], impute = 2)
+#     
+#     rda_full <- vegan::rda(rda_scaled ~ latitude + 
+#                              longitude + elevation +
+#                              tmax_sum + tmin_winter,
+#                            data = gen_dat_clim)
+#     
+#     rda_full
+#     summary(rda_full)
+#     
+#     anova(rda_full)
+#     
+#     anova(rda_full, by="axis", permutations = 100)
+#     
+#     anova(rda_full, 
+#           by = "margin",
+#           permutations = 100)
+#     
+#     round(summary(rda_full)$biplot[, c(1,2)], 2)
+#     
+#     plot(rda_full)
+#     
+#     
+#     loadings <- summary(rda_full)$species # Extracts loadings for each SNP (named species here)
+#     head(loadings)
+#     
+#     # Plot histogram of the loadings
+#     hist(loadings[, 1], xlab = "RDA1", breaks = 30, col = "skyblue2", main = "RDA1")
+#     
+#     # Outliers function from Forester et al.
+#     outliers <- function(loadings, sd_cutoff){
+#       # find loadings +/-z sd from mean loading
+#       lims <- mean(loadings) + c(-1, 1) * sd_cutoff * sd(loadings)
+#       loadings[loadings < lims[1] | loadings > lims[2]] # locus names in these tails
+#     }
+#     
+#     cand_rda1 <- outliers(loadings[, 1], sd_cutoff = 2) 
+#     cand_rda1
+#     
+#     cand_rda2 <- outliers(loadings[, 2], sd_cutoff = 2)
+#     cand_rda2
+#     
+#     outlier_snps_names <- c(names(cand_rda1), names(cand_rda2))
+#     
+#     # Extract row indices of outlier snps
+#     sig_snps <- which(rownames(loadings) %in% outlier_snps_names) 
+#     
+#     sig_snps <- which(rownames(loadings) %in% top_snps$snp)
+#     
+#     # Color of outlier SNPs
+#     snp_cols <- rep("grey90",  times = nrow(loadings)) # Set default color
+#     snp_cols[sig_snps] <- "red"
+#     
+#     # Labels of outlier SNPs
+#     snp_labels <- rep("", times = nrow(loadings))
+#     snp_labels[sig_snps] <- outlier_snps_names
+#     
+#     # Make biplot
+#     plot(rda_full, type = "n", scaling = 3, xlim = c(-1, 1), ylim = c(-1,1)) # Create empty plot 
+#     points(rda_full, display = "species", pch = 21,
+#            col = "black", bg = snp_cols, scaling = 3)
+#     
+#     points(rda_full, display = "species", pch = 21, # Overplot sig snps
+#            col = "black", select = sig_snps, bg = "red", scaling = 3)
+#     # text(rda_full, display = "species", labels = snp_labels, cex = .75, scaling = 3)
+#     text(rda_full, scaling = 3, display = "bp", col="black") # Environmental vectors  
+#     
+#     
+#     
+#     
+#     # Plot onto map
+#     
+#     
+#     # Get map of California - already loaded in ggplot2 package
+#     ca_map <- dplyr::filter(ggplot2::map_data("state"), region == "california")
+#     
+#     
+#     # Get loadings for each individual
+#     ind_loadings <- summary(rda_full)$sites
+#     head(ind_loadings)
+#     
+#     
+#     # Plot values for first RDA axis
+#     ggplot(ca_map, aes(x = long, y = lat)) +
+#       geom_polygon(color = "black", fill = "grey80") +
+#       geom_point(data = gen_dat_clim, aes(x = longitude, y = latitude, 
+#                                           fill = ind_loadings[, 1]), # Color by first RDA axis
+#                  color = "black", pch = 21, size = 5) +
+#       scale_fill_gradientn(colours = terrain.colors(10), 
+#                            name = "RDA1") +
+#       theme_bw() + coord_equal(ratio = 1)
+#     
+#     
+#     
+#     ## Calculate correlation between prob of finding beneficial allele and future climate change
+#     
+#     # Read in future tmax scenarios
+#     tmax_CCSM4 <- raster("./data/gis/climate_data/BCM/future/CCSM4_rcp85/tmx2070_2099jja_ave_CCSM4_rcp85_1529358915/tmx2070_2099jja_ave_CCSM4_rcp85_1529358915.tif")
+#     tmax_CCSM4 <- projectRaster(tmax_CCSM4, crs = CRS("+proj=longlat +datum=WGS84"))
+#     tmax_CCSM4 <- resample(tmax_CCSM4, tmax_rast)
+#     compareRaster(tmax_CCSM4, tmax_rast)
+#     levelplot(tmax_CCSM4, margin = FALSE)
+#     
+#     
+#     tmax_CNRM <- raster("./data/gis/climate_data/BCM/future/CNRM_rcp85/tmx2070_2099jja_ave_CNRM_rcp85_1529358976/tmx2070_2099jja_ave_CNRM_rcp85_1529358976.tif")
+#     tmax_CNRM <- projectRaster(tmax_CNRM, crs = CRS("+proj=longlat +datum=WGS84"))
+#     tmax_CNRM <- resample(tmax_CNRM, tmax_rast)
+#     compareRaster(tmax_CNRM, tmax_rast)
+#     levelplot(tmax_CNRM, margin = FALSE)
+#     
+#     tmax_IPSL <- raster("./data/gis/climate_data/BCM/future/IPSL_rcp85/tmx2070_2099jja_ave_IPSL_rcp85_1529358959/tmx2070_2099jja_ave_IPSL_rcp85_1529358959.tif")
+#     tmax_IPSL <- projectRaster(tmax_IPSL, crs = CRS("+proj=longlat +datum=WGS84"))
+#     tmax_IPSL <- resample(tmax_IPSL, tmax_rast)
+#     compareRaster(tmax_IPSL, tmax_rast)
+#     levelplot(tmax_IPSL, margin = FALSE)
+#     
+#     tmax_MIROC <- raster("./data/gis/climate_data/BCM/future/MIROC_rcp85/tmx2070_2099jja_ave_MIROC_rcp85_1529357403/tmx2070_2099jja_ave_MIROC_rcp85_1529357403.tif")
+#     tmax_MIROC <- projectRaster(tmax_MIROC, crs = CRS("+proj=longlat +datum=WGS84"))
+#     tmax_MIROC <- resample(tmax_MIROC, tmax_rast)
+#     compareRaster(tmax_MIROC, tmax_rast)
+#     levelplot(tmax_MIROC, margin = FALSE)
+#     
+#     # Stack rasters
+#     future_stack <- stack(tmax_CCSM4) 
+#     tmax_CNRM,
+#     tmax_IPSL, 
+#     tmax_MIROC)
+# 
+# levelplot(future_stack, margin = FALSE)
+# 
+# # Calculate future differences in temperature
+# future_stack_dif <- future_stack - tmax_rast 
+# 
+# future_stack_dif <- mean(future_stack_dif)
+# levelplot(future_stack_dif, margin = FALSE)
+# 
+# 
+# # Correlations in future temp differences and probability of finding allele
+# data.frame(tmax_sum_dif = values(future_stack_dif),
+#            prob_bene = values(top_snps_stack)) %>%
+#   ggplot(., aes(tmax_sum_dif, prob_bene)) + geom_point(size = 0.15, alpha = 0.25) +
+#   geom_smooth(method = "lm") + theme_bw(15) +
+#   geom_smooth(col = "forestgreen") 
+# 
+# cor(values(future_stack_dif), values(bene_stack),
+#     use = "na.or.complete")
+# 
+# 
+# # Just lobata range
+# future_stack_dif_range <- mask(future_stack_dif, lobata_range_rough)
+# 
+# plot(future_stack_dif_range, bene_stack_range,
+#      las = 1, ylab = "Probability of finding beneficial allele",
+#      xlab = "Tmax_sum_dif")
+# 
+# cor(values(future_stack_dif_range), values(bene_stack_range),
+#     use = "na.or.complete")
+# 
+# data.frame(tmax_sum_dif = values(future_stack_dif_range),
+#            prob_bene = values(bene_stack_range)) %>%
+#   ggplot(., aes(tmax_sum_dif, prob_bene)) + geom_point(size = 0.15, alpha = 0.25) +
+#   geom_smooth(method = "lm") + geom_smooth(col = "forestgreen") + theme_bw(15)
+# 
+# 
+# 
+# rasterCo  
+# 
+# library(spatialEco)
+# 
+# test <-  rasterCorrelation(future_stack_dif, bene_stack, s = 7)
+# test
+# levelplot(test, margin = FALSE)
 
 
     
