@@ -46,7 +46,6 @@
       # path_to_predictions <- "./output/run_3718304_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
     
       
-    
  # Read in files
     sum_df_raw <- plyr::ldply(list.files(path_to_summaries, full = TRUE), read_csv)
     
@@ -545,7 +544,7 @@
     gen_dat_top[, snp] <- apply(gen_dat_clim_all[, snp], 1, function(x) {
                 if(is.na(x)){ NA
                 } else if(x == ben_gen){ 1
-           #     } else if(x == 1){ .5 # Set heterozygotes to presence
+                } else if(x == 1){ .5 # Set heterozygotes to presence
                 } else {  0
                 }
               }) # End apply
@@ -573,7 +572,7 @@
     gen_dat_bottom[, snp] <- apply(gen_dat_clim_all[, snp], 1, function(x) {
       if(is.na(x)){ NA
       } else if(x == ben_gen){ 1
-    #  } else if(x == 1){ .5 # Set heterozygotes to presence
+      } else if(x == 1){ .5 # Set heterozygotes to presence
       } else {  0
       }
     }) # End apply
@@ -683,7 +682,7 @@
      
     # Function to downscale and project raster 
      process_raster <- function(rast){
-       rast <- aggregate(rast, fact = 10) # Make smaller by averaging across cells
+       rast <- aggregate(rast, fact = 5) # Make smaller by averaging across cells
        rast_latlon <- projectRaster(rast, crs = CRS("+proj=longlat +datum=WGS84"))
        plot(rast_latlon)
        return(rast_latlon)
@@ -737,16 +736,60 @@
      
      summary(gam_dist_rast_df_nona)
      dim(gam_dist_rast_df_nona)
-   
+ 
+   ## Remove cells that are out of climate range
+     
+     # Calculate ranges
+     tmax_sum_range <- range(unlist(raster::extract(tmax_rast, lobata_range_rough)), na.rm = TRUE)
+     tmin_winter_range <- range(unlist(raster::extract(tmin_winter, lobata_range_rough)), 
+                                na.rm = TRUE)
+     aet_range <- range(unlist(raster::extract(aet, lobata_range_rough)), na.rm = TRUE)
+     cwd_range <- range(unlist(raster::extract(cwd, lobata_range_rough)), na.rm = TRUE)
+     elevation_range <- range(unlist(raster::extract(dem, lobata_range_rough)), na.rm = TRUE)
+     bioclim_04_range <- range(unlist(raster::extract(bioclim_04, lobata_range_rough)),
+                               na.rm = TRUE)
+     bioclim_15_range <- range(unlist(raster::extract(bioclim_15, lobata_range_rough)),
+                               na.rm = TRUE)
+     bioclim_18_range <- range(unlist(raster::extract(bioclim_18, lobata_range_rough)),
+                               na.rm = TRUE)
+     bioclim_19_range <- range(unlist(raster::extract(bioclim_19, lobata_range_rough)),
+                               na.rm = TRUE)
+     
+     
+     # Set percentage threshold for range extension of climate and spatial variables
+     range_thresh <- 0.05
+    
+     gam_dist_rast_df_nona <- gam_dist_rast_df_nona %>%
+       dplyr::filter(tmax_sum >= tmax_sum_range[1] - (abs(tmax_sum_range[1]) * range_thresh) &
+                       tmax_sum <= tmax_sum_range[2] + (abs(tmax_sum_range[1]) * range_thresh)) %>%
+       dplyr::filter(tmin_winter >= tmin_winter_range[1] - (abs(tmin_winter_range[1]) * range_thresh) &
+                     tmin_winter <= tmin_winter_range[2] + (abs(tmin_winter_range[1]) * range_thresh)) %>%
+       dplyr::filter(cwd >= cwd_range[1] - (abs(cwd_range[1]) * range_thresh) &
+                       cwd <= cwd_range[2] + (abs(cwd_range[1]) * range_thresh)) %>%
+       dplyr::filter(bioclim_04 >= bioclim_04_range[1] - (abs(bioclim_04_range[1]) * range_thresh) &
+                       bioclim_04 <= bioclim_04_range[2] + (abs(bioclim_04_range[1]) * range_thresh)) %>%
+       dplyr::filter(bioclim_15 >= bioclim_15_range[1] - (abs(bioclim_15_range[1]) * range_thresh) &
+                       bioclim_15 <= bioclim_15_range[2] + (abs(bioclim_15_range[1]) * range_thresh)) %>%
+       dplyr::filter(bioclim_18 >= bioclim_18_range[1] - (abs(bioclim_18_range[1]) * range_thresh) &
+                       bioclim_18 <= bioclim_18_range[2] + (abs(bioclim_18_range[1]) * range_thresh)) %>%
+       dplyr::filter(elevation >= elevation_range[1] - (abs(elevation_range[1]) * range_thresh) &
+                       elevation <= elevation_range[2] + (abs(elevation_range[1]) * range_thresh)) %>%
+       dplyr::filter(longitude >= extent(lobata_range_rough)@xmin - (abs(extent(lobata_range_rough)@xmin) * range_thresh) &
+                       longitude <= extent(lobata_range_rough)@xmax + (abs(extent(lobata_range_rough)@xmax) * range_thresh)) %>%
+       dplyr::filter(latitude >= extent(lobata_range_rough)@ymin - (abs(extent(lobata_range_rough)@ymin) * range_thresh) &
+                       latitude <= extent(lobata_range_rough)@ymax + (abs(extent(lobata_range_rough)@ymax) * range_thresh))  
+     
+     dim(gam_dist_rast_df_nona)
+
 
   # Choose climate variables   
      climate_vars_gam_dist <-  c("tmax_sum", 
                            "tmin_winter", 
                             "cwd",
-                         #  "aet",
+                      #     "aet",
                            "bioclim_04",
                            "bioclim_15",
-                        #   "bioclim_18",
+                           "bioclim_18",
                           # "bioclim_19", # R = 0.79 with aet; R = 0.84 with bioclim_18
                            "elevation",
                            "latitude",
@@ -852,6 +895,7 @@
       
       summary(gam_dist_rast_df_nona)
       
+     
       climate_vars_gam_dist <- c("PC1","PC2","PC3", "PC4")
      
      
@@ -1030,52 +1074,57 @@
        geom_boxplot() + geom_jitter(width = .1) + theme_bw(15) +
        NULL
 
-   # Partial plots
-     pp_df$var <- as.character(pp_df$var)
-     pp_df$var[pp_df$var == "aet"] <- "Actual Evap."
-     pp_df$var[pp_df$var == "bioclim_04"] <- "Temp. seasonality"
-     pp_df$var[pp_df$var == "bioclim_15"] <- "Precip. seasonality"
-     pp_df$var[pp_df$var == "bioclim_18"] <- "Summer precip."
-     pp_df$var[pp_df$var == "latitude"] <- "Latitude"
-     pp_df$var[pp_df$var == "longitude"] <- "Longitude"
-     pp_df$var[pp_df$var == "tmax_sum"] <- "Tmax"
-     pp_df$var[pp_df$var == "tmin_winter"] <- "Tmin"
-     pp_df$var[pp_df$var == "elevation"] <- "Elevation"
-     pp_df$var[pp_df$var == "random"] <- "Random variable"
-     pp_df$var <- factor(pp_df$var)
-     table(pp_df$var)
+   # # Partial plots
+   #   pp_df$var <- as.character(pp_df$var)
+   #   pp_df$var[pp_df$var == "aet"] <- "Actual Evap."
+   #   pp_df$var[pp_df$var == "bioclim_04"] <- "Temp. seasonality"
+   #   pp_df$var[pp_df$var == "bioclim_15"] <- "Precip. seasonality"
+   #   pp_df$var[pp_df$var == "bioclim_18"] <- "Summer precip."
+   #   pp_df$var[pp_df$var == "latitude"] <- "Latitude"
+   #   pp_df$var[pp_df$var == "longitude"] <- "Longitude"
+   #   pp_df$var[pp_df$var == "tmax_sum"] <- "Tmax"
+   #   pp_df$var[pp_df$var == "tmin_winter"] <- "Tmin"
+   #   pp_df$var[pp_df$var == "elevation"] <- "Elevation"
+   #   pp_df$var[pp_df$var == "random"] <- "Random variable"
+   #   pp_df$var <- factor(pp_df$var)
+   #   table(pp_df$var)
      
      ## Reverse order of snps
-     pp_df$mode
-     pp_df$mode <- factor(pp_df$mode, levels = c("bottom_snps", 
-                                                 "random_snps", 
-                                                 "top_snps"))
-    table(pp_df$mode)
+    #  pp_df$mode
+    #  pp_df$mode <- factor(pp_df$mode, levels = c("bottom_snps", 
+    #                                              "random_snps", 
+    #                                              "top_snps"))
+    # table(pp_df$mode)
     
  # Looking at rasters
     stack_top
   
   ## Weighted means      
-  top_snps_stack <- weighted.mean(stack_top,
-                                    w = dev_df$deviance[dev_df$mode == "top_snps"])
-  bottom_snps_stack <- weighted.mean(stack_bottom,
-                                  w = dev_df$deviance[dev_df$mode == "bottom_snps"])
+  # top_snps_stack <- weighted.mean(stack_top,
+  #                                   w = dev_df$deviance[dev_df$mode == "top_snps"])
+  # bottom_snps_stack <- weighted.mean(stack_bottom,
+  #                                 w = dev_df$deviance[dev_df$mode == "bottom_snps"])
   
   # Sum
-    top_snps_stack <- sum(stack_top)
-    bottom_snps_stack <- sum(stack_bottom)
+    # top_snps_stack <- sum(stack_top)
+    # bottom_snps_stack <- sum(stack_bottom)
   
   # Regular means
     top_snps_stack <- mean(stack_top, na.rm = TRUE)
     bottom_snps_stack <- mean(stack_bottom, na.rm = TRUE)
     
+  # Regular means - with only models with deviance explained > 1%
+    # top_snps_stack <- mean(stack_top[[which(dev_df$deviance[dev_df$mode == "top_snps"] >= .01)]], na.rm = TRUE)
+    # bottom_snps_stack <- mean(stack_bottom[[which(dev_df$deviance[dev_df$mode == "bottom_snps"] >= .01)]], na.rm = TRUE)  
+    # 
+    
   # Medians  
-    top_snps_stack <- calc(stack_top, median, na.rm = TRUE)
-    bottom_snps_stack <- calc(stack_bottom, median, na.rm = TRUE)
+    # top_snps_stack <- calc(stack_top, median, na.rm = TRUE)
+    # bottom_snps_stack <- calc(stack_bottom, median, na.rm = TRUE)
     
   # Crop to just lobata range  
-    top_snps_stack <- mask(top_snps_stack,  lobata_range_rough)
-    bottom_snps_stack <- mask(bottom_snps_stack,  lobata_range_rough)
+    # top_snps_stack <- mask(top_snps_stack,  lobata_range_rough)
+    # bottom_snps_stack <- mask(bottom_snps_stack,  lobata_range_rough)
     
     
   ## Figure 4 - spatial maps of outlier genotypes ####  
@@ -1084,18 +1133,26 @@
     # color_breaks <-  seq(from = min(c(values(top_snps_stack), values(bottom_snps_stack)),
     #                                 na.rm = TRUE),
     #                      to = max(c(values(top_snps_stack), values(bottom_snps_stack)),
-    #                          na.rm = TRUE), 
+    #                          na.rm = TRUE),
     #                      length.out = 9)
     
-  ## Plot beneficial raster
-     levelplot(top_snps_stack, margin = FALSE,
-           #    main = "Probability of finding beneficial genotype",
-               maxpixels = 1e6,
-               par.settings =  rasterTheme(region = brewer.pal('PRGn', n = 9))) + 
-            #   at = color_breaks) +
-       latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
-     #  latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
+     # Initialize blank raster that will be plotted as white
+     blank <- top_snps_stack
+     values(blank) <- 1
+     blank_theme <- rasterTheme(region = "white")
+     
+     theme <- rasterTheme(region = brewer.pal('PRGn', n = 9))
+
+     levelplot(blank , margin = FALSE,
+               maxpixels = 1e4, par.settings = blank_theme) + 
+       latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey25", fill = "grey70")) + 
+       as.layer(levelplot(top_snps_stack, under = TRUE, 
+                          maxpixels = 1e6,
+                 par.settings = theme)) + 
+       #  latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
        latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
+     
+     
      
      # Save plot
      dev.copy(png, paste0("./figs_tables/Figure 3 - beneficial alleles map ", Sys.Date(), ".png"),
@@ -1118,13 +1175,14 @@
      ## Maybe make a PDF version that will only have the scale
      
      ## Plot Detrimental SNPS
-     levelplot(bottom_snps_stack, margin = FALSE,
-            #   main = "Probability of finding detrimental genotype",
-               maxpixels = 1e6,
-               par.settings =  rasterTheme(region = brewer.pal('PRGn', n = 9))) +
-       latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
-       latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
-       latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
+       levelplot(blank , margin = FALSE,
+                 maxpixels = 1e4, par.settings = blank_theme) + 
+         latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey25", fill = "grey70")) + 
+         as.layer(levelplot(bottom_snps_stack, under = TRUE, 
+                            maxpixels = 1e6,
+                            par.settings = theme)) + 
+         #  latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
+         latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
      
    # Save plot
        dev.copy(png, paste0("./figs_tables/Figure 3 - detrimental alleles map ", Sys.Date(), ".png"),
@@ -1153,7 +1211,7 @@
            #   y = prob_scaled,
               group = snp, col = mode, fill = mode), alpha = 0.75) + 
   #  geom_line(lwd = .25, alpha = 0.55) + # Plot individual lines
-    ylab("Scaled allele frequency") + xlab("") + 
+    ylab("Allele frequency") + xlab("") + 
     theme_bw(8) + 
     # theme(legend.position="none") +
        scale_color_manual(values = c("#FF6633", "#6699CC")) + 
@@ -1170,23 +1228,6 @@
   ggsave(filename = paste0("./figs_tables/Figure 3 - partial plots ", Sys.Date(), ".pdf"),
          units = "cm",
          width = 16, height = 4, useDingbats = FALSE)
-  
-  
-  ## Correlate with climate variables
-  
-  # gam_dist_rast_df2 <- gam_dist_rast_df
-  # gam_dist_rast_df2$n_top_snps <- values(top_snps_stack)
-  # gam_dist_rast_df2$n_bottom_snps <- values(bottom_snps_stack)
-  # 
-  # gam_dist_rast_df2 <-  gam_dist_rast_df2 %>%
-  #   dplyr::select(-cell_id) %>%
-  #   dplyr::filter(!is.na(tmax_sum))
-  # 
-  #   ggplot(gam_dist_rast_df2, aes(x = tmax_sum, y = n_top_snps)) + 
-  #            geom_point(alpha = .5, size = .15) + 
-  #            geom_smooth() +
-  #            theme_bw()
-  
 
 
   
