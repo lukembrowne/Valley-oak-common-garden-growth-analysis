@@ -472,7 +472,24 @@ back_transform <- function(x, var, means, sds){
     
     summary(future_stack_height_change_85 )
     names(future_stack_height_change_85) <- "RCP 8.5"
+    
+    
+    
+    ## Mask based on climate range
+    # future_stack_height_change_85_2 <- future_stack_height_change_85
+    # #  future_stack_height_change_85 <- future_stack_height_change_85_2 # Reset
+    # 
+    # future_stack_height_change_85[tmax_rast >= max(dat_all_clim$tmax_sum)
+    #                               * 1.1, ] <- NA
+    # future_stack_height_change_85[tmax_rast <= min(dat_all_clim$tmax_sum)
+    #                               * 0.9, ] <- NA
+    # 
+    # plot(future_stack_height_change_85)
+    # 
+    
+    
 
+    
     ## Project to latlong
     future_stack_height_change_85 <- projectRaster(future_stack_height_change_85, 
                                                    crs = CRS("+proj=longlat +datum=WGS84"))
@@ -483,8 +500,8 @@ back_transform <- function(x, var, means, sds){
     
     summary(future_stack_height_change_85)
     quantile(future_stack_height_change_85, probs = c(0.01, 0.99))
+
     
-  
   ## Figure 1 - spatial predictions ####
   ## Options for levelplot
     pixel_num = 1e5 ## Can make resolution better by making this 1e6 

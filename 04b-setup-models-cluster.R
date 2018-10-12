@@ -254,8 +254,6 @@
   # table(dat_snp_unscaled$section_block[folds[[3]]])
   # table(dat_snp_unscaled$section_block[folds[[4]]])
   # table(dat_snp_unscaled$section_block[folds[[5]]])
-  # 
-  
   
 
 # Save data to file that will be uploaded to cluster  

@@ -12,38 +12,36 @@
   
   ## Randomized phenotypes
   
-    # # Run 1 - 0 SNPs passed - tested on Sept 25th 2018
-      path_to_summaries <- "./output/run_3826675_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-      path_to_predictions <- "./output/run_3826675_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-      # Run 2 - 0 SNPs passed
-      path_to_summaries <- "./output/run_3826678_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-      path_to_predictions <- "./output/run_3826678_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-      # # Run 3 - 0 SNPs passed
-      path_to_summaries <- "./output/run_3826681_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-      path_to_predictions <- "./output/run_3826681_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-      # Run 4 - 0 SNPs passed
-      path_to_summaries <- "./output/run_3826685_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-      path_to_predictions <- "./output/run_3826685_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-      # Run 5 - 0 SNPs passed
-      path_to_summaries <- "./output/run_3826688_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-      path_to_predictions <- "./output/run_3826688_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-      
-      
-      # # Run 6 - 0 SNPs passed
-      # path_to_summaries <- "./output/run_3718299_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-      # path_to_predictions <- "./output/run_3718299_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-      # # Run 7 - 0 SNPs passed
-      # path_to_summaries <- "./output/run_3718300_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-      # path_to_predictions <- "./output/run_3718300_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-      # # Run 8 - 0 SNPs passed
-      # path_to_summaries <- "./output/run_3718301_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-      # path_to_predictions <- "./output/run_3718301_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-      # # Run 9 - 0 SNPs passed
-      # path_to_summaries <- "./output/run_3718302_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-      # path_to_predictions <- "./output/run_3718302_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-      # # Run 10 - 0 SNPs passed
-      # path_to_summaries <- "./output/run_3718304_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-      # path_to_predictions <- "./output/run_3718304_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    # # # Run 1 - 0 SNPs passed - tested on Sept 25th 2018
+    #   path_to_summaries <- "./output/run_3826675_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3826675_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    #   # Run 2 - 0 SNPs passed
+    #   path_to_summaries <- "./output/run_3826678_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3826678_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    #   # # Run 3 - 0 SNPs passed
+    #   path_to_summaries <- "./output/run_3826681_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3826681_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    #   # Run 4 - 0 SNPs passed
+    #   path_to_summaries <- "./output/run_3826685_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3826685_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    #   # Run 5 - 0 SNPs passed
+    #   path_to_summaries <- "./output/run_3826688_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3826688_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    #   # # Run 6 - 0 SNPs passed
+    #   path_to_summaries <- "./output/run_3888991_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3888991_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    #   # Run 7 - 0 SNPs passed
+    #   path_to_summaries <- "./output/run_3888992_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3888992_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    #   # Run 8 - 0 SNPs passed
+    #   path_to_summaries <- "./output/run_3888993_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3888993_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    #   # Run 9 - 0 SNPs passed
+    #   path_to_summaries <- "./output/run_3888994_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3888994_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
+    #   # Run 10 - 0 SNPs passed
+    #   path_to_summaries <- "./output/run_3888995_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
+    #   path_to_predictions <- "./output/run_3888995_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
     
       
  # Read in files
@@ -305,7 +303,7 @@
 
  # Also make a comparable dataframe of 'random snps'
  
-   set.seed(129) # To make sure same SNPs are chosen everytime - reproducible
+   set.seed(1) # To make sure same SNPs are chosen everytime - reproducible
    
    mid_snps_long <- sum_df_long %>%
      dplyr::filter(p_val_adj <= p_val_adj_thresh) %>%
@@ -383,11 +381,11 @@
            axis.line = element_line(colour = "black"))   
    
    # Save to file
-   ggsave(filename = paste0("./figs_tables/Figure 2 - outlier responses ",
-                            Sys.Date(), ".pdf"),
-          units = "cm",
-          height = 8, width = 15,
-          useDingbats = FALSE )
+   # ggsave(filename = paste0("./figs_tables/Figure 2 - outlier responses ",
+   #                          Sys.Date(), ".pdf"),
+   #        units = "cm",
+   #        height = 8, width = 15,
+   #        useDingbats = FALSE )
    
   summary(top_snps_long$height_change_warmer_base0)
   summary(bottom_snps_long$height_change_warmer_base0)
@@ -513,15 +511,15 @@
      # axis.text.x=element_blank(), axis.ticks.x=element_blank()) +
      NULL
    
-   # Save as file - PNG
-     ggsave(paste0("./figs_tables/Figure 2 - manhattan plot interaction term wo labels_",
-                          Sys.Date(), ".png"),
-              width = 16, height = 4, units = "cm", dpi = 300)
-    
-     # Save as PDF for legend
-     ggsave(paste0("./figs_tables/Figure 2 - manhattan plot interaction term LEGEND",
-                   Sys.Date(), ".pdf"),
-            width = 10, height = 2)
+   # # Save as file - PNG
+   #   ggsave(paste0("./figs_tables/Figure 2 - manhattan plot interaction term wo labels_",
+   #                        Sys.Date(), ".png"),
+   #            width = 16, height = 4, units = "cm", dpi = 300)
+   #  
+   #   # Save as PDF for legend
+   #   ggsave(paste0("./figs_tables/Figure 2 - manhattan plot interaction term LEGEND",
+   #                 Sys.Date(), ".pdf"),
+   #          width = 10, height = 2)
    
    
    
@@ -638,8 +636,8 @@
     theme_bw(10) +
     NULL
   
-  ggsave(paste0("./figs_tables/Figure S4 - deviance explained ", Sys.Date(), ".pdf"),
-         units = "cm", height = 8, width = 15)
+  # ggsave(paste0("./figs_tables/Figure S4 - deviance explained ", Sys.Date(), ".pdf"),
+  #        units = "cm", height = 8, width = 15)
   
   
   ## Statistical tests
@@ -846,12 +844,30 @@
        fviz_contrib(pca_clim, choice = "var", axes = 3)
        fviz_contrib(pca_clim, choice = "var", axes = 4)
        
-  
+      
        fviz_pca_var(pca_clim, axes = c(1, 2), col.var="contrib")
-       fviz_pca_var(pca_clim, axes = c(3, 4), col.var="contrib")
+       fviz_pca_var(pca_clim, axes = c(1, 4), col.var="contrib")
        
        
-       ## PC1 - cwd, long, lat, bioclim_18
+       ## Save plot of contributions
+       
+       fviz_pca_var(pca_clim, axes = c(1, 2), col.var="contrib")
+       ggsave(filename = paste0("./figs_tables/Figure S5 - climate PCA 1 ", 
+                                Sys.Date(), ".png"),
+              units = "cm",
+              width = 20, height = 15)
+       
+       fviz_pca_var(pca_clim, axes = c(1, 3), col.var="contrib")
+       
+       ggsave(filename = paste0("./figs_tables/Figure S5 - climate PCA 2 ",
+                                Sys.Date(), ".png"),
+              units = "cm",
+              width = 20, height = 15)
+       
+       
+       
+       
+         ## PC1 - cwd, long, lat, bioclim_18
        ## PC2 - bioclim4, bioclim15, tmin winter
        ## PC3 - latlong, elevation, tmax_sum,
        ## PC4 - latlong, tmax_sum, elevation
@@ -884,7 +900,7 @@
        
       summary(gam_dist_rast_df_nona)
       
-      ## Makt lat long interaction
+      ## Make lat long interaction
       gam_dist_rast_df_nona$latlong <- gam_dist_rast_df_nona$latitude * gam_dist_rast_df_nona$longitude
        
       # Generate predictions
@@ -896,7 +912,7 @@
       summary(gam_dist_rast_df_nona)
       
      
-      climate_vars_gam_dist <- c("PC1","PC2","PC3", "PC4")
+      climate_vars_gam_dist <- c("PC1","PC2","PC3")
      
      
      
@@ -966,11 +982,10 @@
          
          gam_dist <- gam(y ~ s(PC1, bs = "cr", k = 3) +
                              s(PC2, bs = "cr", k = 3) +
-                             s(PC3, bs = "cr", k = 3) + 
-                             s(PC4, bs = "cr", k = 3),
+                             s(PC3, bs = "cr", k = 3),
                      # method = "fREML",
                      # discrete = TRUE,
-                     select = TRUE,
+                   #  select = TRUE,
                     family = "binomial",
                      data = dat_gam_dist)
       
@@ -1145,14 +1160,12 @@
 
      levelplot(blank , margin = FALSE,
                maxpixels = 1e4, par.settings = blank_theme) + 
-       latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey25", fill = "grey70")) + 
+       latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey25", fill = "grey75")) + 
        as.layer(levelplot(top_snps_stack, under = TRUE, 
                           maxpixels = 1e6,
                  par.settings = theme)) + 
-       #  latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
+       latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
        latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
-     
-     
      
      # Save plot
      dev.copy(png, paste0("./figs_tables/Figure 3 - beneficial alleles map ", Sys.Date(), ".png"),
@@ -1170,18 +1183,14 @@
                    par.settings =  rasterTheme(region = brewer.pal('PRGn', n = 9)))
        dev.off()
      
-     
-     
-     ## Maybe make a PDF version that will only have the scale
-     
      ## Plot Detrimental SNPS
        levelplot(blank , margin = FALSE,
                  maxpixels = 1e4, par.settings = blank_theme) + 
-         latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey25", fill = "grey70")) + 
+         latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey25", fill = "grey75")) + 
          as.layer(levelplot(bottom_snps_stack, under = TRUE, 
                             maxpixels = 1e6,
                             par.settings = theme)) + 
-         #  latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
+         latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
          latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
      
    # Save plot
@@ -1211,7 +1220,7 @@
            #   y = prob_scaled,
               group = snp, col = mode, fill = mode), alpha = 0.75) + 
   #  geom_line(lwd = .25, alpha = 0.55) + # Plot individual lines
-    ylab("Allele frequency") + xlab("") + 
+    ylab("Allele frequency \n (centered)") + xlab("") + 
     theme_bw(8) + 
     # theme(legend.position="none") +
        scale_color_manual(values = c("#FF6633", "#6699CC")) + 
@@ -1227,7 +1236,7 @@
   # # Save file
   ggsave(filename = paste0("./figs_tables/Figure 3 - partial plots ", Sys.Date(), ".pdf"),
          units = "cm",
-         width = 16, height = 4, useDingbats = FALSE)
+         width = 14, height = 4, useDingbats = FALSE)
 
 
   
@@ -1368,8 +1377,8 @@
     NULL
   
   # Save plot output
-  ggsave(filename = paste0("./figs_tables/Figure 2 - outlier counts ", Sys.Date(), ".pdf"),
-         units = "cm", width = 6, height = 4)
+  # ggsave(filename = paste0("./figs_tables/Figure 2 - outlier counts ", Sys.Date(), ".pdf"),
+  #        units = "cm", width = 6, height = 4)
 
   
   ## Calculating differences in growth rates
@@ -1379,15 +1388,17 @@
     dplyr::mutate(tmax_sum_dif_unscaled = back_transform(tmax_sum_dif, var = "tmax_sum_dif",
                                                          means = scaled_var_means_gbs_only, sds = scaled_var_sds_gbs_only))
  
+  # Comparing high to mid
  (growth_dif$pred[growth_dif$type_count == paste0(high[1],":",high[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] - 
   growth_dif$pred[growth_dif$type_count == paste0(mid[1],":", mid[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8]) / 
   growth_dif$pred[growth_dif$type_count == paste0(mid[1],":", mid[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] * 100
  
- 
+  # Compare high to low
  (growth_dif$pred[growth_dif$type_count == paste0(high[1],":",high[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] - 
   growth_dif$pred[growth_dif$type_count == paste0(low[1],":", low[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8]) / 
   growth_dif$pred[growth_dif$type_count == paste0(low[1],":", low[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] * 100
  
+  # Compare mid to low
  (growth_dif$pred[growth_dif$type_count == paste0(mid[1],":", mid[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] - 
   growth_dif$pred[growth_dif$type_count == paste0(low[1],":", low[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8]) / 
   growth_dif$pred[growth_dif$type_count == paste0(low[1],":", low[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] * 100
