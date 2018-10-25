@@ -27,6 +27,11 @@
                                                     split = "\\."), function(x) x[[1]]))
   
   head(blasted)
+  
+  ## Extract out gene name
+  blasted$athal_gene_description <- unlist(lapply(strsplit(x = blasted$athal_description,
+                                                           split = " \\| "),
+                                                           function(x) x[[3]]))
 
   
 ## Read in arabidopsis go terms
@@ -64,7 +69,7 @@
                            pos = unlist(lapply(strsplit(top_snps_long$snp, "_"),
                                                function(x) x[[3]])),
                            pos2 = as.numeric(unlist(lapply(strsplit(top_snps_long$snp, "_"),
-                                                           function(x) x[[3]]))) + 1),
+                                                           function(x) x[[3]])))),
             "./output/temp/top_snps.bed",
             col_names = FALSE)
   
@@ -74,7 +79,7 @@
                            pos = unlist(lapply(strsplit(mid_snps_long$snp, "_"),
                                                function(x) x[[3]])),
                            pos2 = as.numeric(unlist(lapply(strsplit(mid_snps_long$snp, "_"),
-                                                           function(x) x[[3]]))) + 1),
+                                                           function(x) x[[3]])))),
             "./output/temp/mid_snps.bed",
             col_names = FALSE)
   
@@ -84,9 +89,17 @@
                            pos = unlist(lapply(strsplit(bottom_snps_long$snp, "_"),
                                                function(x) x[[3]])),
                            pos2 = as.numeric(unlist(lapply(strsplit(bottom_snps_long$snp, "_"),
-                                                           function(x) x[[3]]))) + 1),
+                                                           function(x) x[[3]])))),
             "./output/temp/bottom_snps.bed",
             col_names = FALSE)
+  
+  
+# All snps  
+  write_tsv(x = tibble(chrom = snp_pos$chrom,
+                           pos = snp_pos$pos,
+                           pos2 = snp_pos$pos),
+            "./output/temp/all_snps.bed",
+            col_names = FALSE)  
   
 
  
@@ -99,6 +112,9 @@
   
   bedtools sort -i ./output/temp/bottom_snps.bed > ./output/temp/bottom_snps_sorted.bed
   bedtools closest -a ./output/temp/bottom_snps_sorted.bed -b ./output/temp/genes.bed -D ref > ./output/temp/bottom_closest_genes.txt
+  
+  bedtools sort -i ./output/temp/all_snps.bed > ./output/temp/all_snps_sorted.bed
+  bedtools closest -a ./output/temp/all_snps_sorted.bed -b ./output/temp/genes.bed -D ref > ./output/temp/all_closest_genes.txt
   
  
   
@@ -166,9 +182,25 @@
     dim(bottom_closest_genes)
     
     all(bottom_snps_long$snp %in% paste0("snp_", bottom_closest_genes$chrom_a, "_", bottom_closest_genes$pos1_a)) # Should be all true
+    
+    
+ # All genes
+    all_closest_genes_raw <- read_tsv("./output/temp/all_closest_genes.txt", 
+                                         col_names = col_names)
+    head(all_closest_genes_raw)
+    dim(all_closest_genes_raw)
+    
+    # Filter down
+    all_closest_genes <- all_closest_genes_raw %>%
+      dplyr::filter(gene_type == "gene") %>%
+      dplyr::left_join(., blasted)  %>%
+      dplyr::distinct(chrom_a, pos1_a, .keep_all = TRUE)  %>%
+      dplyr::left_join(., ara_go, by = c("athal_gene_name" = "locus_name"))  %>%
+      dplyr::mutate(outlier_type = "All")
+    
+    dim(all_closest_genes)
+    
 
-    
-    
     
  ## Output to table
     
@@ -177,7 +209,7 @@
   # Select columns we need  
     all_genes <- all_genes_raw %>%
       dplyr::select(outlier_type, chrom_a, pos1_a, qlob_gene_name,
-                    distance, athal_gene_name, GOslim, GO_term,
+                    distance, athal_gene_name, athal_gene_description, GOslim, GO_term,
                     GO_ID)
     
     head(all_genes)
@@ -185,8 +217,10 @@
 
  all_genes_formatted =  all_genes %>%
             dplyr::distinct(outlier_type, qlob_gene_name, 
-                            athal_gene_name, GOslim, .keep_all = TRUE) %>%
-            dplyr::group_by(outlier_type, chrom_a, pos1_a, qlob_gene_name, distance, 
+                            athal_gene_name, athal_gene_description, GOslim, 
+                            .keep_all = TRUE) %>%
+            dplyr::group_by(outlier_type, chrom_a, pos1_a, qlob_gene_name,
+                            athal_gene_description, distance, 
                           athal_gene_name) %>%
             dplyr::summarise(GOslim_terms = toString(GOslim)) %>%
             dplyr::ungroup() %>% 
@@ -196,6 +230,7 @@
                          `Q. lobata gene name` = qlob_gene_name,
                          `Distance to gene` = distance,
                          `A. thaliana gene name` = athal_gene_name,
+                         `Gene description` = athal_gene_description,
                          `GOslim terms` = GOslim_terms)
  
  write_tsv(all_genes_formatted, 
@@ -211,8 +246,19 @@
  summary(abs(all_genes_formatted$`Distance to gene`))
  
  
+ ## Gene distances of all SNPs
  
- 
+all_genes_sub = all_closest_genes %>%
+   dplyr::distinct(chrom_a, pos1_a, .keep_all = TRUE)
+
+summary(abs(all_genes_sub$distance))
+
+sum(all_genes_sub$distance == 0) / length(all_genes_sub$distance)
+
+wilcox.test(abs(all_genes_formatted$`Distance to gene`),
+            abs(all_genes_sub$distance))
+            
+
  
  ## Barplot of GOslim terms
  
@@ -223,8 +269,9 @@
  dim(qlob_genes)
  
  all_genes_barchart <- all_genes_raw %>%
+   dplyr::filter(distance < 5000 & distance > -5000) %>% # Restrict to just 5kb
    dplyr::select(outlier_type, GOslim) %>%
-   dplyr::bind_rows(., dplyr::select(qlob_genes, outlier_type, GOslim))
+   dplyr::bind_rows(., dplyr::select(qlob_genes, outlier_type, GOslim)) 
  
  table(all_genes_barchart$outlier_type)
  
