@@ -662,8 +662,16 @@
      lobata_range_rough <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
                                          proj4string = CRS("+proj=longlat +datum=WGS84"))
      
+     lobata_range_extended <- readShapePoly("./data/gis/valley_oak_range/qlobata_extended.shp", delete_null_obj = TRUE,
+                                            proj4string = CRS("+proj=longlat +datum=WGS84"))
+     
     # Elevation map
      dem <- raster("./data/gis/dem/ClimateNA_DEM_cropped.tif")
+
+     slope = raster::terrain(dem, opt='slope')
+     aspect = raster::terrain(dem, opt='aspect')
+     hill = hillShade(slope, aspect, 40, 270)
+     hill_cropped <- crop(hill, extent(-125, -113.5, 32, 42.5)) # crop based on california outline
      
      # Climate rasters
      tmax_rast <- raster("./data/gis/climate_data/BCM/historical/1951-1980/tmx1951_1980jja_ave_HST_1513103038/tmx1951_1980jja_ave_HST_1513103038.tif")
@@ -737,47 +745,47 @@
  
    ## Remove cells that are out of climate range
      
-     # Calculate ranges
-     tmax_sum_range <- range(unlist(raster::extract(tmax_rast, lobata_range_rough)), na.rm = TRUE)
-     tmin_winter_range <- range(unlist(raster::extract(tmin_winter, lobata_range_rough)), 
-                                na.rm = TRUE)
-     aet_range <- range(unlist(raster::extract(aet, lobata_range_rough)), na.rm = TRUE)
-     cwd_range <- range(unlist(raster::extract(cwd, lobata_range_rough)), na.rm = TRUE)
-     elevation_range <- range(unlist(raster::extract(dem, lobata_range_rough)), na.rm = TRUE)
-     bioclim_04_range <- range(unlist(raster::extract(bioclim_04, lobata_range_rough)),
-                               na.rm = TRUE)
-     bioclim_15_range <- range(unlist(raster::extract(bioclim_15, lobata_range_rough)),
-                               na.rm = TRUE)
-     bioclim_18_range <- range(unlist(raster::extract(bioclim_18, lobata_range_rough)),
-                               na.rm = TRUE)
-     bioclim_19_range <- range(unlist(raster::extract(bioclim_19, lobata_range_rough)),
-                               na.rm = TRUE)
+     # # Calculate ranges
+     # tmax_sum_range <- range(unlist(raster::extract(tmax_rast, lobata_range_rough)), na.rm = TRUE)
+     # tmin_winter_range <- range(unlist(raster::extract(tmin_winter, lobata_range_rough)), 
+     #                            na.rm = TRUE)
+     # aet_range <- range(unlist(raster::extract(aet, lobata_range_rough)), na.rm = TRUE)
+     # cwd_range <- range(unlist(raster::extract(cwd, lobata_range_rough)), na.rm = TRUE)
+     # elevation_range <- range(unlist(raster::extract(dem, lobata_range_rough)), na.rm = TRUE)
+     # bioclim_04_range <- range(unlist(raster::extract(bioclim_04, lobata_range_rough)),
+     #                           na.rm = TRUE)
+     # bioclim_15_range <- range(unlist(raster::extract(bioclim_15, lobata_range_rough)),
+     #                           na.rm = TRUE)
+     # bioclim_18_range <- range(unlist(raster::extract(bioclim_18, lobata_range_rough)),
+     #                           na.rm = TRUE)
+     # bioclim_19_range <- range(unlist(raster::extract(bioclim_19, lobata_range_rough)),
+     #                           na.rm = TRUE)
      
      
-     # Set percentage threshold for range extension of climate and spatial variables
-     range_thresh <- 0.05
-    
-     gam_dist_rast_df_nona <- gam_dist_rast_df_nona %>%
-       dplyr::filter(tmax_sum >= tmax_sum_range[1] - (abs(tmax_sum_range[1]) * range_thresh) &
-                       tmax_sum <= tmax_sum_range[2] + (abs(tmax_sum_range[1]) * range_thresh)) %>%
-       dplyr::filter(tmin_winter >= tmin_winter_range[1] - (abs(tmin_winter_range[1]) * range_thresh) &
-                     tmin_winter <= tmin_winter_range[2] + (abs(tmin_winter_range[1]) * range_thresh)) %>%
-       dplyr::filter(cwd >= cwd_range[1] - (abs(cwd_range[1]) * range_thresh) &
-                       cwd <= cwd_range[2] + (abs(cwd_range[1]) * range_thresh)) %>%
-       dplyr::filter(bioclim_04 >= bioclim_04_range[1] - (abs(bioclim_04_range[1]) * range_thresh) &
-                       bioclim_04 <= bioclim_04_range[2] + (abs(bioclim_04_range[1]) * range_thresh)) %>%
-       dplyr::filter(bioclim_15 >= bioclim_15_range[1] - (abs(bioclim_15_range[1]) * range_thresh) &
-                       bioclim_15 <= bioclim_15_range[2] + (abs(bioclim_15_range[1]) * range_thresh)) %>%
-       dplyr::filter(bioclim_18 >= bioclim_18_range[1] - (abs(bioclim_18_range[1]) * range_thresh) &
-                       bioclim_18 <= bioclim_18_range[2] + (abs(bioclim_18_range[1]) * range_thresh)) %>%
-       dplyr::filter(elevation >= elevation_range[1] - (abs(elevation_range[1]) * range_thresh) &
-                       elevation <= elevation_range[2] + (abs(elevation_range[1]) * range_thresh)) %>%
-       dplyr::filter(longitude >= extent(lobata_range_rough)@xmin - (abs(extent(lobata_range_rough)@xmin) * range_thresh) &
-                       longitude <= extent(lobata_range_rough)@xmax + (abs(extent(lobata_range_rough)@xmax) * range_thresh)) %>%
-       dplyr::filter(latitude >= extent(lobata_range_rough)@ymin - (abs(extent(lobata_range_rough)@ymin) * range_thresh) &
-                       latitude <= extent(lobata_range_rough)@ymax + (abs(extent(lobata_range_rough)@ymax) * range_thresh))  
-     
-     dim(gam_dist_rast_df_nona)
+     # # Set percentage threshold for range extension of climate and spatial variables
+     # range_thresh <- 0.05
+     # 
+     # gam_dist_rast_df_nona <- gam_dist_rast_df_nona %>%
+     #   dplyr::filter(tmax_sum >= tmax_sum_range[1] - (abs(tmax_sum_range[1]) * range_thresh) &
+     #                   tmax_sum <= tmax_sum_range[2] + (abs(tmax_sum_range[1]) * range_thresh)) %>%
+     #   dplyr::filter(tmin_winter >= tmin_winter_range[1] - (abs(tmin_winter_range[1]) * range_thresh) &
+     #                 tmin_winter <= tmin_winter_range[2] + (abs(tmin_winter_range[1]) * range_thresh)) %>%
+     #   dplyr::filter(cwd >= cwd_range[1] - (abs(cwd_range[1]) * range_thresh) &
+     #                   cwd <= cwd_range[2] + (abs(cwd_range[1]) * range_thresh)) %>%
+     #   dplyr::filter(bioclim_04 >= bioclim_04_range[1] - (abs(bioclim_04_range[1]) * range_thresh) &
+     #                   bioclim_04 <= bioclim_04_range[2] + (abs(bioclim_04_range[1]) * range_thresh)) %>%
+     #   dplyr::filter(bioclim_15 >= bioclim_15_range[1] - (abs(bioclim_15_range[1]) * range_thresh) &
+     #                   bioclim_15 <= bioclim_15_range[2] + (abs(bioclim_15_range[1]) * range_thresh)) %>%
+     #   dplyr::filter(bioclim_18 >= bioclim_18_range[1] - (abs(bioclim_18_range[1]) * range_thresh) &
+     #                   bioclim_18 <= bioclim_18_range[2] + (abs(bioclim_18_range[1]) * range_thresh)) %>%
+     #   dplyr::filter(elevation >= elevation_range[1] - (abs(elevation_range[1]) * range_thresh) &
+     #                   elevation <= elevation_range[2] + (abs(elevation_range[1]) * range_thresh)) %>%
+     #   dplyr::filter(longitude >= extent(lobata_range_rough)@xmin - (abs(extent(lobata_range_rough)@xmin) * range_thresh) &
+     #                   longitude <= extent(lobata_range_rough)@xmax + (abs(extent(lobata_range_rough)@xmax) * range_thresh)) %>%
+     #   dplyr::filter(latitude >= extent(lobata_range_rough)@ymin - (abs(extent(lobata_range_rough)@ymin) * range_thresh) &
+     #                   latitude <= extent(lobata_range_rough)@ymax + (abs(extent(lobata_range_rough)@ymax) * range_thresh))  
+     # 
+     # dim(gam_dist_rast_df_nona)
 
 
   # Choose climate variables   
@@ -1134,81 +1142,78 @@
     # 
     
   # Medians  
-    # top_snps_stack <- calc(stack_top, median, na.rm = TRUE)
-    # bottom_snps_stack <- calc(stack_bottom, median, na.rm = TRUE)
+    top_snps_stack <- calc(stack_top, median, na.rm = TRUE)
+    bottom_snps_stack <- calc(stack_bottom, median, na.rm = TRUE)
     
   # Crop to just lobata range  
-    # top_snps_stack <- mask(top_snps_stack,  lobata_range_rough)
-    # bottom_snps_stack <- mask(bottom_snps_stack,  lobata_range_rough)
+    top_snps_stack <- mask(top_snps_stack,  lobata_range_extended)
+    bottom_snps_stack <- mask(bottom_snps_stack,  lobata_range_extended)
     
     
   ## Figure 4 - spatial maps of outlier genotypes ####  
     
-  # Set breaks for color palette
-    # color_breaks <-  seq(from = min(c(values(top_snps_stack), values(bottom_snps_stack)),
-    #                                 na.rm = TRUE),
-    #                      to = max(c(values(top_snps_stack), values(bottom_snps_stack)),
-    #                          na.rm = TRUE),
-    #                      length.out = 9)
+    ## Set raster themes
+    # Height theme
+    genoTheme <- modifyList(rasterTheme(region = brewer.pal('PRGn',
+                                                              n = 11)),                   
+                              list(regions=list(alpha=0.8)))
+
+    # Set max pixels
+    max_pixels = 250000
     
-     # Initialize blank raster that will be plotted as white
-     blank <- top_snps_stack
-     values(blank) <- 1
-     blank_theme <- rasterTheme(region = "white")
-     
-     theme <- rasterTheme(region = brewer.pal('PRGn', n = 9))
+    ## Plots of changes in height - RCP 85 top
+    levelplot(hill_cropped , margin = FALSE,
+              maxpixels = max_pixels, 
+              par.settings = GrTheme()) + 
+      latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey25")) + 
+      as.layer(levelplot(top_snps_stack, 
+                         under = TRUE, 
+                         maxpixels = max_pixels,
+                         par.settings = genoTheme)) + 
+      latticeExtra::layer(sp.polygons(lobata_range, col = "black", lwd = 0.5)) + 
+      latticeExtra::layer(sp.polygons(lobata_range_extended, col = "black", lwd = 1.5))
+    
+    # Main plot
+    dev.copy(png, paste0("./figs_tables/Figure 3 - beneficial alleles map ", Sys.Date(), ".png"),
+             res = 300, units = "cm", width = 16, height = 16)
+    dev.off()
+    
+    # Save a quick PDF version for the legend
+    pdf(paste0("./figs_tables/Figure 3 - beneficial alleles map legend ", Sys.Date(), ".pdf"),
+        width = 4, height = 3)
+    levelplot(top_snps_stack, margin = FALSE,
+              maxpixels = max_pixels,
+              par.settings =  genoTheme)
+    dev.off()
 
-     levelplot(blank , margin = FALSE,
-               maxpixels = 1e4, par.settings = blank_theme) + 
-       latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey25", fill = "grey75")) + 
-       as.layer(levelplot(top_snps_stack, under = TRUE, 
-                          maxpixels = 1e6,
-                 par.settings = theme)) + 
-       latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
-       latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
-     
-     # Save plot
-     dev.copy(png, paste0("./figs_tables/Figure 3 - beneficial alleles map ", Sys.Date(), ".png"),
-              res = 300, units = "cm", width = 16, height = 16)
-     dev.off()
-
-     
-     
-   # Save a quick PDF version for the legend
-       pdf(paste0("./figs_tables/Figure 3 - beneficial alleles map LEGEND ", Sys.Date(), ".pdf"),
-          width = 4, height = 3)
-         levelplot(top_snps_stack, margin = FALSE,
-                 #  main = "Probability of finding beneficial genotype",
-                   maxpixels = 1e3,
-                   par.settings =  rasterTheme(region = brewer.pal('PRGn', n = 9)))
-       dev.off()
-     
-     ## Plot Detrimental SNPS
-       levelplot(blank , margin = FALSE,
-                 maxpixels = 1e4, par.settings = blank_theme) + 
-         latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey25", fill = "grey75")) + 
-         as.layer(levelplot(bottom_snps_stack, under = TRUE, 
-                            maxpixels = 1e6,
-                            par.settings = theme)) + 
-         latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
-         latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
-     
-   # Save plot
-       dev.copy(png, paste0("./figs_tables/Figure 3 - detrimental alleles map ", Sys.Date(), ".png"),
-            res = 300, units = "cm", width = 16, height = 16)
-     dev.off()
-     
-     pdf(paste0("./figs_tables/Figure 3 - detrimental alleles map LEGEND ", Sys.Date(), ".pdf"),
-         width = 4, height = 3)
-     levelplot(bottom_snps_stack, margin = FALSE,
-               #  main = "Probability of finding beneficial genotype",
-               maxpixels = 1e3,
-               par.settings =  rasterTheme(region = brewer.pal('PRGn', n = 9)))
-     dev.off()
-   
-     
-  
- # Figure 3 - partial dependence plots ####
+    
+## Plot Detrimental SNPS
+    
+    levelplot(hill_cropped , margin = FALSE,
+              maxpixels = max_pixels, 
+              par.settings = GrTheme()) + 
+      latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey25")) + 
+      as.layer(levelplot(bottom_snps_stack, 
+                         under = TRUE, 
+                         maxpixels = max_pixels,
+                         par.settings = genoTheme)) + 
+      latticeExtra::layer(sp.polygons(lobata_range, col = "black", lwd = 0.5)) + 
+      latticeExtra::layer(sp.polygons(lobata_range_extended, col = "black", lwd = 1.5))
+    
+    # Main plot
+    dev.copy(png, paste0("./figs_tables/Figure 3 - detrimental alleles map ", Sys.Date(), ".png"),
+             res = 300, units = "cm", width = 16, height = 16)
+    dev.off()
+    
+    # Save a quick PDF version for the legend
+    pdf(paste0("./figs_tables/Figure 3 - detrimental alleles map legend ", Sys.Date(), ".pdf"),
+        width = 4, height = 3)
+    levelplot(bottom_snps_stack, margin = FALSE,
+              maxpixels = max_pixels,
+              par.settings =  genoTheme)
+    dev.off()
+    
+# Figure 3 - partial dependence plots ####
 
   pp_df %>%
     dplyr::filter(mode != "random_snps") %>%
@@ -1412,7 +1417,7 @@
   library(raster)
   library(rasterVis)
   
-  
+
   # Loading in rasters ------------------------------------------------------
   
   ## Read in elevation dem and create a hillshade for mapping
@@ -1421,6 +1426,8 @@
     slope = raster::terrain(dem, opt='slope')
     aspect = raster::terrain(dem, opt='aspect')
     hill = hillShade(slope, aspect, 40, 270)
+    
+    hill_cropped <- crop(hill, extent(-125, -113.5, 32, 42.5)) # crop based on california outline
   
   ## Load in california outline
     cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
@@ -1430,6 +1437,9 @@
                                   proj4string = CRS("+proj=longlat +datum=WGS84"))
     
     lobata_range_rough <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
+                                        proj4string = CRS("+proj=longlat +datum=WGS84"))
+    
+    lobata_range_extended <- readShapePoly("./data/gis/valley_oak_range/qlobata_extended.shp", delete_null_obj = TRUE,
                                         proj4string = CRS("+proj=longlat +datum=WGS84"))
   
   ## Creates vector with list of file paths to all .tif raster files
@@ -1647,13 +1657,13 @@
   # future_stack_height_change_topbottom_avg <- projectRaster(future_stack_height_change_topbottom_avg, 
   #                                                           crs = CRS("+proj=longlat +datum=WGS84"))
   
-  ## Crop them
+  ## Crop them to extended valley oak range
   future_stack_height_change_top_avg <- mask(future_stack_height_change_top_avg, 
-                                             cali_outline)
+                                             lobata_range_extended)
   future_stack_height_change_mid_avg <- mask(future_stack_height_change_mid_avg, 
-                                             cali_outline)
+                                             lobata_range_extended)
   future_stack_height_change_bottom_avg <- mask(future_stack_height_change_bottom_avg, 
-                                                cali_outline)
+                                                lobata_range_extended)
   # future_stack_height_change_topbottom_avg <- mask(future_stack_height_change_topbottom_avg, 
   #                                                  cali_outline)
   
@@ -1666,70 +1676,69 @@
   
 ## Figure 2 - spatial predictions ####
   
+  ## Set raster themes
+    ## hill shade theme: gray colors with semitransparency
+    # hsTheme <- modifyList(GrTheme(),                   
+    #                       list(axis.line = list(col = "transparent"))
+    
+    # Height theme
+    heightTheme <- modifyList(rasterTheme(region = brewer.pal('RdYlBu',
+                                                              n = 11)),                   
+                              list(regions=list(alpha=0.8)))
+    
+    # Set max pixels
+    max_pixels = 250000
+    
   ## Plots of changes in height - RCP 85 top
-  levelplot(future_stack_height_change_top_avg,
-            margin = FALSE,
-            maxpixels = 1000000,
-            par.settings = rasterTheme(region = brewer.pal('RdYlBu', n = 9)),
-            at = seq(-6, 7.5, length.out = 18),
-            main = "Top genotypes") + 
-    latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
-    latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
-    latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
+    levelplot(hill_cropped , margin = FALSE,
+              maxpixels = max_pixels, 
+              par.settings = GrTheme()) + 
+     latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey25")) + 
+     as.layer(levelplot(future_stack_height_change_top_avg, 
+                       under = TRUE, 
+                       maxpixels = max_pixels,
+                       par.settings = heightTheme)) + 
+      latticeExtra::layer(sp.polygons(lobata_range, col = "black", lwd = 0.5)) + 
+      latticeExtra::layer(sp.polygons(lobata_range_extended, col = "black", lwd = 1.5))
   
-  # Main plot
-  dev.copy(png, paste0("./figs_tables/Figure 2 - top genotypes map ", Sys.Date(), ".png"),
-           res = 300, units = "cm", width = 16, height = 16)
-  dev.off()
+    # Main plot
+    dev.copy(png, paste0("./figs_tables/Figure 2 - top genotypes height change map ", Sys.Date(), ".png"),
+             res = 300, units = "cm", width = 16, height = 16)
+    dev.off()
+    
+    # Save a quick PDF version for the legend
+      pdf(paste0("./figs_tables/Figure 2 - top genotypes height change legend ", Sys.Date(), ".pdf"),
+          width = 4, height = 3)
+      levelplot(future_stack_height_change_top_avg, margin = FALSE,
+                maxpixels = max_pixels,
+                par.settings =  heightTheme)
+      dev.off()
+    
   
-  # For legend
-  dev.copy(pdf, paste0("./figs_tables/Figure 2 - top genotypes legend ", Sys.Date(), ".pdf"),
-           width = 5, height = 3)
-  dev.off()
+## Plots of changes in height - RCP 85 bottom
+  levelplot(hill_cropped , margin = FALSE,
+            maxpixels = max_pixels, 
+            par.settings = GrTheme()) + 
+    latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey25")) + 
+    as.layer(levelplot(future_stack_height_change_bottom_avg, 
+                       under = TRUE, 
+                       maxpixels = max_pixels,
+                       par.settings = heightTheme)) + 
+    latticeExtra::layer(sp.polygons(lobata_range, col = "black", lwd = 0.5)) + 
+    latticeExtra::layer(sp.polygons(lobata_range_extended, col = "black", lwd = 1.5))
   
-  
-  ## Plots of changes in height - RCP 85 mid
-  levelplot(future_stack_height_change_mid_avg,
-            margin = FALSE,
-            maxpixels = 1000000,
-            par.settings = rasterTheme(region = brewer.pal('RdYlBu', n = 9)),
-            at = seq(-9.1, -6.2, length.out = 18),
-            main = "Mid genotypes") + 
-    latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
-    latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
-    latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
-  
-  # Main plot
-  dev.copy(png, paste0("./figs_tables/Figure 2 - mid genotypes map ", Sys.Date(), ".png"),
-           res = 300, units = "cm", width = 16, height = 16)
-  dev.off()
-  
-  # For legend
-  dev.copy(pdf, paste0("./figs_tables/Figure 2 - mid genotypes legend ", Sys.Date(), ".pdf"),
-           width = 5, height = 3)
-  dev.off()
-  
-
-  ## Plots of changes in height - RCP 85 - bottom
-  levelplot(future_stack_height_change_bottom_avg,
-            margin = FALSE,
-            maxpixels = 1000000,
-            par.settings = rasterTheme(region = brewer.pal('RdYlBu', n = 9)),
-            at = seq(-19, -26, length.out = 18),
-            main = "Bottom genotypes") + 
-    latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
-    latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
-    latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
-  
-  # Main plot
-  dev.copy(png, paste0("./figs_tables/Figure 2 - bottom genotypes map ", Sys.Date(), ".png"),
-           res = 300, units = "cm", width = 16, height = 16)
-  dev.off()
-  
-  # For legend
-  dev.copy(pdf, paste0("./figs_tables/Figure 2 - bottom genotypes legend ", Sys.Date(), ".pdf"),
-           width = 5, height = 3)
-  dev.off()
+      # Main plot
+      dev.copy(png, paste0("./figs_tables/Figure 2 - bottom genotypes height change map ", Sys.Date(), ".png"),
+               res = 300, units = "cm", width = 16, height = 16)
+      dev.off()
+      
+      # Save a quick PDF version for the legend
+      pdf(paste0("./figs_tables/Figure 2 - bottom genotypes height change legend ", Sys.Date(), ".pdf"),
+          width = 4, height = 3)
+      levelplot(future_stack_height_change_bottom_avg, margin = FALSE,
+                maxpixels = max_pixels,
+                par.settings =  heightTheme)
+      dev.off()
   
   
   ## Compare histograms of heights
@@ -1743,7 +1752,7 @@
   ggplot(height_change_vals, aes(height_change)) + 
     geom_histogram(aes(fill = type), col = "white", bins = 50, size = .01, position = "identity", alpha  = 0.8) + 
     # geom_density(aes(fill = type, col = type), alpha = 0.5) +
-    xlab("% change in relative growth rate") + ylab("Frequency") +
+    xlab("% Change in relative growth rate \n in warmer temperatures") + ylab("Frequency") +
     # scale_x_continuous(breaks = c(seq(-10, 5, 2.5)),
     #                    limits = c(-10, 5)) +
     scale_fill_manual(values = c("#6699CC", "#FF6633", "grey50")) + # Flipped from normal order
@@ -1758,15 +1767,6 @@
   
   ggsave(filename = paste0("./figs_tables/Figure 2 - histogram of height predictions ", Sys.Date(), ".pdf"),
          units = "cm", width = 6, height = 4)
-  
-  
-  
-  
-  
-  
-     
-     
-     
      
 
 # Gradient forest test ----------------------------------------------------

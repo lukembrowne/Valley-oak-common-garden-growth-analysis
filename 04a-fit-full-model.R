@@ -321,6 +321,7 @@ back_transform <- function(x, var, means, sds){
   slope = raster::terrain(dem, opt='slope')
   aspect = raster::terrain(dem, opt='aspect')
   hill = hillShade(slope, aspect, 40, 270)
+  hill_cropped <- crop(hill, extent(-125, -113.5, 32, 42.5)) # crop based on california outline
   
   ## Load in california outline
   cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
@@ -330,6 +331,9 @@ back_transform <- function(x, var, means, sds){
                                 proj4string = CRS("+proj=longlat +datum=WGS84"))
   
   lobata_range_rough <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
+                                      proj4string = CRS("+proj=longlat +datum=WGS84"))
+  lobata_range_extended <- readShapePoly("./data/gis/valley_oak_range/qlobata_extended.shp",
+                                         delete_null_obj = TRUE,
                                       proj4string = CRS("+proj=longlat +datum=WGS84"))
   
   ## Creates vector with list of file paths to all .tif raster files
@@ -496,47 +500,48 @@ back_transform <- function(x, var, means, sds){
     
     
     ## Crop them
-    future_stack_height_change_85 <- mask(future_stack_height_change_85, cali_outline)
+    future_stack_height_change_85 <- mask(future_stack_height_change_85, 
+                                          lobata_range_extended)
     
     summary(future_stack_height_change_85)
     quantile(future_stack_height_change_85, probs = c(0.01, 0.99))
 
     
-  ## Figure 1 - spatial predictions ####
-  ## Options for levelplot
-    pixel_num = 1e5 ## Can make resolution better by making this 1e6 
+## Figure 1 - spatial predictions ####
 
-    ## Plots of changes in height - RCP 85
+  ## Set raster themes
+    # Height theme
+    heightTheme <- modifyList(rasterTheme(region = brewer.pal('RdYlBu',
+                                                              n = 11)),                   
+                              list(regions=list(alpha=0.8)))
     
-     breaks_85 <- seq(-3.55, -3, by = 0.01)
-
-    levelplot(future_stack_height_change_85,
-              margin = FALSE,
-              maxpixels = 1000000,
-             par.settings = rasterTheme(region = brewer.pal('RdYlBu', n = 9)),
-                                     #   axis.line = list(col = "transparent")), # To make box transparent
-              at = breaks_85,
-            #  scales=list(draw=FALSE),
-           #  xlab = "", ylab ="",
-              main = "Rising emissions (RCP 8.5)") + 
-      latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey10")) + 
-      latticeExtra::layer(sp.polygons(lobata_range, col = "grey50", lwd = 0.5)) + 
-      latticeExtra::layer(sp.polygons(lobata_range_rough, col = "black", lwd = 1.5))
+    # Set max pixels
+    max_pixels = 250000
+    
+    ## Plots of changes in height - RCP 85 top
+    levelplot(hill_cropped , margin = FALSE,
+              maxpixels = max_pixels, 
+              par.settings = GrTheme()) + 
+      latticeExtra::layer(sp.polygons(cali_outline, lwd=1.5, col = "grey25")) + 
+      as.layer(levelplot(future_stack_height_change_85, 
+                         under = TRUE, 
+                         maxpixels = max_pixels,
+                         par.settings = heightTheme)) + 
+      latticeExtra::layer(sp.polygons(lobata_range, col = "black", lwd = 0.5)) + 
+      latticeExtra::layer(sp.polygons(lobata_range_extended, col = "black", lwd = 1.5))
     
     # Main plot
     dev.copy(png, paste0("./figs_tables/Figure 1 - RCP85 ", Sys.Date(), ".png"),
              res = 300, units = "cm", width = 16, height = 16)
     dev.off()
     
-    # For legend
-    dev.copy(pdf, paste0("./figs_tables/Figure 1 - RCP85 for legend ", Sys.Date(), ".pdf"),
-              width = 5, height = 3)
+    # Save a quick PDF version for the legend
+    pdf(paste0("./figs_tables/Figure 1 - RCP85 legend ", Sys.Date(), ".pdf"),
+        width = 4, height = 3)
+    levelplot(future_stack_height_change_85, margin = FALSE,
+              maxpixels = max_pixels,
+              par.settings =  heightTheme)
     dev.off()
-    
-    
-
-    
-    
     
     
     
