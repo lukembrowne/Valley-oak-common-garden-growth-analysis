@@ -32,6 +32,8 @@
   blasted$athal_gene_description <- unlist(lapply(strsplit(x = blasted$athal_description,
                                                            split = " \\| "),
                                                            function(x) x[[3]]))
+  
+  dim(blasted)
 
   
 ## Read in arabidopsis go terms
@@ -44,6 +46,7 @@
                      guess_max = 50000)
   
   head(ara_go)
+  dim(ara_go)
 
 # Subset down to just columns that are useful
   ara_go <- ara_go %>%
@@ -55,6 +58,8 @@
 # Subset down to just biological processes
   ara_go <- ara_go %>%
     dplyr::filter(Aspect == "P")
+  
+  dim(ara_go)
   
 
   
@@ -117,9 +122,6 @@
   bedtools closest -a ./output/temp/all_snps_sorted.bed -b ./output/temp/genes.bed -D ref > ./output/temp/all_closest_genes.txt
   
  
-  
-  
-   
 # Read back in as dataframes  
   col_names <- c("chrom_a", "pos1_a", "pos2_a", "chrom_b", "pos1_b", "pos2_b",
                  "qlob_gene_name",
@@ -264,12 +266,14 @@ wilcox.test(abs(all_genes_formatted$`Distance to gene`),
  
  ## Add in total go terms across all blasted genes
  
- qlob_genes <- left_join(blasted, ara_go, by = c("athal_gene_name" = "locus_name")) %>%
-        dplyr::mutate(outlier_type = "Overall gene set")
+ qlob_genes <- left_join(blasted, ara_go, 
+                         by = c("athal_gene_name" = "locus_name")) %>%
+               dplyr::distinct(qlob_gene_name, GOslim, .keep_all = TRUE) %>%
+               dplyr::mutate(outlier_type = "Overall gene set")
  dim(qlob_genes)
  
  all_genes_barchart <- all_genes_raw %>%
-   dplyr::filter(distance < 5000 & distance > -5000) %>% # Restrict to just 5kb
+   dplyr::filter(distance <= 5000 & distance >= -5000) %>% # Restrict to just 5kb
    dplyr::select(outlier_type, GOslim) %>%
    dplyr::bind_rows(., dplyr::select(qlob_genes, outlier_type, GOslim)) 
  
@@ -294,6 +298,35 @@ wilcox.test(abs(all_genes_formatted$`Distance to gene`),
         units = "cm",
         height = 10, width = 15,
         useDingbats = FALSE )
+
+ 
+ 
+ #  
+# all_genes_raw %>%
+#    dplyr::filter(distance <= 5000 & distance >= -5000) %>% # Restrict to just 5kb
+#    dplyr::distinct(chrom_a, pos1_a, .keep_all = TRUE) %>%
+#    dplyr::select(outlier_type, athal_gene_name) %>%
+#    dplyr::filter(outlier_type == "Beneficial genotype") %>%
+#    dplyr::select(athal_gene_name) %>%
+#  write_tsv(. , 
+#            "./output/temp/top_closest_genes_arath_names.txt", col_names = FALSE) 
+#   
+# all_genes_raw %>%
+#   dplyr::filter(distance <= 5000 & distance >= -5000) %>% # Restrict to just 5kb
+#   dplyr::distinct(chrom_a, pos1_a, .keep_all = TRUE) %>%
+#   dplyr::select(outlier_type, athal_gene_name) %>%
+#   dplyr::filter(outlier_type == "Beneficial genotype") %>%
+#   dplyr::select(athal_gene_name) %>%
+#   write_tsv(. , 
+#             "./output/temp/bottom_closest_genes_arath_names.txt", col_names = FALSE) 
+# 
+#  
+ 
+ 
+ 
+ 
+ 
+ 
  
  
 
