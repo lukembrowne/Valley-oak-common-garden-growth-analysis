@@ -9,19 +9,20 @@
   dim(dat_gbs_only_scaled)
 
 
-  # install_github("jdstorey/qvalue")
+  
   library(gamm4)
   library(visreg)
   library(rrBLUP)
-  library(qvalue)
+  library(qvalue) # devtools::install_github("jdstorey/qvalue")
   library(MuMIn)
   library(vegan)
   library(beepr)
-  library(patchwork)
+  library(patchwork) # devtools::install_github("thomasp85/patchwork")
   library(rasterVis)
   library(pdp)
   library(ggrepel)
   library(caret)
+  library(flashpcaR) # devtools::install_github("gabraham/flashpca/flashpcaR")
   
   
   # function to transform from raw to scaled variables

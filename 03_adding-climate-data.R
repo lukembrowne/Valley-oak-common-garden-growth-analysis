@@ -6,6 +6,7 @@
 
   library(psych)
   library(factoextra)
+ library(spmoran) # For calculate MEMs
 
 # Load in climate data ----------------------------------------------------
 
@@ -173,8 +174,6 @@
     
     
   ## Calculating MEMs
-    
-    library(spmoran)
     
     # Moms in common garden
     mem <- meigen(climate_garden_mom[, c("longitude", "latitude")])
