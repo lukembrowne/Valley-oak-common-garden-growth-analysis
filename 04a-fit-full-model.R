@@ -84,9 +84,11 @@ back_transform <- function(x, var, means, sds){
   future_85_mean <- mean(apply(dplyr::select(future_df, contains("85")), MARGIN = 1, mean))
   future_45_mean <- mean(apply(dplyr::select(future_df, contains("45")), MARGIN = 1, mean))
   future_26_mean <-  mean(apply(dplyr::select(future_df, contains("26")), MARGIN = 1, mean))
+  
+  
+  # Calculate LGM differences in temps
+  lgm_mean <- mean(climate_garden_mom$tmax_sum_lgm - climate_garden_mom$tmax_sum)
 
-
-    
 
 # Run FULL models with all seedlings (no genomic data) --------------------
 
@@ -103,7 +105,7 @@ back_transform <- function(x, var, means, sds){
 
 # Set formula for gam
   form <- formula(paste0("rgr ~ section_block + s(height_2014, bs =\"cr\") + s(", var, " , bs = \"cr\") + s(accession, bs = \"re\")"))
-                      
+
 # With all 5,000+ seedlings
   gam_all <- bam(formula = form,
                  data = dat_all_scaled,
@@ -114,12 +116,11 @@ back_transform <- function(x, var, means, sds){
                family = "tw",
                control = list(trace = FALSE))
   
-  summary(gam_all)
-
-  
+   summary(gam_all)
+ 
   test = summary(gam_all)
   
-   # Plot overall model fit
+  # Plot overall model fit
   test_fit <- dat_all_scaled
   test_fit$pred <- gam_all$fitted.values
   
@@ -192,16 +193,15 @@ back_transform <- function(x, var, means, sds){
                                       var = "tmax_sum_dif",
                                       means = scaled_var_means_all,
                                       sds = scaled_var_sds_all))
- 
     
-    
-    
+
 ## Figure 2 - Plot of decrease in Main GGPLOT ####
  
    gg <- 
     ggplot(v$fit, aes(x = tmax_sum_dif, y = rgr)) +
     
     geom_vline(aes(xintercept = 0), lty = 2, size = .5) +
+     geom_vline(xintercept = lgm_mean, size = .5) + 
   #  geom_vline(xintercept = future_26_mean) + 
     geom_vline(xintercept = future_85_mean, size = .5) +
     geom_ribbon(data = v$fit, aes(ymin = visregLwr, ymax = visregUpr), 
@@ -224,9 +224,9 @@ back_transform <- function(x, var, means, sds){
   
   
   ## SAVE TO PDF AND EDIT IN KEYNOTE, etc
-  # ggsave(filename = paste0("./figs_tables/Figure 1 - transfer function ", Sys.Date(), ".pdf"),
+  # ggsave(filename = paste0("./figs_tables/fig1/Figure 1 - transfer function ", Sys.Date(), ".pdf"),
   #        gg,
-  #        units = "cm", width = 12, height = 8)
+  #        units = "cm", width = 11, height = 8)
   
   
   
