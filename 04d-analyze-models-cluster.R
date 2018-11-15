@@ -542,7 +542,7 @@
     gen_dat_top[, snp] <- apply(gen_dat_clim_all[, snp], 1, function(x) {
                 if(is.na(x)){ NA
                 } else if(x == ben_gen){ 1
-                } else if(x == 1){ .5 # Set heterozygotes to presence
+           #     } else if(x == 1){ .5 # Set heterozygotes to presence
                 } else {  0
                 }
               }) # End apply
@@ -570,7 +570,7 @@
     gen_dat_bottom[, snp] <- apply(gen_dat_clim_all[, snp], 1, function(x) {
       if(is.na(x)){ NA
       } else if(x == ben_gen){ 1
-      } else if(x == 1){ .5 # Set heterozygotes to presence
+     # } else if(x == 1){ .5 # Set heterozygotes to presence
       } else {  0
       }
     }) # End apply
@@ -595,7 +595,7 @@
     gen_dat_mid[, snp] <- apply(gen_dat_clim_all[, snp], 1, function(x) {
       if(is.na(x)){ NA
       } else if(x == ben_gen){ 1
-      } else if(x == 1){ .5 # Set heterozygotes to presence
+    #  } else if(x == 1){ .5 # Set heterozygotes to presence
       } else {  0
       }
     }) # End apply
@@ -647,6 +647,789 @@
     kruskal.test(dev_dif ~ has_outlier_snp, data = .)
   
   
+  
+  
+# Figure 2 - growth vs copies of alleles ##################
+  
+  ## Calculate number of top and bottom SNPs 
+  dat_snp_count <- dat_snp_unscaled %>%
+    dplyr::select(accession, site, tmax_sum, tmax_sum_dif, rgr, section_block, PC1_gen, PC2_gen, PC3_gen, height_2014) %>%
+    dplyr::mutate(accession = as.numeric(as.character(accession))) %>% # Change accession to numeric
+    dplyr::left_join(., dplyr::select(gen_dat_top, accession, top_snps_long$snp)) %>%
+    #  mutate(n_top_snps = rowSums(dplyr::select(., top_snps_long$snp), na.rm = TRUE)) %>%
+    mutate(n_top_snps = apply(dplyr::select(., top_snps_long$snp), 1, function(x) sum(x == 1, na.rm = TRUE))) %>%
+    dplyr::left_join(., dplyr::select(gen_dat_bottom, accession, bottom_snps_long$snp)) %>%
+    #  mutate(n_bottom_snps = rowSums(dplyr::select(., bottom_snps_long$snp), na.rm = TRUE)) %>%
+    mutate(n_bottom_snps = apply(dplyr::select(., bottom_snps_long$snp), 1, function(x) sum(x == 1, na.rm = TRUE))) %>%
+    mutate(accession = factor(as.character(accession)))
+  
+  dim(dat_snp_count)
+  
+  summary(dat_snp_count$n_top_snps)
+  summary(dat_snp_count$n_bottom_snps)
+  
+  plot(dat_snp_count$n_bottom_snps, dat_snp_count$n_top_snps)
+  cor.test(dat_snp_count$n_bottom_snps, dat_snp_count$n_top_snps)
+  
+  
+  ## Scale number of top and bottom snps 
+  
+  dat_snp_count_unscaled <- dat_snp_count
+  
+  n_top_snps_mean <- mean(dat_snp_count$n_top_snps)
+  n_top_snps_sd <- sd(dat_snp_count$n_top_snps)
+  dat_snp_count$n_top_snps_unscaled <- dat_snp_count$n_top_snps
+  dat_snp_count$n_top_snps <- (dat_snp_count$n_top_snps - n_top_snps_mean) / n_top_snps_sd
+  
+  n_bottom_snps_mean <- mean(dat_snp_count$n_bottom_snps)
+  n_bottom_snps_sd <- sd(dat_snp_count$n_bottom_snps)
+  dat_snp_count$n_bottom_snps_unscaled <- dat_snp_count$n_bottom_snps
+  dat_snp_count$n_bottom_snps <- (dat_snp_count$n_bottom_snps - n_bottom_snps_mean) / n_bottom_snps_sd
+  
+  # Set formula
+  fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(n_top_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_top_snps, bs=\"cr\") + s(n_bottom_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_bottom_snps, bs=\"cr\") + s(accession, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC1_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC2_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC3_gen, bs=\"cr\")"))
+  
+  
+  # Gam with interaction effect
+  gam_snp = bam(formula = formula(fixed_effects),
+                data = dat_snp_count,
+                discrete = TRUE, 
+                nthreads = 8,
+                method = "fREML",
+                #   method = "ML",
+                family = "tw",
+                control = list(trace = FALSE))
+  
+  summary(gam_snp)
+  
+  ## Save output
+  
+  # Save gam summary to file
+  # sink(file = paste0("./figs_tables/Table S2 - outlier_count_gam_model_summary_",
+  #                    Sys.Date(), ".txt"))
+  # summary(gam_snp)
+  # anova(gam_snp)
+  # sink()
+  
+  
+  ## Plot predictions
+  low <- c(0, max(dat_snp_count_unscaled$n_bottom_snps))
+  mid <- c(round(mean(dat_snp_count_unscaled$n_top_snps)),
+           round(mean(dat_snp_count_unscaled$n_bottom_snps)))
+  high <-c(max(dat_snp_count_unscaled$n_top_snps), 0)
+  
+  # Set up dataframe for prediction
+  newdata <-  expand.grid(section_block = "IFG_1",
+                          height_2014 = 0,
+                          accession = "1",
+                          tmax_sum_dif = c(seq(min(dat_snp_unscaled$tmax_sum_dif),
+                                               max(dat_snp_unscaled$tmax_sum_dif),
+                                               length.out = 50), 
+                                           forward_transform(4.8, "tmax_sum_dif",
+                                                             scaled_var_means_gbs_only,
+                                                             scaled_var_sds_gbs_only)),
+                          PC1_gen = 0, PC2_gen = 0, PC3_gen = 0, 
+                          n_top_snps_unscaled = c(low[1], mid[1], high[1]),
+                          n_bottom_snps_unscaled = c(low[2], mid[2], high[2]))
+  
+  table(newdata$n_bottom_snps_unscaled, newdata$n_top_snps_unscaled)
+  
+  # Transform variables
+  newdata$n_top_snps <- forward_transform(x = newdata$n_top_snps_unscaled,
+                                          var = 1,
+                                          means = n_top_snps_mean,
+                                          sd = n_top_snps_sd)
+  
+  newdata$n_bottom_snps <- forward_transform(x = newdata$n_bottom_snps_unscaled,
+                                             var = 1,
+                                             means = n_bottom_snps_mean,
+                                             sd = n_bottom_snps_sd)
+  
+  # Make predictions
+  newdata$pred <- predict(gam_snp,
+                          newdata = newdata,
+                          se.fit = TRUE, type = "response")$fit
+  
+  newdata$se <- predict(gam_snp,
+                        newdata = newdata,
+                        se.fit = TRUE, type = "response")$se
+  
+  # Plot predictions
+  newdata %>%
+    # dplyr::select(tmax_sum_dif, n_top_snps, n_bottom_snps, pred) %>%
+    dplyr::mutate(type_count = paste0(n_top_snps_unscaled, ":", n_bottom_snps_unscaled)) %>%
+    dplyr::mutate(tmax_sum_dif_unscaled = back_transform(tmax_sum_dif, var = "tmax_sum_dif",
+                                                         means = scaled_var_means_gbs_only, sds = scaled_var_sds_gbs_only)) %>%
+    dplyr::filter(type_count %in% c(paste0(low[1],":", low[2]), 
+                                    paste0(mid[1],":", mid[2]),
+                                    paste0(high[1],":",high[2]))) %>%
+    ggplot(., aes(x = tmax_sum_dif_unscaled, y = pred)) +
+    geom_vline(aes(xintercept = 0), lty = 2, size = .25) +
+    geom_vline(xintercept = 4.8, size = .25) +
+    
+    geom_ribbon(aes(ymin = pred - 1.96*se, ymax = pred + 1.96 * se, fill = factor(type_count)), alpha = .25) +
+    geom_line(aes(col = factor(type_count))) + 
+    scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
+    # ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
+    ylab("Relative growth rate") +
+    xlab("Tmax transfer distance") +
+    # ylim(c(.20, .5)) +
+    scale_color_manual(values = c("#FF6633", "#6699CC", "grey50")) +
+    scale_fill_manual(values =  c("#FF6633", "#6699CC", "grey50")) +
+    theme_bw(8) + 
+    theme(panel.border = element_blank(), 
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), 
+          axis.line = element_line(colour = "black"),
+          legend.position = "none") +
+    NULL
+  
+  # Save plot output
+  # ggsave(filename = paste0("./figs_tables/Figure 2 - outlier counts ", Sys.Date(), ".pdf"),
+  #        units = "cm", width = 6, height = 4)
+  
+  
+  ## Calculating differences in growth rates
+  growth_dif =  newdata %>%
+    # dplyr::select(tmax_sum_dif, n_top_snps, n_bottom_snps, pred) %>%
+    dplyr::mutate(type_count = paste0(n_top_snps_unscaled, ":", n_bottom_snps_unscaled)) %>%
+    dplyr::mutate(tmax_sum_dif_unscaled = back_transform(tmax_sum_dif, var = "tmax_sum_dif",
+                                                         means = scaled_var_means_gbs_only, sds = scaled_var_sds_gbs_only))
+  
+  # Comparing high to mid
+  (growth_dif$pred[growth_dif$type_count == paste0(high[1],":",high[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] - 
+      growth_dif$pred[growth_dif$type_count == paste0(mid[1],":", mid[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8]) / 
+    growth_dif$pred[growth_dif$type_count == paste0(mid[1],":", mid[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] * 100
+  
+  # Compare high to low
+  (growth_dif$pred[growth_dif$type_count == paste0(high[1],":",high[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] - 
+      growth_dif$pred[growth_dif$type_count == paste0(low[1],":", low[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8]) / 
+    growth_dif$pred[growth_dif$type_count == paste0(low[1],":", low[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] * 100
+  
+  # Compare mid to low
+  (growth_dif$pred[growth_dif$type_count == paste0(mid[1],":", mid[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] - 
+      growth_dif$pred[growth_dif$type_count == paste0(low[1],":", low[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8]) / 
+    growth_dif$pred[growth_dif$type_count == paste0(low[1],":", low[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] * 100
+  
+  
+  
+
+# Testing diversity within and among populations --------------------------
+
+  # Count % of missing data for full gbs dataset
+  missing_all <- data.frame(gen_dat_clim_all[ "id"],
+             missing = apply(dplyr::select(gen_dat_clim_all, snp_col_names),
+                             MARGIN = 1, function(x) sum(is.na(x)))/length(snp_col_names))
+  
+  # Get list of samples to exclude because of missing data
+  exclude_based_on_missing <- missing_all$id[which(missing_all$missing > .2)]
+  
+  
+  # Choose climate variables
+  climate_vars_gam_dist <-  c("tmax_sum", 
+                              "tmin_winter", 
+                              "cwd",
+                              #     "aet",
+                              "bioclim_04",
+                              "bioclim_15",
+                              "bioclim_18",
+                              # "bioclim_19", # R = 0.79 with aet; R = 0.84 with bioclim_18
+                              "elevation",
+                              "latitude",
+                              "longitude") # R = -0.84 with latitude
+  #   "random")
+  
+
+  ## Calculate number of top and bottom SNPs 
+  dat_snp_count_mom <- gen_dat_clim_all %>%
+    dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
+                     by = c("id" = "gbs_name")) %>%
+    dplyr::select(id, accession, locality, climate_vars_gam_dist,
+                  mem1, mem2, mem3, mem4) %>%
+    dplyr::filter(!id %in% exclude_based_on_missing) %>%
+    dplyr::mutate(accession = as.numeric(as.character(accession))) %>% 
+    dplyr::bind_cols(., 
+                     dplyr::select(dplyr::filter(gen_dat_top, !(id %in% 
+                                                   exclude_based_on_missing)),
+                                   top_snps_long$snp)) %>%
+      mutate(n_top_snps = rowSums(dplyr::select(., top_snps_long$snp), na.rm = TRUE)) %>%
+    dplyr::bind_cols(., 
+                     dplyr::select(dplyr::filter(gen_dat_bottom, !(id %in% 
+                                                                  exclude_based_on_missing)),
+                                   bottom_snps_long$snp)) %>%
+      mutate(n_bottom_snps = rowSums(dplyr::select(., bottom_snps_long$snp), na.rm = TRUE)) %>%
+    mutate(accession = factor(as.character(accession))) %>%
+    dplyr::select(-contains("snp_chr"))
+  
+  # Average by locality
+  dat_snp_count_locality <- dat_snp_count_mom %>%
+                          dplyr::group_by(locality) %>% 
+                          summarise_all(mean)
+  
+  
+# Explore data  
+  dim(dat_snp_count_mom)
+  head(dat_snp_count_mom)
+  
+  summary(dat_snp_count_mom$n_top_snps) # Average number of genotypes per individual in a population
+  summary(dat_snp_count_mom$n_bottom_snps)
+  
+  
+  dim(dat_snp_count_locality)
+  head(dat_snp_count_locality)
+  
+  summary(dat_snp_count_locality$n_top_snps) # Average number of genotypes per individual in a population
+  summary(dat_snp_count_locality$n_bottom_snps)
+  
+  
+  # Histogram
+  dat_snp_count_mom %>%
+    dplyr::select(n_top_snps, n_bottom_snps) %>%
+    gather(key = type, value = count) %>%
+    ggplot(aes(count, fill = type)) + 
+    geom_histogram(col = "white", position="identity", alpha = .5) + 
+    theme_bw(15)
+  
+  dat_snp_count_locality %>%
+    dplyr::select(n_top_snps, n_bottom_snps) %>%
+    gather(key = type, value = count) %>%
+    ggplot(aes(count, fill = type)) + 
+    geom_histogram(col = "white", position="identity", alpha = .5) + 
+    theme_bw(15)
+  
+  pairs.panels(dplyr::select(dat_snp_count_mom, -id, -accession)) # No strong correlations
+
+## Bar chart of top and bottom snps per locality
+ library(tmap)
+ 
+ # Shape outlines
+ cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
+                               proj4string = CRS("+proj=longlat +datum=WGS84"))
+ 
+ lobata_range <- readShapePoly("./data/gis/valley_oak_range/qlobata_refined_grouped.shp",
+                               proj4string = CRS("+proj=longlat +datum=WGS84"))
+ 
+ lobata_range_rough <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
+                                     proj4string = CRS("+proj=longlat +datum=WGS84"))
+ 
+ lobata_range_extended <- readShapePoly("./data/gis/valley_oak_range/qlobata_extended.shp", delete_null_obj = TRUE,
+                                        proj4string = CRS("+proj=longlat +datum=WGS84"))
+ 
+ dem <- raster("./data/gis/dem/ClimateNA_DEM_cropped.tif")
+ 
+ slope = raster::terrain(dem, opt='slope')
+ aspect = raster::terrain(dem, opt='aspect')
+ hill = hillShade(slope, aspect, 40, 270)
+ hill_cropped <- crop(hill, extent(-125, -113.5, 32, 42.5)) # crop based on california outline
+ 
+ # Set up spatial dataframe
+  dat_snp_count_locality_sp <- SpatialPointsDataFrame(dat_snp_count_locality[, c("longitude", "latitude")],
+                                      data = dat_snp_count_locality[, c("locality", "n_top_snps",
+                                                               "n_bottom_snps")],
+                                      proj4string = CRS("+proj=longlat +datum=WGS84"))
+  
+  
+ # Set up grobs - or individual bar charts  
+  gen_dat_list = dat_snp_count_mom %>%
+    dplyr::select(locality, n_top_snps, n_bottom_snps) %>%
+    tidyr::gather(key = type, value = number, -locality) %>%
+    group_by(locality, type) %>%
+    summarise_all(mean)
+
+  grobs_qlob <- lapply(split(gen_dat_list, gen_dat_list$locality), function(x) {
+    ggplotGrob(ggplot(x, aes(x="", y=number, fill=type)) +
+                 geom_bar(width=.35, stat="identity", position = "dodge") +
+                 # geom_text(aes(label=round(number)), vjust=-.5, 
+                 #           position=position_dodge(width=0.5)) +
+                 ylim(c(0, 20)) +
+                 ylab("") + 
+                 scale_fill_manual(values = c("#FF6633", "#6699CC")) +
+                 theme_bw(2) + theme(legend.position = "none",
+                                     axis.title.x=element_blank(),
+                                     axis.text.x=element_blank(),
+                                     axis.ticks.x=element_blank(),
+                                     # axis.text.y=element_blank(),
+                                     # axis.ticks.y=element_blank(),
+                                     panel.grid.major = element_blank(),
+                                     panel.grid.minor = element_blank(),
+                                     panel.border = element_blank(),
+                                     plot.background = element_rect(fill = "transparent",
+                                                                    color = NA),
+                                     panel.background = element_rect(fill = "transparent",colour = NA)))
+  })
+  
+  names(grobs_qlob) <- dat_snp_count_locality$locality # Add names of localities
+  
+  plot(grobs_qlob[[1]]) # Example plot
+    
+ ## Make actual plot
+  # tmap_mode("view")
+   tmap_mode("plot")
+   
+  tm <-   tm_shape(hill_cropped) + 
+      tm_grid(lwd = .45, labels.inside.frame = FALSE) +
+    tm_raster(palette = gray.colors(n= 9), legend.show = FALSE) +
+   tm_shape(cali_outline) +
+     tm_borders("black") +
+     tm_shape(lobata_range_extended) + 
+     tm_borders("black") +
+    tm_fill("white", alpha = .65) +
+      tm_shape(dat_snp_count_locality_sp, legend.show = FALSE) +
+      tm_dots() +
+  #  tm_bubbles(size = "n_top_snps") +
+  #    tm_layout(outer.margins=c(.5,.5, .5, .5))
+     tm_shape(dat_snp_count_locality_sp) +
+     tm_symbols(size=1, shape="locality", 
+             #   just = "top",
+                shapes=grobs_qlob, 
+              #  sizes.legend=c(5, 10, 30), 
+                scale=1, border.alpha = 0) + tm_legend(show = FALSE)
+    # legend.shape.show = FALSE,
+    # legend.size.is.portrait = TRUE,
+    # shapes.legend = 22,
+    # title.size = "Population",
+    # id = "locality",
+    # popup.vars = c("population", "origin_native"
+    #                           )) + tm_legend(show = FALSE)
+    
+    tm
+  
+    # Save plot
+    tmap_save(tm, filename = "./testing_barchart.pdf", width = 16, height =16, units = "cm")
+   
+    
+    
+    
+
+# Predicting growth rates based on n of snps in pops ----------------------
+
+    ## Scale number of top and bottom snps 
+    dat_snp_count_locality_unscaled <- dat_snp_count_locality
+    
+    dat_snp_count_locality$n_top_snps_unscaled <- dat_snp_count_locality$n_top_snps
+    dat_snp_count_locality$n_top_snps <- (dat_snp_count_locality$n_top_snps - n_top_snps_mean) / n_top_snps_sd
+    
+    dat_snp_count_locality$n_bottom_snps_unscaled <- dat_snp_count_locality$n_bottom_snps
+    dat_snp_count_locality$n_bottom_snps <- (dat_snp_count_locality$n_bottom_snps - n_bottom_snps_mean) / n_bottom_snps_sd
+    
+   
+    summary(gam_snp)
+
+
+    # Set up dataframe for prediction
+    newdata <-  expand.grid(#locality = dat_snp_count_locality$locality, 
+                            id = dat_snp_count_locality$id,
+                            section_block = "IFG_1",
+                            height_2014 = 0,
+                            accession = "1",
+                            tmax_sum_dif = c(seq(min(dat_snp_unscaled$tmax_sum_dif),
+                                                 max(dat_snp_unscaled$tmax_sum_dif),
+                                                 length.out = 50), 
+                                             forward_transform(c(0, 4.8), "tmax_sum_dif",
+                                                               scaled_var_means_gbs_only,
+                                                               scaled_var_sds_gbs_only)),
+                            PC1_gen = 0, PC2_gen = 0, PC3_gen = 0)
+    
+    dim(newdata)
+    
+    table(newdata$locality)
+    
+    
+    newdata <- newdata %>%
+      dplyr::left_join(., dplyr::select(dat_snp_count_locality, 
+                                      #  locality, 
+                                       id, 
+                                        n_top_snps_unscaled,
+                                        n_bottom_snps_unscaled))
+    
+    head(newdata)
+    
+    # Transform variables
+    newdata$n_top_snps <- forward_transform(x = newdata$n_top_snps_unscaled,
+                                            var = 1,
+                                            means = n_top_snps_mean,
+                                            sd = n_top_snps_sd)
+    
+    newdata$n_bottom_snps <- forward_transform(x = newdata$n_bottom_snps_unscaled,
+                                               var = 1,
+                                               means = n_bottom_snps_mean,
+                                               sd = n_bottom_snps_sd)
+    
+    newdata$tmax_sum_dif_unscaled <- back_transform(x = newdata$tmax_sum_dif,
+                                                    var = "tmax_sum_dif",
+                                                    means = scaled_var_means_gbs_only,
+                                                    sds = scaled_var_sds_gbs_only)
+    
+    # Make predictions
+    newdata$pred <- predict(gam_snp,
+                            newdata = newdata,
+                            se.fit = TRUE, type = "response")$fit
+    
+    newdata$se <- predict(gam_snp,
+                          newdata = newdata,
+                          se.fit = TRUE, type = "response")$se 
+    
+    newdata %>%
+    ggplot(., aes(tmax_sum_dif_unscaled, pred, group = locality)) + 
+      geom_line() + theme_bw(15)
+    
+    
+    
+    preds_by_locality = newdata %>%
+    #  dplyr::group_by(locality) %>%
+      dplyr::group_by(id) %>%
+      do(data.frame(
+                    height_change_warmer_base0 = mean((.$pred[.$tmax_sum_dif_unscaled >= 0]
+                                                       - base0 ) /  base0) * 100))
+    
+    head(preds_by_locality)
+    
+    dat_snp_count_locality <- dat_snp_count_locality %>%
+      dplyr::left_join(., preds_by_locality)
+    
+    
+    plot(dat_snp_count_locality$n_bottom_snps_unscaled, dat_snp_count_locality$height_change_warmer_base0)
+    
+    plot(dat_snp_count_locality$n_top_snps_unscaled, dat_snp_count_locality$height_change_warmer_base0)
+    
+    pairs.panels(dplyr::select(dat_snp_count_locality, height_change_warmer_base0, climate_vars_gam_dist))
+
+    # ## Avg aross localities
+    # dat_snp_count_mom <- dat_snp_count_mom %>%
+    #   group_by(locality) %>%
+    #   summarise_all(mean)
+    # 
+    # 
+    # Set up spatial dataframe
+    dat_snp_count_locality_sp <- SpatialPointsDataFrame(dat_snp_count_locality[, c("longitude", "latitude")],
+                                               data = dat_snp_count_locality[, c("locality", "n_top_snps",
+                                                                        "n_bottom_snps",
+                                                                        "height_change_warmer_base0")],
+                                               proj4string = CRS("+proj=longlat +datum=WGS84"))
+    
+    
+    hist(dat_snp_count_locality$height_change_warmer_base0)
+    
+    ## Make actual plot
+    # tmap_mode("view")
+    tmap_mode("plot")
+    
+    tm <-   tm_shape(hill_cropped) + 
+      tm_grid(lwd = .45, labels.inside.frame = FALSE) +
+      tm_raster(palette = gray.colors(n= 9), legend.show = FALSE) +
+      tm_shape(cali_outline) +
+      tm_borders("black") +
+      tm_shape(lobata_range_extended) + 
+      tm_borders("black") +
+      tm_fill("white", alpha = .65) +
+      tm_shape(dat_snp_count_locality_sp) +
+       tm_bubbles(
+                  col = "height_change_warmer_base0",
+                  alpha = 0.95,
+                  border.alpha = 0.5,
+                  breaks = c(-Inf,  -10, -7.5, -5, -2.5, 0, Inf),
+                  palette = "RdYlBu",
+                  title.size = "Metro population (2010)", 
+                  title.col = "Change in relative growth rate in warmer temperatures (%)",
+                midpoint = NA)
+
+    
+    tm
+    
+   
+  ## Testing kriging in between points  
+    
+    library(gstat)
+    
+
+    vario <- variogram(height_change_warmer_base0 ~ longitude + latitude, dat_snp_count_locality_sp)
+    vario_fit <- fit.variogram(vario, vgm("Gau"))
+    plot(vario)
+    plot(variogramLine(vario_fit, 250), type = "l")
+    points(vario[,2:3], pch=20, col='red')
+
+    hill_test <- aggregate(hill_cropped, 20)
+    test2 <- as(hill_test, 'SpatialPointsDataFrame')
+    test2
+    crs(test2) <- "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 "
+    colnames(test2@coords) <- c("longitude", "latitude")
+    
+    test <- krige(formula = height_change_warmer_base0 ~ longitude + latitude, 
+                  locations =  dat_snp_count_locality_sp,
+                  newdata = test2)
+    
+    test
+    
+    
+    
+    
+    
+    spplot(test)
+    
+    
+     
+    
+   
+ ## PCA on climate variables
+ pca_test = prcomp(dat_snp_count_mom[ , climate_vars_gam_dist], center = TRUE, scale = TRUE) 
+ 
+ biplot(pca_test)
+ summary(pca_test)
+ screeplot(pca_test, bstick = TRUE)
+
+
+ pcs_test <- as.data.frame(pca_test$x[, 1:7])
+ 
+ # Add PCs as columns to dataframes
+ dat_snp_count_mom <- bind_cols(dat_snp_count_mom, pcs_test)
+ 
+ 
+ summary(lm(n_top_snps ~ PC1 + PC2 + PC3 + PC4 + mem1 + mem2 + mem3 + mem4, 
+             data = dplyr::select(dat_snp_count_mom, -id, -accession, -locality)))
+ 
+ 
+### Calculate %% presecence across populations
+ 
+ ## Calculate number of top and bottom SNPs 
+ gen_dat_perc <- gen_dat_clim_all %>%
+   dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
+                    by = c("id" = "gbs_name")) %>%
+   dplyr::select(id, accession, locality, climate_vars_gam_dist) %>%
+   dplyr::filter(!id %in% exclude_based_on_missing) %>%
+   dplyr::mutate(accession = as.numeric(as.character(accession))) %>% 
+   dplyr::bind_cols(., 
+                    dplyr::select(dplyr::filter(gen_dat_top, !(id %in% 
+                                                                 exclude_based_on_missing)),
+                                  top_snps_long$snp)) %>%
+   dplyr::bind_cols(., 
+                    dplyr::select(dplyr::filter(gen_dat_bottom, !(id %in% 
+                                                                    exclude_based_on_missing)),
+                                  bottom_snps_long$snp)) %>%
+   mutate(accession = factor(as.character(accession)))
+ #  dplyr::select(-contains("snp_chr"))
+   # dplyr::group_by(locality) %>% 
+   # summarise_all(mean)
+ 
+ head(gen_dat_perc)
+ 
+ latlongs <- gen_dat_perc %>%
+   group_by(locality) %>%
+   dplyr::select(climate_vars_gam_dist) %>%
+   summarise_all(mean)
+ 
+ 
+ test = gen_dat_perc %>%
+   dplyr::group_by(locality) %>%
+   summarise_at(vars(contains("snp_chr")), 
+                function(x) sum(x == 1, na.rm = TRUE)/length(x)) %>%
+   dplyr::left_join(., latlongs) %>%
+   gather(key = "snp", value = "geno_freq", -locality, -climate_vars_gam_dist)
+ 
+ test$outlier_type <- NA
+ test$outlier_type[test$snp %in% top_snps_long$snp] <- "top"
+ test$outlier_type[test$snp %in% bottom_snps_long$snp] <- "bottom"
+ table(test$outlier_type)
+ 
+ ggplot(test, aes(outlier_type, geno_freq)) +
+   geom_boxplot() + geom_jitter() +
+   theme_bw(15)
+   
+ ggplot(test, aes(geno_freq, fill = outlier_type)) +
+     geom_density( alpha = 0.5) + 
+   theme_bw(15)
+ 
+ test %>%
+   group_by(locality, outlier_type) %>%
+   summarise_all(mean) %>%
+ ggplot(., aes(longitude, latitude, size = geno_freq)) + 
+   geom_point() + facet_wrap(~ outlier_type) + theme_bw(15)
+ 
+ 
+ 
+ 
+ 
+ test_top <- test %>%
+   filter(outlier_type == "top") %>%
+   group_by(locality) %>%
+   summarise_all(mean)
+ 
+ pairs.panels(dplyr::select(test_top, -snp, -locality, -outlier_type))
+   
+ 
+ 
+ 
+ 
+ test <-  gen_dat_perc %>%
+   dplyr::group_by(locality) %>%
+   summarise_at(vars(contains("snp_chr")), 
+                function(x) sum(x == 1, na.rm = TRUE)/length(x))
+ 
+ summary(dplyr::select(test, top_snps_long$snp))
+ 
+ 
+ 
+ 
+ 
+ 
+ library(lmerTest)
+ library(MuMIn)
+  
+  # Are these SNPS distributed across populations equally? Or clustered?
+  # Is there more variation in SNPs within a population than among populations?
+  # Is there enough standing genetic variation without us intervening?
+   # - if some number of genotypes are present in all populations
+   # 
+ 
+ 
+ library(vegan)
+ 
+
+## Top snps  
+ rda_top <- gen_dat_top %>%
+   dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
+                    by = c("id" = "gbs_name")) %>%
+   dplyr::filter(!(id %in% exclude_based_on_missing))
+ 
+ rda_top_scaled <- flashpcaR::scale2(dplyr::select(rda_top, 
+                                                    top_snps_long$snp), impute = 2)
+ dim(rda_top_scaled)
+ 
+ 
+## All other snps  
+ rda_all <- gen_dat_clim_all %>%
+   dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
+                    by = c("id" = "gbs_name")) %>%
+   dplyr::filter(!(id %in% exclude_based_on_missing))
+ 
+ rda_all_scaled <- flashpcaR::scale2(dplyr::select(rda_all, contains("snp_chr"),
+                                                   -c(top_snps_long$snp), 
+                                                   -c(mid_snps_long$snp)), impute = 2)
+ dim(rda_all_scaled) 
+ 
+ 
+## Bottom snps  
+ rda_bottom <- gen_dat_bottom %>%
+   dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
+                    by = c("id" = "gbs_name")) %>%
+   dplyr::filter(!(id %in% exclude_based_on_missing))
+ 
+ rda_bottom_scaled <- flashpcaR::scale2(dplyr::select(rda_bottom, 
+                                                   bottom_snps_long$snp), impute = 2)
+ dim(rda_bottom_scaled) 
+ 
+ 
+
+ 
+## Run RDAs  
+ rda_top_mod = rda(rda_top_scaled ~ rda_snps$tmax_sum + rda_snps$tmin_winter + rda_snps$cwd + rda_snps$bioclim_04 + rda_snps$bioclim_15 + rda_snps$bioclim_18 + rda_snps$elevation + rda_snps$latitude + rda_snps$longitude + rda_snps$mem1 + rda_snps$mem2 + rda_snps$mem3 + rda_snps$mem4)
+     
+ rda_top_mod
+ 
+ 
+ rda_all_mod = rda(rda_all_scaled ~ rda_snps$tmax_sum + rda_snps$tmin_winter + rda_snps$cwd + rda_snps$bioclim_04 + rda_snps$bioclim_15 + rda_snps$bioclim_18 + rda_snps$elevation + rda_snps$latitude + rda_snps$longitude + rda_snps$mem1 + rda_snps$mem2 + rda_snps$mem3 + rda_snps$mem4)
+ 
+ rda_all_mod
+ 
+ 
+ rda_bottom_mod = rda(rda_bottom_scaled ~ rda_snps$tmax_sum + rda_snps$tmin_winter + rda_snps$cwd + rda_snps$bioclim_04 + rda_snps$bioclim_15 + rda_snps$bioclim_18 + rda_snps$elevation + rda_snps$latitude + rda_snps$longitude + rda_snps$mem1 + rda_snps$mem2 + rda_snps$mem3 + rda_snps$mem4)
+ 
+ rda_bottom_mod
+ 
+ 
+ 
+ 
+ 
+ str(summary(rda_bottom_mod))
+ 
+ bind_cols(vars = names(summary(rda_bottom_mod)$biplot[, 1]), 
+                           top = summary(rda_top_mod)$biplot[, 1],
+         bottom = summary(rda_bottom_mod)$biplot[, 1],
+         overall = summary(rda_all_mod)$biplot[, 1])
+ 
+ 
+ 
+#### Calculating Fst per snp
+ 
+ library(adegenet)
+ library(hierfstat)
+ 
+ fst <- gen_dat_clim_all %>%
+   dplyr::select(id, snp_col_names)  %>%
+   dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
+                    by = c("id" = "gbs_name")) %>%
+   dplyr::filter(!(id %in% exclude_based_on_missing))
+ 
+ dim(fst)
+ 
+
+ fst[fst == 0] <- "1/1" # homozygote reference
+ fst[fst == 1] <- "1/2" # homozygote reference
+ fst[fst == 2] <- "2/2" # homozygote reference
+ head(fst)
+ 
+ fst_genind <- df2genind(dplyr::select(fst, -id, -locality), 
+                         sep = "/", ploidy = 2,
+                         pop = fst$locality)
+ 
+ fst_hier <- genind2hierfstat(fst_genind)
+ 
+ stats <- basic.stats(fst_hier)
+ 
+ 
+ 
+ test = data.frame(locus = rownames(stats$perloc),
+            fst = stats$perlo$Fst)
+ 
+ test$outlier_type = "overall"
+ test$outlier_type[test$locus %in% top_snps_long$snp] <- "beneficial"
+ test$outlier_type[test$locus %in% mid_snps_long$snp] <- "overall"
+ test$outlier_type[test$locus %in% bottom_snps_long$snp] <- "detrimental"
+ 
+ test$outlier_type <- factor(test$outlier_type, levels = c("beneficial", "detrimental", "overall"))
+ 
+ table(test$outlier_type)
+ 
+ library(ggridges)
+ 
+ ggplot(test, aes(fst, fill = outlier_type)) + 
+   geom_histogram(col = "white", bins = 40) + 
+   facet_wrap(~outlier_type, scales = "free_y", ncol = 1) +
+   theme_bw(15)
+ 
+ 
+ ggplot(test, aes(fst, y = outlier_type, fill = outlier_type)) + 
+  # geom_density_ridges(col = "white", bins = 40, alpha = 0.75, scale = 2) + 
+   stat_density_ridges(quantile_lines = TRUE, quantiles = 2, col = "grey10", alpha = .9) + 
+ #  geom_density_ridges(stat = "binline", bins = 20, scale = 0.95, draw_baseline = FALSE) +
+   xlim(c(-.1, .25)) +
+   scale_fill_manual(values =  c("#6699CC", "#FF6633",  "grey50")) + 
+#   facet_wrap(~outlier_type, scales = "free_y", ncol = 1) +
+   theme_bw(15)
+ 
+ test %>% 
+   group_by(outlier_type) %>%
+   summarise(mean = mean(fst),
+                 sd = sd(fst),
+             se = sd(fst)/sqrt(n()))
+ 
+ test$outlier_type <- as.factor(test$outlier_type)
+ 
+ kruskal.test(fst ~ outlier_type, data = test)
+ 
+ t.test(test$fst[test$outlier_type == "beneficial"],
+             test$fst[test$outlier_type == "overall"] )
+ 
+ t.test(test$fst[test$outlier_type == "detrimental"],
+             test$fst[test$outlier_type == "overall"] )
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
 # Modeling spatial distributions of outlier alleles ------------------------
    
    library(raster)
@@ -1245,180 +2028,12 @@
 
 
   
-  
-# Figure 2 - growth vs copies of alleles ##################
-  
-  ## Calculate number of top and bottom SNPs 
-  dat_snp_count <- dat_snp_unscaled %>%
-    dplyr::select(accession, tmax_sum_dif, rgr, section_block, PC1_gen, PC2_gen, PC3_gen, height_2014) %>%
-    dplyr::mutate(accession = as.numeric(as.character(accession))) %>% # Change accession to numeric
-    dplyr::left_join(., dplyr::select(gen_dat_top, accession, top_snps_long$snp)) %>%
-  #  mutate(n_top_snps = rowSums(dplyr::select(., top_snps_long$snp), na.rm = TRUE)) %>%
-    mutate(n_top_snps = apply(dplyr::select(., top_snps_long$snp), 1, function(x) sum(x == 1, na.rm = TRUE))) %>%
-    dplyr::left_join(., dplyr::select(gen_dat_bottom, accession, bottom_snps_long$snp)) %>%
-  #  mutate(n_bottom_snps = rowSums(dplyr::select(., bottom_snps_long$snp), na.rm = TRUE)) %>%
-      mutate(n_bottom_snps = apply(dplyr::select(., bottom_snps_long$snp), 1, function(x) sum(x == 1, na.rm = TRUE))) %>%
-    mutate(accession = factor(as.character(accession)))
-  
-  dim(dat_snp_count)
-  
-  summary(dat_snp_count$n_top_snps)
-  summary(dat_snp_count$n_bottom_snps)
-  
-  plot(dat_snp_count$n_bottom_snps, dat_snp_count$n_top_snps)
-  cor.test(dat_snp_count$n_bottom_snps, dat_snp_count$n_top_snps)
-  
-  
-  ## Scale number of top and bottom snps 
-  
-  dat_snp_count_unscaled <- dat_snp_count
-  
-  n_top_snps_mean <- mean(dat_snp_count$n_top_snps)
-  n_top_snps_sd <- sd(dat_snp_count$n_top_snps)
-  dat_snp_count$n_top_snps_unscaled <- dat_snp_count$n_top_snps
-  dat_snp_count$n_top_snps <- (dat_snp_count$n_top_snps - n_top_snps_mean) / n_top_snps_sd
-  
-  n_bottom_snps_mean <- mean(dat_snp_count$n_bottom_snps)
-  n_bottom_snps_sd <- sd(dat_snp_count$n_bottom_snps)
-  dat_snp_count$n_bottom_snps_unscaled <- dat_snp_count$n_bottom_snps
-  dat_snp_count$n_bottom_snps <- (dat_snp_count$n_bottom_snps - n_bottom_snps_mean) / n_bottom_snps_sd
-  
-  # Set formula
-    fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(n_top_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_top_snps, bs=\"cr\") + s(n_bottom_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_bottom_snps, bs=\"cr\") + s(accession, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC1_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC2_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC3_gen, bs=\"cr\")"))
-  
-  
-  # Gam with interaction effect
-  gam_snp = bam(formula = formula(fixed_effects),
-                data = dat_snp_count,
-                discrete = TRUE, 
-                nthreads = 8,
-                method = "fREML",
-                #   method = "ML",
-                family = "tw",
-                control = list(trace = FALSE))
-  
-  summary(gam_snp)
-  
-  ## Save output
-  
-  # Save gam summary to file
-  # sink(file = paste0("./figs_tables/Table S2 - outlier_count_gam_model_summary_",
-  #                    Sys.Date(), ".txt"))
-  # summary(gam_snp)
-  # anova(gam_snp)
-  # sink()
-  
-  
-## Plot predictions
-  low <- c(0, max(dat_snp_count_unscaled$n_bottom_snps))
-  mid <- c(round(mean(dat_snp_count_unscaled$n_top_snps)),
-           round(mean(dat_snp_count_unscaled$n_bottom_snps)))
-  high <-c(max(dat_snp_count_unscaled$n_top_snps), 0)
-  
-  # Set up dataframe for prediction
-  newdata <-  expand.grid(section_block = "IFG_1",
-                          height_2014 = 0,
-                          accession = "1",
-                          tmax_sum_dif = c(seq(min(dat_snp_unscaled$tmax_sum_dif),
-                                               max(dat_snp_unscaled$tmax_sum_dif),
-                                               length.out = 50), 
-                                              forward_transform(4.8, "tmax_sum_dif",
-                                                                scaled_var_means_gbs_only,
-                                                                scaled_var_sds_gbs_only)),
-                          PC1_gen = 0, PC2_gen = 0, PC3_gen = 0, 
-                       n_top_snps_unscaled = c(low[1], mid[1], high[1]),
-                       n_bottom_snps_unscaled = c(low[2], mid[2], high[2]))
-  
-  table(newdata$n_bottom_snps_unscaled, newdata$n_top_snps_unscaled)
-  
-  # Transform variables
-  newdata$n_top_snps <- forward_transform(x = newdata$n_top_snps_unscaled,
-                                          var = 1,
-                                          means = n_top_snps_mean,
-                                          sd = n_top_snps_sd)
-  
-  newdata$n_bottom_snps <- forward_transform(x = newdata$n_bottom_snps_unscaled,
-                                             var = 1,
-                                             means = n_bottom_snps_mean,
-                                             sd = n_bottom_snps_sd)
-  
-  # Make predictions
-  newdata$pred <- predict(gam_snp,
-                          newdata = newdata,
-                          se.fit = TRUE, type = "response")$fit
-  
-  newdata$se <- predict(gam_snp,
-                        newdata = newdata,
-                        se.fit = TRUE, type = "response")$se
-  
-  # Plot predictions
-  newdata %>%
-    # dplyr::select(tmax_sum_dif, n_top_snps, n_bottom_snps, pred) %>%
-    dplyr::mutate(type_count = paste0(n_top_snps_unscaled, ":", n_bottom_snps_unscaled)) %>%
-    dplyr::mutate(tmax_sum_dif_unscaled = back_transform(tmax_sum_dif, var = "tmax_sum_dif",
-                                                         means = scaled_var_means_gbs_only, sds = scaled_var_sds_gbs_only)) %>%
-    dplyr::filter(type_count %in% c(paste0(low[1],":", low[2]), 
-                                    paste0(mid[1],":", mid[2]),
-                                    paste0(high[1],":",high[2]))) %>%
-    ggplot(., aes(x = tmax_sum_dif_unscaled, y = pred)) +
-    geom_vline(aes(xintercept = 0), lty = 2, size = .25) +
-    geom_vline(xintercept = 4.8, size = .25) +
-    
-    geom_ribbon(aes(ymin = pred - 1.96*se, ymax = pred + 1.96 * se, fill = factor(type_count)), alpha = .25) +
-    geom_line(aes(col = factor(type_count))) + 
-    scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
-    # ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
-    ylab("Relative growth rate") +
-    xlab("Tmax transfer distance") +
-   # ylim(c(.20, .5)) +
-     scale_color_manual(values = c("#FF6633", "#6699CC", "grey50")) +
-     scale_fill_manual(values =  c("#FF6633", "#6699CC", "grey50")) +
-    theme_bw(8) + 
-    theme(panel.border = element_blank(), 
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(), 
-          axis.line = element_line(colour = "black"),
-          legend.position = "none") +
-    NULL
-  
-  # Save plot output
-  # ggsave(filename = paste0("./figs_tables/Figure 2 - outlier counts ", Sys.Date(), ".pdf"),
-  #        units = "cm", width = 6, height = 4)
 
   
-  ## Calculating differences in growth rates
-  growth_dif =  newdata %>%
-    # dplyr::select(tmax_sum_dif, n_top_snps, n_bottom_snps, pred) %>%
-    dplyr::mutate(type_count = paste0(n_top_snps_unscaled, ":", n_bottom_snps_unscaled)) %>%
-    dplyr::mutate(tmax_sum_dif_unscaled = back_transform(tmax_sum_dif, var = "tmax_sum_dif",
-                                                         means = scaled_var_means_gbs_only, sds = scaled_var_sds_gbs_only))
- 
-  # Comparing high to mid
- (growth_dif$pred[growth_dif$type_count == paste0(high[1],":",high[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] - 
-  growth_dif$pred[growth_dif$type_count == paste0(mid[1],":", mid[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8]) / 
-  growth_dif$pred[growth_dif$type_count == paste0(mid[1],":", mid[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] * 100
- 
-  # Compare high to low
- (growth_dif$pred[growth_dif$type_count == paste0(high[1],":",high[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] - 
-  growth_dif$pred[growth_dif$type_count == paste0(low[1],":", low[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8]) / 
-  growth_dif$pred[growth_dif$type_count == paste0(low[1],":", low[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] * 100
- 
-  # Compare mid to low
- (growth_dif$pred[growth_dif$type_count == paste0(mid[1],":", mid[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] - 
-  growth_dif$pred[growth_dif$type_count == paste0(low[1],":", low[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8]) / 
-  growth_dif$pred[growth_dif$type_count == paste0(low[1],":", low[2]) & growth_dif$tmax_sum_dif_unscaled == 4.8] * 100
+# Make spatial predictions across landscape for number of alleles vs growth -------------------------------
   
-  
-  
-  
-# Make spatial predictions across landscape -------------------------------
-  
-  # Load libraries ----------------------------------------------------------
   library(raster)
   library(rasterVis)
-  
-
-  # Loading in rasters ------------------------------------------------------
   
   ## Read in elevation dem and create a hillshade for mapping
     dem <- raster("./data/gis/dem/ClimateNA_DEM_cropped.tif")
