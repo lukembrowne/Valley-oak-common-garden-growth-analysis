@@ -69,14 +69,14 @@ back_transform <- function(x, var, means, sds){
                                     miroc5_26,
                                     mri_26))
   
-  pairs.panels(future_df)
+  # pairs.panels(future_df)
   
   ## Density plots of different scenarios for provenances
   ## Miroc much higher than the others
-  future_df %>%
-    gather(key = "projection", "tmax_sum") %>%
-    ggplot(., aes(tmax_sum, fill = projection)) + geom_density(alpha = 0.5) + 
-    theme_bw(15) 
+  # future_df %>%
+  #   gather(key = "projection", "tmax_sum") %>%
+  #   ggplot(., aes(tmax_sum, fill = projection)) + geom_density(alpha = 0.5) + 
+  #   theme_bw(15) 
   
   colMeans(future_df)
   
@@ -99,13 +99,14 @@ back_transform <- function(x, var, means, sds){
   # dat_all_scaled$section_line <- factor(dat_all_scaled$section_line) 
   dat_all_scaled$accession <- factor(dat_all_scaled$accession)
   dat_all_scaled$site <- factor(dat_all_scaled$site)
+  dat_all_scaled$locality <- factor(dat_all_scaled$locality)
   
   var = "tmax_sum_dif"
 
 
 # Set formula for gam
-  form <- formula(paste0("rgr ~ section_block + s(height_2014, bs =\"cr\") + s(", var, " , bs = \"cr\") + s(accession, bs = \"re\")"))
-
+  form <- formula(paste0("rgr ~ section_block + s(height_2014, bs =\"cr\") + s(", var, " , bs = \"cr\") + s(PC1_clim, bs =\"cr\") + s(PC2_clim, bs =\"cr\") + s(tmax_sum_dif, by = PC1_clim, bs =\"cr\") + s(tmax_sum_dif, by = PC2_clim, bs =\"cr\") + s(locality, bs = \"re\") + s(accession, bs = \"re\")"))
+  
 # With all 5,000+ seedlings
   gam_all <- bam(formula = form,
                  data = dat_all_scaled,
@@ -116,7 +117,7 @@ back_transform <- function(x, var, means, sds){
                family = "tw",
                control = list(trace = FALSE))
   
-   summary(gam_all)
+  summary(gam_all)
  
   test = summary(gam_all)
   
@@ -132,7 +133,7 @@ back_transform <- function(x, var, means, sds){
   
   visreg(gam_all, partial = TRUE, ylab = "RGR")
   
-  visreg(gam_all, partial = FALSE, ylab = "RGR")
+  visreg(gam_all, partial = FALSE, ylab = "RGR", scale = "response")
   
   gam.check(gam_all)
   
@@ -184,7 +185,12 @@ back_transform <- function(x, var, means, sds){
   v <- visreg(gam_all, xvar = "tmax_sum_dif", 
               scale = "response", rug = FALSE, ylab = "Relative growth rate", plot = FALSE,
               # Set prediction values
-              cond = list(section_block = "IFG_1", height_2014 = 0, accession = 1)) 
+              cond = list(section_block = "IFG_1", 
+                          locality = "FHL",
+                          height_2014 = 0, 
+                          PC1_clim = 0,
+                          PC2_clim = 0, 
+                          accession = 1)) 
   
     # Transform x axis + assign variables for lo and hi CI
     v$fit <- v$fit %>%
@@ -195,8 +201,37 @@ back_transform <- function(x, var, means, sds){
                                       sds = scaled_var_sds_all))
     
 
-## Figure 2 - Plot of decrease in Main GGPLOT ####
- 
+## Figure 1 - Plot of decrease in Main GGPLOT ####
+    
+    
+    ## Save version to use as conceptual figure
+    gg <- 
+      ggplot(v$fit, aes(x = tmax_sum_dif, y = rgr)) +
+      
+      geom_vline(aes(xintercept = 0), lty = 2, size = .5) +
+      scale_x_continuous(breaks = c(0)) +
+      scale_y_continuous(breaks = NULL) +
+      ylab("Growth") +
+      xlab("Tmax climate distance") +
+      ylim(c(.25, .4)) +
+      theme_bw(10) + 
+      theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
+            plot.margin = (margin(1.5,1.5,1.5,1.5, "cm")),
+            axis.text.y=element_blank(),
+            axis.ticks.y=element_blank()) +
+      NULL
+    
+    gg
+    
+    
+    # SAVE TO PDF AND EDIT IN KEYNOTE, etc
+    # ggsave(filename = paste0("./figs_tables/fig1/Figure 1 - conceptual diagram ", Sys.Date(), ".pdf"),
+    #        gg,
+    #        units = "cm", width = 11, height = 8)
+    
+    
+  ## Main plot with results  
    gg <- 
     ggplot(v$fit, aes(x = tmax_sum_dif, y = rgr)) +
     
@@ -210,27 +245,321 @@ back_transform <- function(x, var, means, sds){
                                 y = visregFit), lwd = 1,
                                 col = "forestgreen") +
     scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
-   # ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
-    ylab("Relative growth rate") +
-    xlab("Tmax transfer distance") +
-    ylim(c(.25, .4)) +
+    ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
+  #  ylab("Relative growth rate") +
+    xlab("Tmax climate distance") +
+  #  ylim(c(.25, .4)) +
     theme_bw(10) + 
     theme(panel.border = element_blank(), panel.grid.major = element_blank(),
           panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
-          plot.margin = (margin(1.5,1.5,1.5,1.5, "cm"))) +
+          plot.margin = (margin(1.5, 1.5, 1.5, 1.5, "cm"))) +
     NULL
   
   gg
   
   
+ ## SAVE TO PDF AND EDIT IN KEYNOTE, etc
+  ggsave(filename = paste0("./figs_tables/fig1/Figure 1 - transfer function ", Sys.Date(), ".pdf"),
+         gg,
+         units = "cm", width = 11, height = 8)
+  
+  
+  
+  
+# Predicting changes in height based on degree increase -------------------
+  
+  # Set degree increases to compare for no change - medium & high emissions & minimum transfer distance
+  degrees <- c(0, future_26_mean, future_85_mean, -4.3)
+  
+  newdata <- data.frame(section_block = v$fit$section_block[1],
+                        height_2014 = v$fit$height_2014[1],
+                        accession = v$fit$accession[1],
+                        locality = v$fit$locality[1],
+                        PC1_clim = v$fit$PC1[1],
+                        PC2_clim = v$fit$PC2[1],
+                     #   PC3 = v$fit$PC3[1],
+                       tmax_sum_dif_unscaled = degrees,
+                        tmax_sum_dif = forward_transform(x = degrees,
+                                                         var = "tmax_sum_dif",
+                                                         means = scaled_var_means_all,
+                                                         sds = scaled_var_sds_all))
+  
+  newdata
+  
+  newdata$pred <- predict(gam_all, newdata = newdata, se.fit = TRUE, type = "response")$fit
+  newdata$se <- predict(gam_all, newdata = newdata, se.fit = TRUE, type = "response")$se.fit
+  
+  newdata$lwr <- newdata$pred - newdata$se * 1.96
+  newdata$upr <- newdata$pred + newdata$se * 1.96
+  
+  newdata
+  
+  ## % change medium emissions scenario
+  
+  ## RCP 2.6
+  (newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[2]] - 
+      newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[1]]) / newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[1]] * 100
+  
+  
+  ## RCP 8.5 change in 5 degree increase
+  
+  ## Mean
+  (newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[3]] - 
+      newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[1]]) / newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[1]] * 100
+  
+  ## Comparing LGM to 
+  (newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[1]] - 
+      newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[4]]) / newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[4]] * 100
+  
+  
+
+
+#  Figure 2 - comparing assisted gene flow to transfer functions ------------
+
+  # Rerun non genetic gam without SNP data to make data sets directly comparing
+  var = "tmax_sum_dif"
+  
+  # Set formula for gam
+  form <- formula(paste0("rgr ~ section_block + s(height_2014, bs =\"cr\") + s(", var, " , bs = \"cr\") + s(accession, bs = \"re\")"))
+  
+  gam_all <- bam(formula = form,
+                 data = dat_snp_count,
+                 discrete = TRUE, 
+                 nthreads = 8,
+                 method = "fREML", 
+                 #  family = "gaussian",
+                 family = "tw",
+                 control = list(trace = FALSE))
+  
+  visreg(gam_all, partial = FALSE, scale = "response")
+
+  # Make new dataset for prediction
+    newdata <-  expand.grid(section_block = "IFG_1",
+                            height_2014 = 0,
+                            accession = "1",
+                            tmax_sum_dif = c(seq(-5, 5, # Scaled
+                                                 length.out = 1000)))
+    
+    dim(newdata)
+
+  # Predictions from model without genotypes
+    newdata$pred <-  predict(gam_all, newdata = newdata, type = "response")
+    newdata$se <-  predict(gam_all, newdata = newdata, type = "response", se.fit = TRUE)$se
+    
+  # Backtransform climate transfer
+    newdata$tmax_sum_dif_unscaled <- back_transform(newdata$tmax_sum_dif,
+                                                    "tmax_sum_dif",
+                                                    means = scaled_var_means_all,
+                                                    sds = scaled_var_sds_all)
+  # Reverse sign to turn into origin - planting from planting - origin
+    newdata$tmax_sum_dif_unscaled <- -newdata$tmax_sum_dif_unscaled
+    newdata$type <- "No assisted gene flow"
+    newdata$scenario <- "Growth under \ncurrent conditions"
+  
+  # To account for future climate
+  # Logic is that: future increases in temp will decrease the benefit of going to warmer sites because it will minimize the temperature differences and ability of pops to go to colder temperatures
+  newdata2 <- newdata 
+   
+  newdata2$tmax_sum_dif_unscaled <- newdata2$tmax_sum_dif_unscaled + 4.8 # Account for future climate
+  newdata2$type =  "No assisted gene flow"
+  newdata2$scenario <- "Growth under \nfuture conditions (RCP 8.5)"
+  
+  
+## Predictions with AGF - must run section 04d - growth vs copies of alleles to get gam_snp_model
+  
+  ## Plot predictions
+  low <- c(0, max(dat_snp_count_unscaled$n_bottom_snps))
+  mid <- c(round(mean(dat_snp_count_unscaled$n_top_snps)),
+           round(mean(dat_snp_count_unscaled$n_bottom_snps)))
+  high <-c(max(dat_snp_count_unscaled$n_top_snps), 0)
+
+  # Set up dataframe for prediction
+  newdata3 <-  expand.grid(section_block = "IFG_1",
+                           height_2014 = 0,
+                           accession = "1",
+                           tmax_sum_dif = c(seq(-5,
+                                                5,
+                                                length.out = 1000)),
+                           PC1_gen = 0, PC2_gen = 0, PC3_gen = 0, 
+                           n_top_snps_unscaled = c(low[1], mid[1], high[1]),
+                           n_bottom_snps_unscaled = c(low[2], mid[2], high[2]))
+  
+  table(newdata3$n_bottom_snps_unscaled, newdata3$n_top_snps_unscaled)
+  
+  # Transform variables
+  newdata3$n_top_snps <- forward_transform(x = newdata3$n_top_snps_unscaled,
+                                           var = 1,
+                                           means = n_top_snps_mean,
+                                           sd = n_top_snps_sd)
+  
+  newdata3$n_bottom_snps <- forward_transform(x = newdata3$n_bottom_snps_unscaled,
+                                              var = 1,
+                                              means = n_bottom_snps_mean,
+                                              sd = n_bottom_snps_sd)
+  
+  # Make predictions
+  newdata3$pred <- predict(gam_snp,
+                           newdata = newdata3,
+                           se.fit = TRUE, type = "response")$fit
+  
+  newdata3$se <- predict(gam_snp,
+                         newdata = newdata3,
+                         se.fit = TRUE, type = "response")$se
+  
+  
+  # Save final datasets
+  newdata4 <- newdata3 %>%
+    # dplyr::select(tmax_sum_dif, n_top_snps, n_bottom_snps, pred) %>%
+    dplyr::mutate(type_count = paste0(n_top_snps_unscaled, ":", n_bottom_snps_unscaled)) %>%
+    dplyr::mutate(tmax_sum_dif_unscaled = back_transform(tmax_sum_dif, var = "tmax_sum_dif",
+                                                         means = scaled_var_means_gbs_only,
+                                                         sds = scaled_var_sds_gbs_only)) %>%
+    dplyr::filter(type_count %in%  paste0(high[1],":",high[2])) # Select just high beneficial
+  
+  newdata4$tmax_sum_dif_unscaled <- -newdata4$tmax_sum_dif_unscaled
+  newdata4$type <- "Assisted gene flow"
+  newdata4$scenario <- "Growth under \ncurrent conditions"
+  
+  newdata5 <- newdata4
+  newdata5$tmax_sum_dif_unscaled <- newdata5$tmax_sum_dif_unscaled + 4.8
+  newdata5$type <- "Assisted gene flow"
+  newdata5$scenario <- "Growth under \nfuture conditions (RCP 8.5)"
+  
+
+  # Bind all datatogether for GGplot
+  ggdat <- bind_rows(newdata, newdata2, 
+                     newdata4, newdata5)
+  
+  ggdat <- dplyr::filter(ggdat, tmax_sum_dif_unscaled >= 0) # %>%
+          # dplyr::filter(scenario != "Current")
+
+  # Main GGPLOT
+  gg <-   ggplot(ggdat, aes(x = tmax_sum_dif_unscaled, y = pred)) +
+ #   geom_vline(aes(xintercept = 0), lty = 1, size = .5) +
+      facet_wrap(~scenario, ncol = 1) + 
+      geom_ribbon(aes(ymin = pred -1.96*se,
+                      ymax = pred  + 1.96*se,
+                      fill = type), alpha = 0.25) +
+      geom_line(aes(col = type), lwd = 1) + 
+      
+      scale_color_manual(values = c("#6699CC", "forestgreen")) + 
+      scale_fill_manual(values = c("#6699CC", "forestgreen")) +
+      scale_x_continuous(breaks = seq(0, 5),
+                         lim = c(0, 5),
+                         expand = c(0, 0)) +
+    
+      ylab("Relative growth rate \n (cm cm-1 yr-1)") +
+      xlab("Tmax transfer distance") +
+      ylim(c(.15, .45)) +
+      theme_bw(10) + 
+      theme(#panel.border = element_blank(), 
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
+          #  plot.margin = (margin(1.5,1.5,1.5,1.5, "cm")),
+           # panel.spacing = unit(1, "lines"), 
+            legend.position = "none",
+            strip.background =element_rect(fill="white")) +
+      NULL
+  
+  gg
+    
+    ggsave(filename = paste0("./figs_tables/fig2/Figure 2 - compare agf vs conventional ", Sys.Date(), ".pdf"),
+           gg,
+           units = "cm", width = 6, height = 9) ## 11 x 5 for wide
+
+      
+    
+    
+
+    
+   ### Testing raster calculations
+  
+    
+    library(raster)
+    library(factoextra)
+    
+    # Shape outlines
+    cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
+                                  proj4string = CRS("+proj=longlat +datum=WGS84"))
+    
+    lobata_range <- readShapePoly("./data/gis/valley_oak_range/qlobata_refined_grouped.shp",
+                                  proj4string = CRS("+proj=longlat +datum=WGS84"))
+    
+    
+    # Climate rasters
+    tmax_rast <- raster("./data/gis/climate_data/BCM/historical/1951-1980/tmx1951_1980jja_ave_HST_1513103038/tmx1951_1980jja_ave_HST_1513103038.tif")
+
+    
+    # Function to downscale and project raster 
+    process_raster <- function(rast){
+      rast <- aggregate(rast, fact = 5) # Make smaller by averaging across cells
+      rast_latlon <- projectRaster(rast, crs = CRS("+proj=longlat +datum=WGS84"))
+      plot(rast_latlon)
+      return(rast_latlon)
+    }
+    
+    # Aggregate and project tmax_raster
+    tmax_rast   <- process_raster(tmax_rast)
+    
+    tmax_rast <- mask(x = tmax_rast, lobata_range)
+    
+    plot(tmax_rast)
+    
+    no_nas <- sum(!is.na(values(tmax_rast)))  
+   
+   
+  ## What proportion of valley oak range has sites that are XXX deg warmer ?
+   
+   tmax_values <- values(tmax_rast)
+   tmax_values <- tmax_values[!is.na(tmax_values)]
+   length(tmax_values)
+   
+  
+  props <- NA 
+  y = 1
+  deg_sequence <- 0:5
+  for(deg in deg_sequence){
+   cat('Working on degree: ', deg, ".. \n")
+    temp =  calc(tmax_rast, function(x) sum((tmax_values - x) >= deg, na.rm = TRUE)/no_nas)
+    temp <- mask(temp, lobata_range)
+    plot(temp, main = deg)
+    
+    props[y] <- mean(values(temp), na.rm = TRUE)
+    names(props)[y] <- as.character(deg)
+    y = y+1
+  }   
+  
+  names(props) <- as.character(deg_sequence)
+  props
+  
+  props_df <- data.frame(tmax_sum_dif_unscaled = deg_sequence,
+                         prop = props)
+  
+  plot(props_df$tmax_sum_dif_unscaled, props_df$prop, type = "b", pch = 19)
+  
+ gg <-  props_df %>%
+    dplyr::filter(tmax_sum_dif_unscaled >= 0) %>%
+  ggplot(., aes(x = tmax_sum_dif_unscaled, 
+                y = prop, fill = tmax_sum_dif_unscaled)) + 
+    geom_bar(stat = "identity", col = "black", lwd = .5, width = .75) + 
+    xlab("Tmax transfer distance") + 
+    ylab("Proportion of range available \n for sourcing seeds") + 
+    scale_fill_gradient(low = "grey95", high = "red") + 
+    scale_x_continuous(breaks = 0:5) + 
+    theme_bw(10) + 
+    theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"), 
+            legend.position="none")
+ 
+ gg
+  
   ## SAVE TO PDF AND EDIT IN KEYNOTE, etc
-  # ggsave(filename = paste0("./figs_tables/fig1/Figure 1 - transfer function ", Sys.Date(), ".pdf"),
-  #        gg,
-  #        units = "cm", width = 11, height = 8)
+  ggsave(filename = paste0("./figs_tables/fig2/Figure ?? - habitat available with increasing temp ", Sys.Date(), ".pdf"),
+         gg,
+         units = "cm", width = 6, height = 6)
+   
   
-  
-  
-  ### Calculating derivatives - TESTING
+   ### Calculating derivatives - TESTING
    
     #   ## now evaluate derivatives of smooths with associated standard 
     #   ## errors, by finite differencing...
@@ -264,46 +593,6 @@ back_transform <- function(x, var, means, sds){
     #   }
     #   
 
-# Predicting changes in height based on degree increase -------------------
-
-  # Set degree increases to compare for no change - medium & high emissions
-  degrees <- c(0, future_26_mean, future_85_mean)
-  
-  newdata <- data.frame(section_block = v$fit$section_block[1],
-                        height_2014 = v$fit$height_2014[1],
-                        accession = v$fit$accession[1],
-                        tmax_sum_dif_unscaled = degrees,
-                        tmax_sum_dif = forward_transform(x = degrees,
-                                                         var = "tmax_sum_dif",
-                                                         means = scaled_var_means_all,
-                                                         sds = scaled_var_sds_all))
-  
-  newdata
-  
-  newdata$pred <- predict(gam_all, newdata = newdata, se.fit = TRUE, type = "response")$fit
-  newdata$se <- predict(gam_all, newdata = newdata, se.fit = TRUE, type = "response")$se.fit
-  
-  newdata$lwr <- newdata$pred - newdata$se * 1.96
-  newdata$upr <- newdata$pred + newdata$se * 1.96
-  
-  newdata
-  
-## % change medium emissions scenario
-  
-  ## RCP 2.6
-  (newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[2]] - 
-    newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[1]]) / newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[1]] * 100
-  
-  
-  ## RCP 8.5 change in 5 degree increase
-  
-  ## Mean
-  (newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[3]] - 
-      newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[1]]) / newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[1]] * 100
-  
-  
-  
-  
 
 # Make spatial predictions across landscape -------------------------------
 
@@ -457,7 +746,7 @@ back_transform <- function(x, var, means, sds){
   } # End scenario loop
     
     
-  r# Plot summaries across scenarios  
+  # Plot summaries across scenarios  
    # histogram(future_stack_height_change)
   # bwplot(future_stack_height_change)
   
@@ -1023,11 +1312,7 @@ back_transform <- function(x, var, means, sds){
     
   } # End plot_pred function
   
-  
 
-  
-  
-  
   ## Average across low and high emissions scenarios
   future_stack_temp_85 <- mean(future_stack_tmax_dif[[c("CCSM4_rcp85", 
                                                                       "CNRM_rcp85",
