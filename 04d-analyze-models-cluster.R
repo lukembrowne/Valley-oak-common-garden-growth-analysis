@@ -351,10 +351,14 @@
          dplyr::mutate(snp_gen = paste0(snp,genotype))
      #    dplyr::filter(type == "bottom_snp") %>%
          
-     
-   ggplot(pred_df_outlier, aes(x = tmax_sum_dif_unscaled, y = pred,
+   
+   pred_df_outlier %>%
+     # dplyr::filter(snp == "snp_chr12_5582738" | 
+     #                 snp == "snp_chr9_10256977") %>%
+   ggplot(., aes(x = tmax_sum_dif_unscaled, y = pred,
                              group = factor(snp_gen),
                               col = factor(type))) +
+     ylim(c(.25, .4)) +
      geom_vline(aes(xintercept = 0), lty = 2, size = .25) +
      geom_vline(xintercept = 4.8, size = .25) +
      geom_line(alpha = 0.2,
@@ -774,8 +778,8 @@
     ylab("Relative growth rate") +
     xlab("Tmax transfer distance") +
     # ylim(c(.20, .5)) +
-    scale_color_manual(values = c("#FF6633", "#6699CC", "grey50")) +
-    scale_fill_manual(values =  c("#FF6633", "#6699CC", "grey50")) +
+    scale_color_manual(values = c("#FF6633", "#6699CC", "#228b22")) +
+    scale_fill_manual(values =  c("#FF6633", "#6699CC", "#228b22")) +
     theme_bw(8) + 
     theme(panel.border = element_blank(), 
           panel.grid.major = element_blank(),
@@ -844,8 +848,7 @@
   dat_snp_count_mom <- gen_dat_clim_all %>%
     dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
                      by = c("id" = "gbs_name")) %>%
-    dplyr::select(id, accession, locality, climate_vars_gam_dist,
-                  mem1, mem2, mem3, mem4) %>%
+    dplyr::select(id, accession, locality, climate_vars_gam_dist) %>%
     dplyr::filter(!id %in% exclude_based_on_missing) %>%
     dplyr::mutate(accession = as.numeric(as.character(accession))) %>% 
     dplyr::bind_cols(., 
@@ -861,6 +864,46 @@
     mutate(accession = factor(as.character(accession))) %>%
     dplyr::select(-contains("snp_chr"))
   
+  
+  
+  ## Define localities based on distance threshold
+  library(geosphere)
+  
+  mom_lat_longs <- as.data.frame(dplyr::select(dat_snp_count_mom, longitude, latitude))
+  dist_mat <- matrix(NA, ncol = nrow(dat_snp_count_mom), nrow = nrow(dat_snp_count_mom))
+  
+  for(i in 1:nrow(dist_mat)){
+    cat("Working on row:", i, " ... \n")
+    for(j in 1:nrow(dist_mat)){
+     
+      dist_mat[i, j] <- distHaversine(mom_lat_longs[i, ], 
+                                      mom_lat_longs[j, ])/ 1000 # To convert to km
+      
+    }
+  }
+  
+ dist_mat[1:10, 1:10]
+ 
+ distance_threshold <- 25 ## in km ~ 20 miles = 32.1869 km
+ 
+ 
+ dist_tree = hclust(as.dist(dist_mat))
+
+ dist_tree_cut <- cutree(dist_tree, h = distance_threshold)
+ 
+ plot(dist_tree)
+ rect.hclust(dist_tree, h = distance_threshold)
+ 
+ ## Assign as locality
+ dat_snp_count_mom$locality <- as.character(dist_tree_cut)
+ length(table(as.character(dist_tree_cut))) # How many localities
+ 
+ sort(table(dist_tree_cut))
+ 
+ plot(dat_snp_count_mom$longitude, dat_snp_count_mom$latitude,
+      col  = dat_snp_count_mom$locality, asp = 1, pch = 19)
+
+
   # Average by locality
   dat_snp_count_locality <- dat_snp_count_mom %>%
                           dplyr::group_by(locality) %>% 
@@ -897,7 +940,13 @@
     geom_histogram(col = "white", position="identity", alpha = .5) + 
     theme_bw(15)
   
-  pairs.panels(dplyr::select(dat_snp_count_mom, -id, -accession)) # No strong correlations
+  ## summary across localities
+  dat_snp_count_locality %>%
+    dplyr::select(n_top_snps, n_bottom_snps) %>%
+    summarise_all(max)
+  
+  # pairs.panels(dplyr::select(dat_snp_count_mom, -id, -accession)) # No strong correlations
+  # pairs.panels(dplyr::select(dat_snp_count_locality, -id, -accession)) # No strong correlations
 
 ## Bar chart of top and bottom snps per locality
  library(tmap)
@@ -938,7 +987,7 @@
 
   grobs_qlob <- lapply(split(gen_dat_list, gen_dat_list$locality), function(x) {
     ggplotGrob(ggplot(x, aes(x="", y=number, fill=type)) +
-                 geom_bar(width=.35, stat="identity", position = "dodge") +
+                 geom_bar(width=.35, stat="identity", position = "dodge", col = "black", size = .1) +
                  # geom_text(aes(label=round(number)), vjust=-.5, 
                  #           position=position_dodge(width=0.5)) +
                  ylim(c(0, 20)) +
@@ -948,8 +997,8 @@
                                      axis.title.x=element_blank(),
                                      axis.text.x=element_blank(),
                                      axis.ticks.x=element_blank(),
-                                     # axis.text.y=element_blank(),
-                                     # axis.ticks.y=element_blank(),
+                                     axis.text.y=element_blank(),
+                                     axis.ticks.y=element_blank(),
                                      panel.grid.major = element_blank(),
                                      panel.grid.minor = element_blank(),
                                      panel.border = element_blank(),
@@ -961,45 +1010,37 @@
   names(grobs_qlob) <- dat_snp_count_locality$locality # Add names of localities
   
   plot(grobs_qlob[[1]]) # Example plot
-    
- ## Make actual plot
-  # tmap_mode("view")
-   tmap_mode("plot")
-   
-  tm <-   tm_shape(hill_cropped) + 
-      tm_grid(lwd = .45, labels.inside.frame = FALSE) +
-    tm_raster(palette = gray.colors(n= 9), legend.show = FALSE) +
-   tm_shape(cali_outline) +
-     tm_borders("black") +
-     tm_shape(lobata_range_extended) + 
-     tm_borders("black") +
-    tm_fill("white", alpha = .65) +
-      tm_shape(dat_snp_count_locality_sp, legend.show = FALSE) +
-      tm_dots() +
-  #  tm_bubbles(size = "n_top_snps") +
-  #    tm_layout(outer.margins=c(.5,.5, .5, .5))
-     tm_shape(dat_snp_count_locality_sp) +
-     tm_symbols(size=1, shape="locality", 
-             #   just = "top",
-                shapes=grobs_qlob, 
-              #  sizes.legend=c(5, 10, 30), 
-                scale=1, border.alpha = 0) + tm_legend(show = FALSE)
-    # legend.shape.show = FALSE,
-    # legend.size.is.portrait = TRUE,
-    # shapes.legend = 22,
-    # title.size = "Population",
-    # id = "locality",
-    # popup.vars = c("population", "origin_native"
-    #                           )) + tm_legend(show = FALSE)
-    
-    tm
+
+## Make an example plot with axes for legend  
+  legend_dat <- split(gen_dat_list, gen_dat_list$locality)[[1]]
+  legend_dat$number <- c(20, 10) ## Known numbers
   
-    # Save plot
-    tmap_save(tm, filename = "./testing_barchart.pdf", width = 16, height =16, units = "cm")
-   
-    
-    
-    
+  grob_legend <- ggplotGrob(ggplot(legend_dat, aes(x="", y=number, fill=type)) +
+                geom_bar(width=.35, stat="identity",
+                         position = "dodge", col = "black", size = .1) +
+                              # geom_text(aes(label=round(number)), vjust=-.5,
+                              #           position=position_dodge(width=0.35)) +
+                              ylim(c(0, 20)) +
+                              ylab("") + 
+                              scale_fill_manual(values = c("#FF6633", "#6699CC")) +
+                              theme_bw(2) + theme(legend.position = "none",
+              axis.title.x=element_blank(),
+              axis.text.x=element_blank(),
+              axis.ticks.x=element_blank(),
+              axis.text.y=element_blank(),
+              axis.ticks.y=element_blank(),
+              panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(),
+              panel.border = element_blank(),
+              plot.background = element_rect(fill = "transparent",
+                                             color = NA),
+              panel.background = element_rect(fill = "transparent",colour = NA)))
+  
+  grob_legend <- list(grob_legend)
+  names(grob_legend) <- "legend"
+  plot(grob_legend[[1]])
+  
+  
 
 # Predicting growth rates based on n of snps in pops ----------------------
 
@@ -1017,8 +1058,8 @@
 
 
     # Set up dataframe for prediction
-    newdata <-  expand.grid(#locality = dat_snp_count_locality$locality, 
-                            id = dat_snp_count_locality$id,
+    newdata <-  expand.grid(locality = dat_snp_count_locality$locality, 
+                            #id = dat_snp_count_locality$id,
                             section_block = "IFG_1",
                             height_2014 = 0,
                             accession = "1",
@@ -1037,8 +1078,8 @@
     
     newdata <- newdata %>%
       dplyr::left_join(., dplyr::select(dat_snp_count_locality, 
-                                      #  locality, 
-                                       id, 
+                                        locality, 
+                                      # id, 
                                         n_top_snps_unscaled,
                                         n_bottom_snps_unscaled))
     
@@ -1076,8 +1117,8 @@
     
     
     preds_by_locality = newdata %>%
-    #  dplyr::group_by(locality) %>%
-      dplyr::group_by(id) %>%
+      dplyr::group_by(locality) %>%
+    #  dplyr::group_by(id) %>%
       do(data.frame(
                     height_change_warmer_base0 = mean((.$pred[.$tmax_sum_dif_unscaled >= 0]
                                                        - base0 ) /  base0) * 100))
@@ -1108,65 +1149,105 @@
                                                proj4string = CRS("+proj=longlat +datum=WGS84"))
     
     
-    hist(dat_snp_count_locality$height_change_warmer_base0)
+    hist(dat_snp_count_locality$height_change_warmer_base0, breaks = 20)
     
-    ## Make actual plot
-    # tmap_mode("view")
-    tmap_mode("plot")
     
-    tm <-   tm_shape(hill_cropped) + 
-      tm_grid(lwd = .45, labels.inside.frame = FALSE) +
-      tm_raster(palette = gray.colors(n= 9), legend.show = FALSE) +
-      tm_shape(cali_outline) +
-      tm_borders("black") +
-      tm_shape(lobata_range_extended) + 
-      tm_borders("black") +
-      tm_fill("white", alpha = .65) +
-      tm_shape(dat_snp_count_locality_sp) +
-       tm_bubbles(
-                  col = "height_change_warmer_base0",
-                  alpha = 0.95,
-                  border.alpha = 0.5,
-                  breaks = c(-Inf,  -10, -7.5, -5, -2.5, 0, Inf),
-                  palette = "RdYlBu",
-                  title.size = "Metro population (2010)", 
-                  title.col = "Change in relative growth rate in warmer temperatures (%)",
-                midpoint = NA)
-
+    legend_sp <- SpatialPointsDataFrame(data.frame(longitude = -122, latitude = 34), 
+                                             data = data.frame(locality = "legend"),
+                                      proj4string = CRS("+proj=longlat +datum=WGS84"))
     
-    tm
     
-   
-  ## Testing kriging in between points  
+    ## Testing kriging in between points  
     
     library(gstat)
     
-
     vario <- variogram(height_change_warmer_base0 ~ longitude + latitude, dat_snp_count_locality_sp)
-    vario_fit <- fit.variogram(vario, vgm("Gau"))
+    vario_fit <- fit.variogram(vario, vgm("Exp"))
     plot(vario)
     plot(variogramLine(vario_fit, 250), type = "l")
     points(vario[,2:3], pch=20, col='red')
 
-    hill_test <- aggregate(hill_cropped, 20)
-    test2 <- as(hill_test, 'SpatialPointsDataFrame')
-    test2
-    crs(test2) <- "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 "
-    colnames(test2@coords) <- c("longitude", "latitude")
+    # Use hillshade as template for growth predictions
+    hill_test <- hill_cropped
+    krig <- as(hill_test, 'SpatialPointsDataFrame')
+    krig
+    crs(krig) <- "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 "
+    colnames(krig@coords) <- c("longitude", "latitude")
     
-    test <- krige(formula = height_change_warmer_base0 ~ longitude + latitude, 
+    krig <- krige(formula = height_change_warmer_base0 ~ longitude + latitude, 
                   locations =  dat_snp_count_locality_sp,
-                  newdata = test2)
+                  newdata = krig,
+                  model = vario_fit)
     
-    test
+    krig
+    spplot(krig[1])
+
+    krig_rast <- rasterFromXYZ(krig)
+    krig_rast <- mask(krig_rast, lobata_range_extended)
     
+    hist(krig_rast)
     
+    tm <-  tm_shape(hill_cropped)+ 
+           tm_grid(lwd = .1, labels.inside.frame = TRUE) + # Add lat long lines
+           tm_xlab("Longitude") + tm_ylab("Latitude") + # Add axis labels
+           tm_raster(palette = gray.colors(n= 9), legend.show = FALSE) + # Add hillshade
+      tm_shape(cali_outline) +
+      tm_borders("black") +
+     # tm_fill("white", alpha = .25) +
+      
+      # Add kriged raster
+      tm_shape(krig_rast) + 
+      tm_raster(palette = "RdYlBu",
+                n = 20,
+             #   breaks = c(-Inf,  -10, -7.5, -5, -2.5, 0, Inf),
+                alpha = .95,
+                midpoint = NA) + 
+      
+      tm_shape(lobata_range_extended) + 
+      tm_borders("black") +
+      tm_shape(lobata_range) + # Fine scale range
+      tm_borders("black", lwd = .15) + 
+      
+      # Bubble plots
+      # tm_shape(dat_snp_count_locality_sp) +
+      # tm_bubbles(size = .25,
+      #            col = "height_change_warmer_base0",
+      #            alpha = 0.95,
+      #            border.alpha = 0.5,
+      #            breaks = c(-Inf,  -10, -7.5, -5, -2.5, 0, Inf),
+      #            palette = "RdYlBu",
+      #            title.size = "Metro population (2010)",
+      #            title.col = "Change in relative growth rate in warmer temperatures (%)",
+      #            midpoint = NA) + 
+      
+      # Bar charts
+      tm_shape(dat_snp_count_locality_sp) +
+      tm_symbols(size=.7, shape="locality",
+                 #   just = "top",
+                 shapes=grobs_qlob,
+                 #  sizes.legend=c(5, 10, 30),
+                 scale=1, border.alpha = 0,
+                 legend.size.show = FALSE,
+                 legend.col.show = FALSE,
+                 legend.shape.show = FALSE) +
     
+     # Add bar chart for legend
+      tm_shape(legend_sp) +
+        tm_symbols(size=.7, shape="locality",
+                   shapes=grob_legend,
+                   #  sizes.legend=c(5, 10, 30),
+                   scale=1, border.alpha = 0,
+                   legend.size.show = FALSE,
+                   legend.col.show = FALSE,
+                   legend.shape.show = FALSE)
+
+    tm
     
+  # Save plot
+   tmap_save(tm, filename = paste0("./figs_tables/fig2/growth_barchart ", Sys.Date(), ".pdf"), 
+             width = 16, height =16, units = "cm")
     
-    spplot(test)
-    
-    
+  
      
     
    
@@ -1268,72 +1349,317 @@
  
  
  
- 
- 
- 
- library(lmerTest)
- library(MuMIn)
-  
-  # Are these SNPS distributed across populations equally? Or clustered?
-  # Is there more variation in SNPs within a population than among populations?
-  # Is there enough standing genetic variation without us intervening?
-   # - if some number of genotypes are present in all populations
-   # 
- 
- 
- library(vegan)
- 
 
-## Top snps  
- rda_top <- gen_dat_top %>%
-   dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
-                    by = c("id" = "gbs_name")) %>%
-   dplyr::filter(!(id %in% exclude_based_on_missing))
+# RDA  --------------------------------------------------------------------
+
+library(vegan)
  
- rda_top_scaled <- flashpcaR::scale2(dplyr::select(rda_top, 
-                                                    top_snps_long$snp), impute = 2)
- dim(rda_top_scaled)
+ # Count % of missing data for full gbs dataset
+ missing_all <- data.frame(gen_dat_clim_all[ "id"],
+                           missing = apply(dplyr::select(gen_dat_clim_all, snp_col_names),
+                                           MARGIN = 1, function(x) sum(is.na(x)))/length(snp_col_names))
  
- 
-## All other snps  
- rda_all <- gen_dat_clim_all %>%
-   dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
-                    by = c("id" = "gbs_name")) %>%
-   dplyr::filter(!(id %in% exclude_based_on_missing))
- 
- rda_all_scaled <- flashpcaR::scale2(dplyr::select(rda_all, contains("snp_chr"),
-                                                   -c(top_snps_long$snp), 
-                                                   -c(mid_snps_long$snp)), impute = 2)
- dim(rda_all_scaled) 
- 
- 
-## Bottom snps  
- rda_bottom <- gen_dat_bottom %>%
-   dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
-                    by = c("id" = "gbs_name")) %>%
-   dplyr::filter(!(id %in% exclude_based_on_missing))
- 
- rda_bottom_scaled <- flashpcaR::scale2(dplyr::select(rda_bottom, 
-                                                   bottom_snps_long$snp), impute = 2)
- dim(rda_bottom_scaled) 
- 
- 
+ # Get list of samples to exclude because of missing data
+ exclude_based_on_missing <- missing_all$id[which(missing_all$missing >= .2)]
 
  
+# Format data 
+ 
+  ## All snps  
+   rda_all <- gen_dat_clim_all %>%
+     dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
+                      by = c("id" = "gbs_name")) %>%
+     dplyr::filter(!(id %in% exclude_based_on_missing))
+   
+   rda_all_scaled <- flashpcaR::scale2(dplyr::select(rda_all, contains("snp_chr")),
+                                       #-c(top_snps_long$snp), 
+                                       # -c(mid_snps_long$snp)), 
+                                       impute = 2)
+   dim(rda_all_scaled) 
+   
+   # Scale climate and spatial variables
+   rda_all_covariates_scaled <- rda_all %>%
+                               dplyr::select(-contains("snp_chr")) %>%
+                               mutate_if(is.numeric, scale)
+   
+  ## Top snps  
+   rda_top <- gen_dat_clim %>%
+     dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
+                      by = c("id" = "gbs_name")) %>%
+     dplyr::filter(!(id %in% exclude_based_on_missing))
+   
+   dim(rda_top)
+   rda_top[1:10, 1000:1010]
+   
+   rda_top_scaled <- flashpcaR::scale2(dplyr::select(rda_top, 
+                                                      top_snps_long$snp), impute = 2)
+   dim(rda_top_scaled)
+ 
+  ## Bottom snps  
+   rda_bottom <- gen_dat_clim %>%
+     dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
+                      by = c("id" = "gbs_name")) %>%
+     dplyr::filter(!(id %in% exclude_based_on_missing))
+   
+   rda_bottom_scaled <- flashpcaR::scale2(dplyr::select(rda_bottom, 
+                                                     bottom_snps_long$snp), impute = 2)
+   dim(rda_bottom_scaled) 
+   
+   
 ## Run RDAs  
- rda_top_mod = rda(rda_top_scaled ~ rda_snps$tmax_sum + rda_snps$tmin_winter + rda_snps$cwd + rda_snps$bioclim_04 + rda_snps$bioclim_15 + rda_snps$bioclim_18 + rda_snps$elevation + rda_snps$latitude + rda_snps$longitude + rda_snps$mem1 + rda_snps$mem2 + rda_snps$mem3 + rda_snps$mem4)
+   
+   climate_vars_rda_current <- names(gen_dat_clim)[4:30] #4:30
+   
+   wna_climate_vars <-  c("tave", 
+                          "MWMT", 
+                          "MCMT", 
+                          "TD", 
+                          "MAP",
+                          "MSP", 
+                          "AHM", 
+                          "SHM", 
+                            "DD_0", "DD5", "DD_18", "DD18", 
+                              "NFFD", "bFFP", "eFFP", "FFP",
+                            "PAS",
+                            "EMT", "EXT", "Eref", "CMD", "RH",
+                          "tmax_sum", "tmin_winter", "PPT_sm", "PPT_wt")
+   
+   climate_vars_rda_current <- paste0(wna_climate_vars, "_wna_current")
+   climate_vars_rda_lgm <- paste0(wna_climate_vars, "_lgm")
+   
+   length(climate_vars_rda_current)
+   
+   # Select same number of PCNMs as climate variables
+   spatial_vars_rda <- names(dplyr::select(rda_top, PCNM1:PCNM26)) # 27
+    
+   length(climate_vars_rda_current) == length(spatial_vars_rda) # Should be true
      
- rda_top_mod
+   library(colorfulVennPlot)
+  
+   ## Function to calculate variance partitioning  
+    calc_varpart <- function(genetic_data, label){
+      
+      # With all data
+      rda_out_full <- rda(as.formula(paste("genetic_data ~ ", 
+                                           paste(c(spatial_vars_rda, 
+                                                   climate_vars_rda_current,
+                                                   climate_vars_rda_lgm), collapse = "+"))),
+                          data = rda_all_covariates_scaled,
+                          scale = FALSE)
+      
+      # Partial out spatial component
+      rda_out_part_spat <- rda(as.formula(paste("genetic_data ~ ", 
+                                           paste(c(climate_vars_rda_current,
+                                                   climate_vars_rda_lgm), collapse = "+"), 
+                                           "+Condition(", 
+                                           paste(spatial_vars_rda, collapse = "+"),")")),
+                          data = rda_all_covariates_scaled,
+                          scale = FALSE)
+      
+      # Partial out current climate component
+      rda_out_part_clim_current <- rda(as.formula(paste("genetic_data ~ ", 
+                                                paste(c(spatial_vars_rda,
+                                                climate_vars_rda_lgm), collapse = "+"), 
+                                                "+Condition(", 
+                                        paste(climate_vars_rda_current, collapse = "+"),")")),
+                                       data = rda_all_covariates_scaled,
+                                       scale = FALSE)
+      
+      # Partial out lgm climate component
+      rda_out_part_clim_lgm <- rda(as.formula(paste("genetic_data ~ ", 
+                                        paste(c(spatial_vars_rda,
+                                                climate_vars_rda_current), collapse = "+"), 
+                                        "+Condition(", 
+                                        paste(climate_vars_rda_lgm, collapse = "+"),")")),
+                                   data = rda_all_covariates_scaled,
+                                   scale = FALSE)
+      
+      # Pure Spatial - partial out climate
+      rda_out_pure_spat <- rda(as.formula(paste("genetic_data ~ ", 
+                                paste(spatial_vars_rda, collapse = "+"), 
+                                "+Condition(", 
+                                paste(c(climate_vars_rda_current, climate_vars_rda_lgm),
+                                        collapse = "+"),")")),
+                               data = rda_all_covariates_scaled,
+                               scale = FALSE)
+      # Pure current climate
+      rda_out_pure_clim_current <-  rda_out_pure_spat <- rda(as.formula(paste("genetic_data ~ ", 
+                                      paste(climate_vars_rda_current, collapse = "+"), 
+                                      "+Condition(", 
+                                      paste(c(spatial_vars_rda, climate_vars_rda_lgm),
+                                            collapse = "+"),")")),
+                                                             data = rda_all_covariates_scaled,
+                                                             scale = FALSE)
+      
+      # Pure lgm climate
+      rda_out_pure_clim_lgm <-  rda_out_pure_spat <- rda(as.formula(paste("genetic_data ~ ", 
+                                      paste(climate_vars_rda_lgm, collapse = "+"), 
+                                      "+Condition(", 
+                                      paste(c(spatial_vars_rda, climate_vars_rda_current),
+                                            collapse = "+"),")")),
+                                                         data = rda_all_covariates_scaled,
+                                                         scale = FALSE)
+      
+      overall_iner <- summary(rda_out_full)$tot.chi
+      
+      ## Set up venn diagram
+# fit1 <- euler(c("Spatial" = round(summary(rda_out_pure_spat)$constr.chi/overall_iner*100, 1),
+# "LGM climate" =   round(summary(rda_out_pure_clim_lgm)$constr.chi/overall_iner*100, 1),
+# "Current climate" = round(summary(rda_out_pure_clim_current)$constr.chi/overall_iner*100, 1),
+# "Spatial&Current climate" = round(summary(rda_out_part_clim_lgm)$constr.chi/overall_iner*100, 1),
+# "Spatial&LGM climate" = round(summary(rda_out_part_clim_current)$constr.chi/overall_iner*100, 1),
+# "Current climate&LGM climate" = round(summary(rda_out_part_spat)$constr.chi/overall_iner*100, 1),
+# "Spatial&Current climate&LGM climate" = round(summary(rda_out_full)$constr.chi/overall_iner*100, 1)),
+# shape = "circle")
+# 
+#       plot(fit1,
+#            quantities = TRUE,
+#          #  fills = list(fill = c("red", "steelblue", "green")),
+#            main = label)
+#         #  legend = list(labels = c("Spatial", "Current climate", "LGM climate")))
+#       
+      # Equal area venn diagram
+      y <-  c("100" = round(summary(rda_out_pure_spat)$constr.chi/overall_iner*100, 1),
+              "010" =   round(summary(rda_out_pure_clim_lgm)$constr.chi/overall_iner*100, 1),
+              "001" = round(summary(rda_out_pure_clim_current)$constr.chi/overall_iner*100, 1),
+              "101" = round(summary(rda_out_part_clim_lgm)$constr.chi/overall_iner*100, 1),
+              "110" = round(summary(rda_out_part_clim_current)$constr.chi/overall_iner*100, 1),
+              "011" = round(summary(rda_out_part_spat)$constr.chi/overall_iner*100, 1),
+              "111" = round(summary(rda_out_full)$constr.chi/overall_iner*100, 1))
+      
+      plot.new()
+     # plot.new()
+      plotVenn3d(y, labels = c("Spatial", "LGM climate", "Current climate"),
+                 Title = label, Colors = "white")  
+      
+      
+    ## Just current climate and spatial
+      
+      y <-  c("10" = round(summary(rda_out_pure_spat)$constr.chi/overall_iner*100, 1),
+              "01" =   round(summary(rda_out_pure_clim_current)$constr.chi/overall_iner*100, 1),
+              "11" = round(summary(rda_out_full)$constr.chi/overall_iner*100, 1))
+      
+      plot.new()
+      # plot.new()
+      plotVenn2d(y, labels = c("Spatial", "Current climate"), Colors = "white") 
+      
+      
+      
+    } 
+    
+    
+    calc_varpart(genetic_data = rda_top_scaled, label = "Warm advantageous")
+    calc_varpart(genetic_data = rda_bottom_scaled, label = "Warm disadvantageous")
+    calc_varpart(genetic_data = rda_all_scaled, label = "All SNPs")
+     
+    genetic_data <- rda_top_scaled
+    for(col in 1:ncol(genetic_data)){
+      genetic_data[, col] <- rnorm(n = nrow(genetic_data))
+    }
+    
+   # calc_varpart(genetic_data = genetic_data, label = "random snps")
+    
+    
+    rda_out_full <- rda(as.formula(paste("genetic_data ~ ", 
+                                         paste(c(spatial_vars_rda, 
+                                                 climate_vars_rda_current), collapse = "+"))),
+                        data = rda_all_covariates_scaled,
+                        scale = FALSE)
+    rda_out_full
+    anova(rda_out_full)
+    
+     
+   
+
+ ## Biplot highlighting outlier SNPs
+    
+    
+    # Outliers function from Forester et al.
+    outliers <- function(loadings, sd_cutoff){
+      # find loadings +/-z sd from mean loading
+      lims <- mean(loadings) + c(-1, 1) * sd_cutoff * sd(loadings)
+      loadings[loadings < lims[1] | loadings > lims[2]] # locus names in these tails
+    }
+
+  rda_all_mod <-  rda(as.formula(paste("rda_all_scaled ~ ", 
+                                       paste(c(spatial_vars_rda, 
+                                               climate_vars_rda_current), collapse = "+"))),
+                                          data = rda_all_covariates_scaled,
+                                          scale = FALSE)
+  rda_all_mod
+
+ loadings <- summary(rda_all_mod)$species # Extracts loadings for each SNP (named species here)
+ head(loadings)
  
  
- rda_all_mod = rda(rda_all_scaled ~ rda_snps$tmax_sum + rda_snps$tmin_winter + rda_snps$cwd + rda_snps$bioclim_04 + rda_snps$bioclim_15 + rda_snps$bioclim_18 + rda_snps$elevation + rda_snps$latitude + rda_snps$longitude + rda_snps$mem1 + rda_snps$mem2 + rda_snps$mem3 + rda_snps$mem4)
+ cand_rda1 <- outliers(loadings[, 1], sd_cutoff = 3) 
+ cand_rda1
+ cand_rda2 <- outliers(loadings[, 2], sd_cutoff = 3)
+ cand_rda2
+ outlier_snps_names <- c(names(cand_rda1), names(cand_rda2))
  
- rda_all_mod
+ # Assign arrows to colors
+ 
+ arrow_names <- names(rda_all_mod$terminfo$ordered)
+ arrow_cols <- arrow_names
+ arrow_cols[grepl("PCNM", arrow_names)] <- "black"
+ # temp variables
+ arrow_cols[grepl("tave", arrow_names)] <- "#E5BA52"
+ arrow_cols[grepl("MWMT", arrow_names)] <- "#E5BA52"
+ arrow_cols[grepl("MCMT", arrow_names)] <- "#E5BA52"
+ arrow_cols[grepl("TD", arrow_names)] <- "#E5BA52"
+ arrow_cols[grepl("DD_0", arrow_names)] <- "#E5BA52"
+ arrow_cols[grepl("DD5", arrow_names)] <- "#E5BA52"
+ arrow_cols[grepl("DD_18", arrow_names)] <- "#E5BA52"
+ arrow_cols[grepl("DD18", arrow_names)] <- "#E5BA52"
+ arrow_cols[grepl("NFFD", arrow_names)] <- "#E5BA52"
+ arrow_cols[grepl("bFFP", arrow_names)] <- "#E5BA52"
+ arrow_cols[grepl("eFFP", arrow_names)] <- "#E5BA52"
+ arrow_cols[grepl("FFP", arrow_names)] <- "#E5BA52"
+ arrow_cols[grepl("PAS", arrow_names)] <- "#E5BA52"
+ arrow_cols[grepl("EMT", arrow_names)] <- "#E5BA52"
+ arrow_cols[grepl("EXT", arrow_names)] <- "#E5BA52"
+ arrow_cols[grepl("tmax_sum", arrow_names)] <- "#E5BA52"
+ arrow_cols[grepl("tmin_winter", arrow_names)] <- "#E5BA52"
+ 
+# Precipitation variables
+ arrow_cols[grepl("MAP", arrow_names)] <- "#65BADA"
+ arrow_cols[grepl("MSP", arrow_names)] <- "#65BADA"
+ arrow_cols[grepl("AHM", arrow_names)] <- "#65BADA" # double check
+ arrow_cols[grepl("SHM", arrow_names)] <- "#65BADA" # double check
+ arrow_cols[grepl("PAS", arrow_names)] <- "#65BADA"
+ arrow_cols[grepl("Eref", arrow_names)] <- "#65BADA" # double check
+ arrow_cols[grepl("CMD", arrow_names)] <- "#65BADA"
+ arrow_cols[grepl("RH", arrow_names)] <- "#65BADA"
+ arrow_cols[grepl("PPT_sm", arrow_names)] <- "#65BADA"
+ arrow_cols[grepl("PPT_wt", arrow_names)] <- "#65BADA"
  
  
- rda_bottom_mod = rda(rda_bottom_scaled ~ rda_snps$tmax_sum + rda_snps$tmin_winter + rda_snps$cwd + rda_snps$bioclim_04 + rda_snps$bioclim_15 + rda_snps$bioclim_18 + rda_snps$elevation + rda_snps$latitude + rda_snps$longitude + rda_snps$mem1 + rda_snps$mem2 + rda_snps$mem3 + rda_snps$mem4)
  
- rda_bottom_mod
+# Make biplot
+ plot(rda_all_mod, type = "n", scaling = 3) # Create empty plot 
+ text(rda_all_mod, scaling = 3, display = "bp",
+      col= arrow_cols,
+      cex = 1) # Environmental vectors
+
+ points(rda_all_mod, display = "species", pch = 21,
+        col = "black", bg = "grey95", scaling = 3)
+ points(rda_all_mod, display = "species", pch = 21,
+        col = "black", bg = "#FF6633", scaling = 3,
+        select = rownames(loadings) %in% bottom_snps_long$snp)
+  points(rda_all_mod, display = "species", pch = 21,
+        col = "black", bg = "#6699CC", scaling = 3,
+        select = rownames(loadings) %in% top_snps_long$snp)
+  points(rda_all_mod, display = "species", pch = 21,
+         col = "black", bg = "grey50", scaling = 3,
+         select = rownames(loadings) %in% outlier_snps_names)
+ 
+  # Save as pdf
+  dev.copy(pdf, paste0("./figs_tables/fig2/Figure 2 - RDA biplot ", Sys.Date(), ".pdf"),
+           width = 4, height = 6.666, useDingbats = FALSE)
+  dev.off()
+ 
+ 
  
  
  
@@ -1423,12 +1749,7 @@
              test$fst[test$outlier_type == "overall"] )
 
  
- 
- 
- 
- 
- 
- 
+
  
 # Modeling spatial distributions of outlier alleles ------------------------
    
@@ -1957,12 +2278,12 @@
       latticeExtra::layer(sp.polygons(lobata_range_extended, col = "black", lwd = 1.5))
     
     # Main plot
-    dev.copy(png, paste0("./figs_tables/Figure 3 - beneficial alleles map ", Sys.Date(), ".png"),
+    dev.copy(png, paste0("./figs_tables/fig3/Figure 3 - beneficial alleles map ", Sys.Date(), ".png"),
              res = 300, units = "cm", width = 16, height = 16)
     dev.off()
     
     # Save a quick PDF version for the legend
-    pdf(paste0("./figs_tables/Figure 3 - beneficial alleles map legend ", Sys.Date(), ".pdf"),
+    pdf(paste0("./figs_tables/fig3/Figure 3 - beneficial alleles map legend ", Sys.Date(), ".pdf"),
         width = 4, height = 3)
     levelplot(top_snps_stack, margin = FALSE,
               maxpixels = max_pixels,
@@ -1984,12 +2305,12 @@
       latticeExtra::layer(sp.polygons(lobata_range_extended, col = "black", lwd = 1.5))
     
     # Main plot
-    dev.copy(png, paste0("./figs_tables/Figure 3 - detrimental alleles map ", Sys.Date(), ".png"),
+    dev.copy(png, paste0("./figs_tables/fig3/Figure 3 - detrimental alleles map ", Sys.Date(), ".png"),
              res = 300, units = "cm", width = 16, height = 16)
     dev.off()
     
     # Save a quick PDF version for the legend
-    pdf(paste0("./figs_tables/Figure 3 - detrimental alleles map legend ", Sys.Date(), ".pdf"),
+    pdf(paste0("./figs_tables/fig3/Figure 3 - detrimental alleles map legend ", Sys.Date(), ".pdf"),
         width = 4, height = 3)
     levelplot(bottom_snps_stack, margin = FALSE,
               maxpixels = max_pixels,
