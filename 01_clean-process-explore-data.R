@@ -84,11 +84,12 @@
   ## Filter down and rename columns
     dat_all <- dat_all %>%
       dplyr::select(contains("Problem"), Site_2017, Section_2017, Block_2017, Row_2017, Line_2017, 
-             Locality_2017, Accession_2017, Progeny_2017, Accession_progeny_2017, Alive_2017,
+             Locality_2017, Accession_2017, Progeny_2017, Accession_progeny_2017, Alive_2017, `Border tree_2017`,
              contains("Height"), contains("Comments")) %>%
       rename(Site = Site_2017, Section = Section_2017, Block = Block_2017, Row = Row_2017,
              Line = Line_2017, Locality = Locality_2017, Accession = Accession_2017,
-             Progeny = Progeny_2017, Accession_progeny = Accession_progeny_2017,
+             Progeny = Progeny_2017, Accession_progeny = Accession_progeny_2017, 
+             Border_tree = `Border tree_2017`,
              Height_2017 = `Height (cm)_2017`, Height_max_2017 = `Height max (cm)_2017`,
              Height_2015 = `Height (cm)_2015`, Height_2014 = `Height (cm)_2014`) %>%
       select_all(., tolower)
@@ -396,7 +397,13 @@
       dat_all <- dplyr::filter(dat_all, rgr >= 0)
 
       }
+      
+    ## Remove border trees  
+    dat_all <- dplyr::filter(dat_all, border_tree == 0)
+      
 
+    ## Filtering based on garden
+   #  dat_all <- dat_all[dat_all$site == "Chico", ]
     
 
     ## Filtering based on survival  
