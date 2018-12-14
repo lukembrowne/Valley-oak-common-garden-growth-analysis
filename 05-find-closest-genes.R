@@ -219,12 +219,12 @@
 
  all_genes_formatted =  all_genes %>%
             dplyr::distinct(outlier_type, qlob_gene_name, 
-                            athal_gene_name, athal_gene_description, GOslim, 
+                            athal_gene_name, athal_gene_description, GO_term, 
                             .keep_all = TRUE) %>%
             dplyr::group_by(outlier_type, chrom_a, pos1_a, qlob_gene_name,
                             athal_gene_description, distance, 
                           athal_gene_name) %>%
-            dplyr::summarise(GOslim_terms = toString(GOslim)) %>%
+            dplyr::summarise(GO_terms = toString(GO_term)) %>%
             dplyr::ungroup() %>% 
             dplyr::rename(`Outlier type` = outlier_type,
                          Chromosome = chrom_a,
@@ -233,7 +233,7 @@
                          `Distance to gene` = distance,
                          `A. thaliana gene name` = athal_gene_name,
                          `Gene description` = athal_gene_description,
-                         `GOslim terms` = GOslim_terms)
+                         `GO terms` = GO_terms)
  
  write_tsv(all_genes_formatted, 
            paste0("./figs_tables/Table S3 - formatted gene list with go terms ", Sys.Date(), ".txt"))
@@ -274,18 +274,28 @@ wilcox.test(abs(all_genes_formatted$`Distance to gene`),
  
  all_genes_barchart <- all_genes_raw %>%
    dplyr::filter(distance <= 5000 & distance >= -5000) %>% # Restrict to just 5kb
-   dplyr::select(outlier_type, GOslim) %>%
-   dplyr::bind_rows(., dplyr::select(qlob_genes, outlier_type, GOslim)) 
+   dplyr::select(outlier_type, GO_term) %>%
+   dplyr::bind_rows(., dplyr::select(qlob_genes, outlier_type, GO_term)) 
+ 
+ ## Filter down to terms that are in both beneficial and detrimental genotypes
+ outlier_go_terms <- unique(c(all_genes_barchart$GO_term[all_genes_barchart$outlier_type == "Beneficial genotype"], 
+        all_genes_barchart$GO_term[all_genes_barchart$outlier_type == "Detrimental genotype"]))
+ 
+ all_genes_barchart <- all_genes_barchart %>%
+   dplyr::filter(GO_term %in% outlier_go_terms)
+ 
+ length(table(all_genes_barchart$GO_term))
+ 
  
  table(all_genes_barchart$outlier_type)
  
- all_genes_barchart$GOslim[is.na(all_genes_barchart$GOslim)] <- "unclassified"
+ all_genes_barchart$GO_term[is.na(all_genes_barchart$GO_term)] <- "unclassified"
 
- ggplot(all_genes_barchart, aes(x = GOslim, y = ..prop.., 
+ ggplot(all_genes_barchart, aes(x = GO_term, y = ..prop.., 
                            group = outlier_type, fill = outlier_type)) + 
    geom_bar(position = "dodge") +
    coord_flip() +
-   xlab("GOslim term") +
+   xlab("GO term") +
    ylab("Percentage") +
    scale_fill_manual(name = "", values = c("#6699CC", "#FF6633", "grey70")) + 
    theme_bw(10) + 
@@ -296,7 +306,7 @@ wilcox.test(abs(all_genes_formatted$`Distance to gene`),
  ggsave(filename = paste0("./figs_tables/Figure S6 - goslim terms barchart ",
                           Sys.Date(), ".pdf"),
         units = "cm",
-        height = 10, width = 15,
+        height = 10, width = 30,
         useDingbats = FALSE )
 
  
