@@ -313,6 +313,22 @@
 
     ## Arrows plot
       fviz_pca_var(clim_pca_home, axes = c(1,2))
+      
+      ## Visualize PCA results
+      # fviz_contrib(clim_pca_home, choice = "var", axes = 1)
+      # fviz_contrib(clim_pca_home, choice = "var", axes = 2)
+      # fviz_contrib(clim_pca_home, choice = "var", axes = 3)
+      # fviz_contrib(clim_pca_home, choice = "var", axes = 4)
+      
+
+      ## Save plot of contributions
+      
+      # fviz_pca_var(clim_pca_home, axes = c(1, 2), col.var="contrib")
+      # ggsave(filename = paste0("./figs_tables/Figure S2 - climate PCA 1 ", 
+      #                          Sys.Date(), ".pdf"),
+      #        units = "cm",
+      #        width = 20, height = 15)
+
 
     ## Predict PC values for
     # 1) Seedlings in common garden
