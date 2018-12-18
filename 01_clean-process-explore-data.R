@@ -400,6 +400,9 @@
       
     ## Remove border trees  
     dat_all <- dplyr::filter(dat_all, border_tree == 0)
+    
+    ## Remove individuals without a locality
+    dat_all <- dplyr::filter(dat_all, !is.na(locality))
       
 
     ## Filtering based on garden
