@@ -154,6 +154,7 @@
     dat_snp$accession <- factor(dat_snp$accession)
     dat_snp$section_block <- factor(dat_snp$section_block)
     dat_snp$section <- factor(dat_snp$section)
+    dat_snp$locality <- factor(dat_snp$locality)
     
     
   # Scale PCA axes
@@ -203,6 +204,8 @@
   pred <-  expand.grid(height_2014 = 0,
                       accession = "1",
                       section_block = "IFG_1",
+                      locality = "FHL",
+                      PC1_clim =0, PC2_clim = 0,
                       PC1_gen = 0, PC2_gen = 0, PC3_gen = 0)
   
   for(var in climate_vars_dif){
@@ -258,12 +261,12 @@
   
 
 # Save data to file that will be uploaded to cluster  
-  # save(dat_snp, dat_snp_unscaled,
-  #      snp_col_names, pred,
-  #      scaled_snps_means, scaled_snps_sds,
-  #      scaled_var_means_gbs_only, scaled_var_sds_gbs_only,
-  #      folds,
-  #   file = paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
+  save(dat_snp, dat_snp_unscaled,
+       snp_col_names, pred,
+       scaled_snps_means, scaled_snps_sds,
+       scaled_var_means_gbs_only, scaled_var_sds_gbs_only,
+       folds,
+    file = paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
 
 
  

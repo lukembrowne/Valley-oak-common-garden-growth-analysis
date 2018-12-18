@@ -122,35 +122,35 @@ back_transform <- function(x, var, means, sds){
   test = summary(gam_all)
   
   # Plot overall model fit
-  test_fit <- dat_all_scaled
-  test_fit$pred <- gam_all$fitted.values
+    # test_fit <- dat_all_scaled
+    # test_fit$pred <- gam_all$fitted.values
+    # 
+    # ggplot(test_fit, aes(y = pred, x = rgr, col = section_block)) + 
+    #   geom_point(alpha = 0.75, pch = 19) + 
+    #   theme_bw(15) +
+    #   xlab("Observed RGR") + ylab("Predicted RGR") +
+    #   geom_abline(slope = 1, intercept = 0, lwd = 1.5, col = "forestgreen")
   
-  ggplot(test_fit, aes(y = pred, x = rgr, col = section_block)) + 
-    geom_point(alpha = 0.75, pch = 19) + 
-    theme_bw(15) +
-    xlab("Observed RGR") + ylab("Predicted RGR") +
-    geom_abline(slope = 1, intercept = 0, lwd = 1.5, col = "forestgreen")
-  
-  visreg(gam_all, partial = TRUE, ylab = "RGR")
-  
-  visreg(gam_all, partial = FALSE, ylab = "RGR", scale = "response")
-  
-  gam.check(gam_all)
+  # visreg(gam_all, partial = TRUE, ylab = "RGR")
+  # 
+  # visreg(gam_all, partial = FALSE, ylab = "RGR", scale = "response")
+  # 
+  # gam.check(gam_all)
   
   ## Save gam summary to file
-    # sink(file = paste0("./figs_tables/Table 1 - full_gam_model_summary_",
+    # sink(file = paste0("./figs_tables/Table S1 - full_gam_model_summary_",
     #                    Sys.Date(), ".txt"))
     # summary(gam_all)
     # anova(gam_all)
     # sink()
-  
+
   
 ## Figure S2 - Comparing residual plots to Guassian for Supplementary material
   # gam_all_gaussian <- bam(formula = form,
   #                data = dat_all_scaled,
-  #                discrete = TRUE, 
+  #                discrete = TRUE,
   #                nthreads = 8,
-  #                method = "fREML", 
+  #                method = "fREML",
   #                  family = "gaussian",
   #               # family = "tw",
   #                control = list(trace = FALSE))
@@ -169,12 +169,12 @@ back_transform <- function(x, var, means, sds){
   # mtext("(b)", side = 3, line = 1, adj = -.25, cex = 1.75)
   # 
   # 
-  # dev.copy(png, filename = paste0("./figs_tables/Figure S2 - residual plots_", 
+  # dev.copy(png, filename = paste0("./figs_tables/Figure S2 - residual plots_",
   #                      Sys.Date(), ".png"),
   #          res = 300, width = 2400, height = 1200)
   # dev.off()
-  # 
-  # 
+
+
   
   
 
@@ -205,25 +205,25 @@ back_transform <- function(x, var, means, sds){
     
     
     ## Save version to use as conceptual figure
-    gg <- 
-      ggplot(v$fit, aes(x = tmax_sum_dif, y = rgr)) +
-      
-      geom_vline(aes(xintercept = 0), lty = 2, size = .5) +
-      scale_x_continuous(breaks = c(0)) +
-      scale_y_continuous(breaks = NULL) +
-      ylab("Growth") +
-      xlab("Tmax climate distance") +
-      ylim(c(.25, .4)) +
-      theme_bw(10) + 
-      theme(panel.border = element_blank(), panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
-            plot.margin = (margin(1.5,1.5,1.5,1.5, "cm")),
-            axis.text.y=element_blank(),
-            axis.ticks.y=element_blank()) +
-      NULL
-    
-    gg
-    
+      # gg <- 
+      #   ggplot(v$fit, aes(x = tmax_sum_dif, y = rgr)) +
+      #   
+      #   geom_vline(aes(xintercept = 0), lty = 2, size = .5) +
+      #   scale_x_continuous(breaks = c(0)) +
+      #   scale_y_continuous(breaks = NULL) +
+      #   ylab("Growth") +
+      #   xlab("Tmax climate distance") +
+      #   ylim(c(.25, .4)) +
+      #   theme_bw(10) + 
+      #   theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+      #         panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
+      #         plot.margin = (margin(1.5,1.5,1.5,1.5, "cm")),
+      #         axis.text.y=element_blank(),
+      #         axis.ticks.y=element_blank()) +
+      #   NULL
+      # 
+      # gg
+      # 
     
     # SAVE TO PDF AND EDIT IN KEYNOTE, etc
     # ggsave(filename = paste0("./figs_tables/fig1/Figure 1 - conceptual diagram ", Sys.Date(), ".pdf"),
@@ -248,7 +248,7 @@ back_transform <- function(x, var, means, sds){
     ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
   #  ylab("Relative growth rate") +
     xlab("Tmax climate distance") +
-  #  ylim(c(.25, .4)) +
+    ylim(c(.25, .4)) +
     theme_bw(10) + 
     theme(panel.border = element_blank(), panel.grid.major = element_blank(),
           panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
@@ -259,9 +259,9 @@ back_transform <- function(x, var, means, sds){
   
   
  ## SAVE TO PDF AND EDIT IN KEYNOTE, etc
-  ggsave(filename = paste0("./figs_tables/fig1/Figure 1 - transfer function ", Sys.Date(), ".pdf"),
-         gg,
-         units = "cm", width = 11, height = 8)
+  # ggsave(filename = paste0("./figs_tables/fig1/Figure 1 - transfer function ", Sys.Date(), ".pdf"),
+  #        gg,
+  #        units = "cm", width = 11, height = 8)
   
   
   
