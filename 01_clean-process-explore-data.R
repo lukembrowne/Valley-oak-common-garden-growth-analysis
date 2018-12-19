@@ -169,8 +169,8 @@
       
       #### Round height values to the nearest 5
      # dat_all$height_2014 <- round(dat_all$height_2014 / 5) * 5
-      dat_all$height_2015 <- round(dat_all$height_2015 / 5) * 5
-      dat_all$height_2017 <- round(dat_all$height_2017 / 5) * 5
+     # dat_all$height_2015 <- round(dat_all$height_2015 / 5) * 5
+     # dat_all$height_2017 <- round(dat_all$height_2017 / 5) * 5
       
       ## Calculate height difference
       # dat_all$height_dif <- dat_all$height_2017 - dat_all$height_2015
@@ -180,7 +180,7 @@
       # plot(dat_all$height_2015, dat_all$height_dif, pch = 19, cex = 0.5)
       
       
-    ## Calculate relative growth rates: over 2 years
+    ## Calculate relative growth rates: over 3 years
       # dat_all$rgr <- (log(dat_all$height_2017) - log(dat_all$height_2015))/ 2
       dat_all$rgr <- (log(dat_all$height_2017) - log(dat_all$height_2014)) / 3
       
@@ -367,13 +367,15 @@
 
         ## Filter out NA heights
         dat_all <- dplyr::filter(dat_all, !is.na(height_2017))
-        dat_all <- dplyr::filter(dat_all, !is.na(height_2014))  
+        dat_all <- dplyr::filter(dat_all, !is.na(height_2014)) 
+        
+        ## Exclude individuals that lost height
+        dat_all <- dplyr::filter(dat_all, height_2017 - height_2014 >= 0)
  
       }
 
     
     ## Filtering based on RGR
-
       if(response_variable == "rgr"){
 
     ## Individuals with negative growth rates
