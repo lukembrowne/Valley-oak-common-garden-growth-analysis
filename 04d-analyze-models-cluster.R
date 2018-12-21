@@ -58,6 +58,8 @@
     which(!snp_col_names %in% sum_df_raw$snp)
     snp_col_names[which(!snp_col_names %in% sum_df_raw$snp)]
     
+    ## snp_chr5_22319422 doesn't have 2 levels
+    
     ## Write snps that were run to file to rerun missing snps on cluster
       # write_csv(data.frame(snp = snp_col_names[which(snp_col_names %in% sum_df_raw$snp)]),
       #           path = "./output/skip_these_SNPs_2018_12_20.csv")
@@ -166,13 +168,18 @@
                                                .$pred[.$tmax_sum_dif_unscaled == 0] ) /
                                                .$pred[.$tmax_sum_dif_unscaled == 0] ) * 100,
                     height_change_warmer_base0 = mean((.$pred[.$tmax_sum_dif_unscaled >= 0]
-                                                       - base0 ) /  base0) * 100))
+                                                       - base0 ) /  base0) * 100,
+                    height_change_warmer_absolute = median(.$pred[.$tmax_sum_dif_unscaled >= 0])))
     
     head(pred_df_long)
     dim(pred_df_long)
     
     summary(pred_df_long$height_change_warmer)
     summary(pred_df_long$height_change_warmer_base0)
+    
+    plot(pred_df_long$height_change_warmer,pred_df_long$height_change_warmer_base0, pch = "." )
+    abline(a = 0, b = 1)
+    cor.test(pred_df_long$height_change_warmer,pred_df_long$height_change_warmer_base0 )
     
     
     # Calculate correlations for each snp and genotype in training and testing
@@ -205,17 +212,17 @@
     
     
     # Join prediction dataframe to summary dataframe
-    sum_df_long <- left_join(sum_df_long, pred_df_long)
+    sum_df_long_w_preds <- left_join(sum_df_long, pred_df_long)
     
   
 # Correct p and q values
   # Vignette - https://bioconductor.org/packages/release/bioc/vignettes/qvalue/inst/doc/qvalue.pdf
   
   # Calculate q values and adjusted p values
-  qvals <- qvalue(p = sum_df_long$p_val,
+  qvals <- qvalue(p = sum_df_long_w_preds$p_val,
                   fdr.level = 0.05)
   
-  pvals_adj <- p.adjust(sum_df_long$p_val, method = "fdr")
+  pvals_adj <- p.adjust(sum_df_long_w_preds$p_val, method = "fdr")
   
   summary(qvals)
   summary(pvals_adj)
@@ -227,28 +234,26 @@
   # hist(qvals)
   
   # Assign back into DF
-  sum_df_long <- sum_df_long %>%
+  sum_df_long_w_preds <- sum_df_long_w_preds %>%
     mutate(q_val = qvals$qvalues) %>%
     mutate(p_val_adj = pvals_adj)
   
-  head(sum_df_long)
+  head(sum_df_long_w_preds)
   
   
   
 ## Identify top and bottom XXX% of SNPs
   
-  p_val_adj_thresh <- 0.05
-  mad_thresh <- 3 # Median absolute deviation for outlier detection
+  p_val_adj_thresh <- 0.01
+  mad_thresh <- 2.5 # Median absolute deviation for outlier detection
   train_test_cor_thresh <- 0.8
   
- top_snps_long <-  sum_df_long %>%
+ top_snps_long <-  sum_df_long_w_preds %>%
     dplyr::filter(p_val_adj < p_val_adj_thresh) %>%
     dplyr::filter(cv_cor >= train_test_cor_thresh) %>%
-    dplyr::filter(height_change_warmer_base0 >= median(height_change_warmer_base0) +
-                   mad_thresh * mad(height_change_warmer_base0)) %>%
-    dplyr::arrange(desc(height_change_warmer_base0))
- 
- #    head(round(nrow(sum_df) * percent_thresh))
+    dplyr::filter(height_change_warmer_absolute >= median(height_change_warmer_absolute) +
+                   mad_thresh * mad(height_change_warmer_absolute))  %>%
+    dplyr::arrange(desc(height_change_warmer_absolute))
 
  dim(top_snps_long)
    
@@ -264,12 +269,11 @@
 
  
  ## Bottom SNPs
- bottom_snps_long <- sum_df_long %>%
+ bottom_snps_long <- sum_df_long_w_preds %>%
    dplyr::filter(p_val_adj < p_val_adj_thresh) %>%
-   dplyr::filter(cv_cor >= train_test_cor_thresh) %>%
-   dplyr::filter(height_change_warmer_base0 <= median(height_change_warmer_base0) - 
-                   mad_thresh * mad(height_change_warmer_base0))
-   
+   dplyr::filter(cv_cor >= train_test_cor_thresh) %>% 
+   dplyr::filter(height_change_warmer_absolute <= median(height_change_warmer_absolute) - 
+                   mad_thresh * mad(height_change_warmer_absolute))
 
    bottom_snps_long$bottom_snp = TRUE
    
@@ -285,7 +289,7 @@
  
    set.seed(1) # To make sure same SNPs are chosen everytime - reproducible
    
-   mid_snps_long <- sum_df_long %>%
+   mid_snps_long <- sum_df_long_w_preds %>%
      dplyr::filter(p_val_adj <= p_val_adj_thresh) %>%
      dplyr::filter(cv_cor >= train_test_cor_thresh) %>%
      dplyr::filter(!snp %in% c(top_snps_long$snp, bottom_snps_long$snp)) %>%
@@ -304,19 +308,19 @@
   
   
   ## Join back to main DF
-   sum_df_long <- left_join(sum_df_long, dplyr::select(top_snps_long, snp, genotype, top_snp)) %>%
+   sum_df_long_outliers <- left_join(sum_df_long_w_preds, dplyr::select(top_snps_long, snp, genotype, top_snp)) %>%
                   left_join(., dplyr::select(bottom_snps_long, snp, genotype, bottom_snp)) %>%
                   mutate(top_snp = replace_na(top_snp, FALSE),
                          bottom_snp = replace_na(bottom_snp, FALSE))
    
-   head(sum_df_long)
+   head(sum_df_long_outliers)
    
-   table(sum_df_long$top_snp)
-   table(sum_df_long$bottom_snp)
+   table(sum_df_long_outliers$top_snp)
+   table(sum_df_long_outliers$bottom_snp)
    
    
-   hist(top_snps_long$height_change_warmer_base0, breaks = 30)
-   hist(bottom_snps_long$height_change_warmer_base0, breaks = 30)
+   hist(top_snps_long$height_change_warmer_absolute, breaks = 30)
+   hist(bottom_snps_long$height_change_warmer_absolute, breaks = 30)
    
    ## How much overlap of top and bottom snps?
    sum(top_snps_long$snp %in% bottom_snps_long$snp)
@@ -343,7 +347,7 @@
    ggplot(., aes(x = tmax_sum_dif_unscaled, y = pred,
                              group = factor(snp_gen),
                               col = factor(type))) +
-     ylim(c(.25, .4)) +
+    # ylim(c(.25, .4)) +
      geom_vline(aes(xintercept = 0), lty = 2, size = .25) +
      geom_vline(xintercept = 4.8, size = .25) +
      geom_line(alpha = 0.2,
@@ -359,7 +363,7 @@
      xlab("Tmax transfer distance") +
      theme_bw(10) + 
      scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
-    # facet_wrap(~type) +
+     facet_wrap(~type) +
    #  facet_wrap(~ type + snp) +
      scale_color_manual(values = c("#FF6633", "grey50", "#6699CC"), 
                         labels = c("Detrimental genotypes", "Random genotypes",
@@ -388,7 +392,7 @@
    
    man_df1$index <- 1:nrow(man_df1) ## For x axis plotting
    
-   man_df <- left_join(man_df1, sum_df_long, by = c("SNP" = "snp"))
+   man_df <- left_join(man_df1, sum_df_long_outliers, by = c("SNP" = "snp"))
   
    head(man_df)
    
@@ -426,9 +430,9 @@
    
    # Start plot
    ggplot(man_df, aes(x = index, 
-                    y = height_change_warmer_base0,
+                    y = height_change_warmer_absolute,
                   #  y = height_change,
-                    col = height_change_warmer_base0,
+                    col = height_change_warmer_absolute,
                   #  col = height_change,
                     label = SNP)) +
   
@@ -446,8 +450,8 @@
      # Overplot top and bottom SNPS
      geom_point(data = man_df[man_df$top_snp | man_df$bottom_snp, ],
                 aes(x = index, 
-                    y = height_change_warmer_base0,
-                    bg = height_change_warmer_base0),
+                    y = height_change_warmer_absolute,
+                    bg = height_change_warmer_absolute),
                     # y = height_change,
                     # bg = height_change),
                     col = "black",
@@ -455,7 +459,7 @@
                     size = .65 + .35) +
      
      # Horizontal line
-     geom_hline(yintercept = mean(man_df$height_change_warmer_base0, na.rm = TRUE), lty = 2, size = .25) +
+     geom_hline(yintercept = mean(man_df$height_change_warmer_absolute, na.rm = TRUE), lty = 2, size = .25) +
      
      # # Add snp names
      #   geom_text_repel(
@@ -489,7 +493,7 @@
      scale_x_continuous(expand = c(0.01, 0.01), 
                         breaks = x_axis_breaks$index,
                         labels = x_axis_breaks$chrom) + 
-     scale_y_continuous(breaks = seq(-30, 20, 5)) + 
+    # scale_y_continuous(breaks = seq(-30, 20, 5)) + 
      ylab("") + 
      xlab("Chromosome") + 
      theme_bw(8) + 
@@ -840,7 +844,7 @@
   
   
 
-# Testing diversity within and among populations --------------------------
+# Plotting current distribution of genotypes and growth rates --------------------------
 
   # Count % of missing data for full gbs dataset
   missing_all <- data.frame(gen_dat_clim_all[ "id"],
@@ -852,25 +856,15 @@
   
   
   # Choose climate variables
-  climate_vars_gam_dist <-  c("tmax_sum", 
-                              "tmin_winter", 
-                              "cwd",
-                              #     "aet",
-                              "bioclim_04",
-                              "bioclim_15",
-                              "bioclim_18",
-                              # "bioclim_19", # R = 0.79 with aet; R = 0.84 with bioclim_18
-                              "elevation",
-                              "latitude",
-                              "longitude") # R = -0.84 with latitude
-  #   "random")
-  
+  climate_vars_core <- climate_vars[!grepl(pattern = "random|PC", x = climate_vars)]
+  climate_vars_core
+  length(climate_vars_core) # Should be 10
 
-  ## Calculate number of top and bottom SNPs 
+  ## Calculate number of top and bottom SNPs for moms
   dat_snp_count_mom <- gen_dat_clim_all %>%
     dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
                      by = c("id" = "gbs_name")) %>%
-    dplyr::select(id, accession, locality, climate_vars_gam_dist) %>%
+    dplyr::select(id, accession, locality, longitude, latitude, climate_vars_core) %>%
     dplyr::filter(!id %in% exclude_based_on_missing) %>%
     dplyr::mutate(accession = as.numeric(as.character(accession))) %>% 
     dplyr::bind_cols(., 
@@ -878,52 +872,58 @@
                                                    exclude_based_on_missing)),
                                    top_snps_long$snp)) %>%
       mutate(n_top_snps = rowSums(dplyr::select(., top_snps_long$snp), na.rm = TRUE)) %>%
+    dplyr::select(-c(top_snps_long$snp)) %>%
     dplyr::bind_cols(., 
                      dplyr::select(dplyr::filter(gen_dat_bottom, !(id %in% 
                                                                   exclude_based_on_missing)),
                                    bottom_snps_long$snp)) %>%
       mutate(n_bottom_snps = rowSums(dplyr::select(., bottom_snps_long$snp), na.rm = TRUE)) %>%
+    dplyr::select(-c(bottom_snps_long$snp)) %>%
     mutate(accession = factor(as.character(accession))) %>%
     dplyr::select(-contains("snp_chr"))
   
   
-  
-  ## Define localities based on distance threshold
-  library(geosphere)
-  
-  mom_lat_longs <- as.data.frame(dplyr::select(dat_snp_count_mom, longitude, latitude))
-  dist_mat <- matrix(NA, ncol = nrow(dat_snp_count_mom), nrow = nrow(dat_snp_count_mom))
-  
-  for(i in 1:nrow(dist_mat)){
-    cat("Working on row:", i, " ... \n")
-    for(j in 1:nrow(dist_mat)){
-     
-      dist_mat[i, j] <- distHaversine(mom_lat_longs[i, ], 
-                                      mom_lat_longs[j, ])/ 1000 # To convert to km
-      
-    }
-  }
-  
- dist_mat[1:10, 1:10]
- 
- distance_threshold <- 25 ## in km ~ 20 miles = 32.1869 km
- 
- 
- dist_tree = hclust(as.dist(dist_mat))
-
- dist_tree_cut <- cutree(dist_tree, h = distance_threshold)
- 
- plot(dist_tree)
- rect.hclust(dist_tree, h = distance_threshold)
- 
- ## Assign as locality
- dat_snp_count_mom$locality <- as.character(dist_tree_cut)
- length(table(as.character(dist_tree_cut))) # How many localities
- 
- sort(table(dist_tree_cut))
- 
- plot(dat_snp_count_mom$longitude, dat_snp_count_mom$latitude,
-      col  = dat_snp_count_mom$locality, asp = 1, pch = 19)
+  ## Define localities based on distance threshold - rows not in same order as calculation in 03_adding-climate-data.R so must redo
+ #  library(geosphere)
+ #  
+ #  mom_lat_longs <- as.data.frame(dplyr::select(dat_snp_count_mom, longitude, latitude))
+ #  dist_mat <- matrix(NA, ncol = nrow(dat_snp_count_mom), nrow = nrow(dat_snp_count_mom))
+ #  
+ #  for(i in 1:nrow(dist_mat)){
+ #    
+ #    if(i %% 50 == 0){
+ #      cat("Working on row:", i, " ... \n")
+ #    }
+ #    
+ #    for(j in 1:nrow(dist_mat)){
+ #     
+ #      dist_mat[i, j] <- distHaversine(mom_lat_longs[i, ], 
+ #                                      mom_lat_longs[j, ])/ 1000 # To convert to km
+ #      
+ #    }
+ #  }
+ # 
+ #  
+ # dist_mat[1:10, 1:10]
+ # 
+ # distance_threshold <- 25 ## in km ~ 20 miles = 32.1869 km
+ # 
+ # 
+ # dist_tree = hclust(as.dist(dist_mat))
+ # 
+ # dist_tree_cut <- cutree(dist_tree, h = distance_threshold)
+ # 
+ # plot(dist_tree)
+ # rect.hclust(dist_tree, h = distance_threshold)
+ # 
+ # ## Assign as locality
+ # dat_snp_count_mom$locality <- as.character(dist_tree_cut)
+ # length(table(as.character(dist_tree_cut))) # How many localities
+ # 
+ # sort(table(dist_tree_cut))
+ # 
+ # plot(dat_snp_count_mom$longitude, dat_snp_count_mom$latitude,
+ #      col  = dat_snp_count_mom$locality, asp = 1, pch = 19)
 
 
   # Average by locality
@@ -931,6 +931,12 @@
                           dplyr::group_by(locality) %>% 
                           summarise_all(mean)
   
+  # Filter down to localities that are in the main dataset
+  dat_snp_count_locality <- dat_snp_count_locality %>%
+                  dplyr::filter(locality %in% dat_snp_count$locality)
+  
+  dat_snp_count_mom <- dat_snp_count_mom %>%
+    dplyr::filter(locality %in% dat_snp_count$locality)
   
 # Explore data  
   dim(dat_snp_count_mom)
@@ -1012,7 +1018,7 @@
                  geom_bar(width=.35, stat="identity", position = "dodge", col = "black", size = .1) +
                  # geom_text(aes(label=round(number)), vjust=-.5, 
                  #           position=position_dodge(width=0.5)) +
-                 ylim(c(0, 20)) +
+                 ylim(c(0, 100)) +
                  ylab("") + 
                  scale_fill_manual(values = c("#FF6633", "#6699CC")) +
                  theme_bw(2) + theme(legend.position = "none",
@@ -1042,7 +1048,7 @@
                          position = "dodge", col = "black", size = .1) +
                               # geom_text(aes(label=round(number)), vjust=-.5,
                               #           position=position_dodge(width=0.35)) +
-                              ylim(c(0, 20)) +
+                              ylim(c(0, 100)) +
                               ylab("") + 
                               scale_fill_manual(values = c("#FF6633", "#6699CC")) +
                               theme_bw(2) + theme(legend.position = "none",
@@ -1080,9 +1086,9 @@
 
 
     # Set up dataframe for prediction
-    newdata <-  expand.grid(locality = dat_snp_count_locality$locality, 
+    newdata <-  expand.grid(locality = dat_snp_count_locality$locality,  # Locality has to be in dataset that original model ran on
                             #id = dat_snp_count_locality$id,
-                            section_block = "IFG_1",
+                            section_block = "Block1_1",
                             height_2014 = 0,
                             accession = "1",
                             tmax_sum_dif = c(seq(min(dat_snp_unscaled$tmax_sum_dif),
@@ -1091,7 +1097,8 @@
                                              forward_transform(c(0, 4.8), "tmax_sum_dif",
                                                                scaled_var_means_gbs_only,
                                                                scaled_var_sds_gbs_only)),
-                            PC1_gen = 0, PC2_gen = 0, PC3_gen = 0)
+                            PC1_clim = 0, PC2_clim = 0,
+                            PC1_gen = 0, PC2_gen = 0)
     
     dim(newdata)
     
@@ -1155,7 +1162,7 @@
     
     plot(dat_snp_count_locality$n_top_snps_unscaled, dat_snp_count_locality$height_change_warmer_base0)
     
-    pairs.panels(dplyr::select(dat_snp_count_locality, height_change_warmer_base0, climate_vars_gam_dist))
+    pairs.panels(dplyr::select(dat_snp_count_locality, height_change_warmer_base0, climate_vars_core))
 
     # ## Avg aross localities
     # dat_snp_count_mom <- dat_snp_count_mom %>%
@@ -1183,7 +1190,8 @@
     
     library(gstat)
     
-    vario <- variogram(height_change_warmer_base0 ~ longitude + latitude, dat_snp_count_locality_sp)
+    vario <- variogram(height_change_warmer_base0 ~ longitude + latitude,
+                       dat_snp_count_locality_sp)
     vario_fit <- fit.variogram(vario, vgm("Exp"))
     plot(vario)
     plot(variogramLine(vario_fit, 250), type = "l")
@@ -1270,26 +1278,7 @@
              width = 16, height =16, units = "cm")
     
   
-     
-    
-   
- ## PCA on climate variables
- pca_test = prcomp(dat_snp_count_mom[ , climate_vars_gam_dist], center = TRUE, scale = TRUE) 
- 
- biplot(pca_test)
- summary(pca_test)
- screeplot(pca_test, bstick = TRUE)
 
-
- pcs_test <- as.data.frame(pca_test$x[, 1:7])
- 
- # Add PCs as columns to dataframes
- dat_snp_count_mom <- bind_cols(dat_snp_count_mom, pcs_test)
- 
- 
- summary(lm(n_top_snps ~ PC1 + PC2 + PC3 + PC4 + mem1 + mem2 + mem3 + mem4, 
-             data = dplyr::select(dat_snp_count_mom, -id, -accession, -locality)))
- 
  
 ### Calculate %% presecence across populations
  
