@@ -6,8 +6,8 @@
 # Read in cluster run output ----------------------------------------------
 
   # Run with predictions
-  path_to_summaries <- "./output/run_3813910_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld/model_summaries/"
-  path_to_predictions <- "./output/run_3813910_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld/model_predictions/"
+  path_to_summaries <- "./output/run_1324_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_cv_devdif_ld/model_summaries/"
+  path_to_predictions <- "./output/run_1324_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_cv_devdif_ld/model_predictions/"
 
   
   ## Randomized phenotypes
@@ -57,6 +57,11 @@
   # Find if there indexes if needed to re-run manually or on the cluster
     which(!snp_col_names %in% sum_df_raw$snp)
     snp_col_names[which(!snp_col_names %in% sum_df_raw$snp)]
+    
+    ## Write snps that were run to file to rerun missing snps on cluster
+      # write_csv(data.frame(snp = snp_col_names[which(snp_col_names %in% sum_df_raw$snp)]),
+      #           path = "./output/skip_these_SNPs_2018_12_20.csv")
+    
     
   
   # For backup
@@ -114,7 +119,6 @@
   
   head(height_0_long)
   
-  
 
 ## Join all long dataframes together
   sum_df_long <- left_join(n_gen_long, p_val_long) %>%
@@ -125,7 +129,9 @@
   head(sum_df_long)
   dim(sum_df_long)
   
-
+  ## Add in cv scores
+  sum_df_long <- left_join(sum_df_long, dplyr::select(sum_df, snp, cv_cor))
+    
   # Filter out based on number of gene copies
     gen_copies_thresh <- 200
     
@@ -171,28 +177,29 @@
     
     
     # Calculate correlations for each snp and genotype in training and testing
-    train_test_cors <-  pred_df_sub %>%
-      dplyr::filter(tmax_sum_dif_unscaled >= 0) %>%
-      dplyr::group_by(snp, genotype) %>%
-      dplyr::summarise(train_test_cor_1 = cor(pred_train_1, pred_test_1),
-                       train_test_cor_2 = cor(pred_train_2, pred_test_2),
-                       train_test_cor_3 = cor(pred_train_3, pred_test_3),
-                       train_test_cor_4 = cor(pred_train_4, pred_test_4),
-                       train_test_cor_5 = cor(pred_train_5, pred_test_5)) %>%
-      ungroup()
+    # Outdated after adding changing CV routine - Dec 20th 2018
+    # train_test_cors <-  pred_df_sub %>%
+    #   dplyr::filter(tmax_sum_dif_unscaled >= 0) %>%
+    #   dplyr::group_by(snp, genotype) %>%
+    #   dplyr::summarise(train_test_cor_1 = cor(pred_train_1, pred_test_1),
+    #                    train_test_cor_2 = cor(pred_train_2, pred_test_2),
+    #                    train_test_cor_3 = cor(pred_train_3, pred_test_3),
+    #                    train_test_cor_4 = cor(pred_train_4, pred_test_4),
+    #                    train_test_cor_5 = cor(pred_train_5, pred_test_5)) %>%
+    #   ungroup()
     
     # Average across CV correlations
-    train_test_cors$train_test_cor <- rowMeans(dplyr::select(train_test_cors, 
-                                                             contains("train_test")),
-                                               na.rm = TRUE)
-    
-    glimpse(train_test_cors)
-    
-    map(train_test_cors, ~sum(is.na(.))) # Count number of NAs
+    # train_test_cors$train_test_cor <- rowMeans(dplyr::select(train_test_cors, 
+    #                                                          contains("train_test")),
+    #                                            na.rm = TRUE)
+    # 
+    # glimpse(train_test_cors)
+    # 
+    # map(train_test_cors, ~sum(is.na(.))) # Count number of NAs
     
     
     # Join back to predictions dataframe
-    pred_df_long <- dplyr::left_join(pred_df_long, train_test_cors)
+    # pred_df_long <- dplyr::left_join(pred_df_long, train_test_cors)
     
     head(pred_df_long)
     dim(pred_df_long)
@@ -232,12 +239,12 @@
 ## Identify top and bottom XXX% of SNPs
   
   p_val_adj_thresh <- 0.05
-  mad_thresh <- 2.5 # Median absolute deviation for outlier detection
-  train_test_cor_thresh <- 0.6
+  mad_thresh <- 3 # Median absolute deviation for outlier detection
+  train_test_cor_thresh <- 0.8
   
  top_snps_long <-  sum_df_long %>%
     dplyr::filter(p_val_adj < p_val_adj_thresh) %>%
-    dplyr::filter(train_test_cor >= train_test_cor_thresh) %>%
+    dplyr::filter(cv_cor >= train_test_cor_thresh) %>%
     dplyr::filter(height_change_warmer_base0 >= median(height_change_warmer_base0) +
                    mad_thresh * mad(height_change_warmer_base0)) %>%
     dplyr::arrange(desc(height_change_warmer_base0))
@@ -286,7 +293,7 @@
  ## Bottom SNPs
  bottom_snps_long <- sum_df_long %>%
    dplyr::filter(p_val_adj < p_val_adj_thresh) %>%
-   dplyr::filter(train_test_cor >= train_test_cor_thresh) %>%
+   dplyr::filter(cv_cor >= train_test_cor_thresh) %>%
    dplyr::filter(height_change_warmer_base0 <= median(height_change_warmer_base0) - 
                    mad_thresh * mad(height_change_warmer_base0))
    
@@ -307,7 +314,7 @@
    
    mid_snps_long <- sum_df_long %>%
      dplyr::filter(p_val_adj <= p_val_adj_thresh) %>%
-     dplyr::filter(train_test_cor >= train_test_cor_thresh) %>%
+     dplyr::filter(cv_cor >= train_test_cor_thresh) %>%
      dplyr::filter(!snp %in% c(top_snps_long$snp, bottom_snps_long$snp)) %>%
      sample_n(mean(c(nrow(top_snps_long), nrow(bottom_snps_long))))
    
@@ -691,7 +698,7 @@
   dat_snp_count$n_bottom_snps <- (dat_snp_count$n_bottom_snps - n_bottom_snps_mean) / n_bottom_snps_sd
   
   # Set formula
-  fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(n_top_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_top_snps, bs=\"cr\") + s(n_bottom_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_bottom_snps, bs=\"cr\") + s(accession, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC3_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC1_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC2_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC3_gen, bs=\"cr\")"))
+  fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(n_top_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_top_snps, bs=\"cr\") + s(n_bottom_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_bottom_snps, bs=\"cr\") + s(accession, bs = \"re\") + s(locality, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\")  + s(tmax_sum_dif, by = PC1_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC2_gen, bs=\"cr\") + s(PC1_clim, bs=\"cr\") + s(PC2_clim, bs=\"cr\")  + s(tmax_sum_dif, by = PC1_clim, bs=\"cr\") + s(tmax_sum_dif, by = PC2_clim, bs=\"cr\")"))
   
   
   # Gam with interaction effect

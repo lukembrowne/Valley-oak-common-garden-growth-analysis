@@ -261,12 +261,12 @@
   
 
 # Save data to file that will be uploaded to cluster  
-  save(dat_snp, dat_snp_unscaled,
-       snp_col_names, pred,
-       scaled_snps_means, scaled_snps_sds,
-       scaled_var_means_gbs_only, scaled_var_sds_gbs_only,
-       folds,
-    file = paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
+  # save(dat_snp, dat_snp_unscaled,
+  #      snp_col_names, pred,
+  #      scaled_snps_means, scaled_snps_sds,
+  #      scaled_var_means_gbs_only, scaled_var_sds_gbs_only,
+  #      folds,
+  #   file = paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
 
 
  

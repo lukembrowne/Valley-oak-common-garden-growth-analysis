@@ -14,8 +14,10 @@
   library(patchwork) # Installed on home directory
 
 # Load data
- load("../gam_cluster_2018-12-14.Rdata")
-
+ load("../gam_cluster_2018-12-20.Rdata")
+ 
+## Read in snps to skip
+ skip_these_SNPs <- read_csv("../skip_these_SNPs_2018_12_20.csv")
 
 # Save functions
 # function to transform from raw to scaled variables
@@ -55,6 +57,12 @@
     
     # Choose snp
     snp <- snp_col_names[snp_index]
+    
+    # Skip SNPs that are already run
+    if(snp %in% skip_these_SNPs$snp){
+      cat("Skipping SNP:", snp, " ... \n")
+      next
+    }
     
    # Make sure there's at least 2 levels
     if(length(table(dat_snp_unscaled[, snp])) < 2){
@@ -515,7 +523,7 @@
       append = TRUE
     }
     
-      write_csv(gam_mod_summary_df, path = paste0("./model_summaries/gam_summaries_", task_id, ".csv"),
+      write_csv(gam_mod_summary_df, path = paste0("./model_summaries/gam_summaries_", task_id + 20000, ".csv"),
                append = append)
     
 
@@ -524,7 +532,7 @@
         dplyr::mutate(snp = snp) %>%
         dplyr::select(snp, tmax_sum_dif_unscaled, genotype, pred, se)
       
-      write_csv(pred_sub_out, path = paste0("./model_predictions/gam_predictions_", task_id, ".csv"),
+      write_csv(pred_sub_out, path = paste0("./model_predictions/gam_predictions_", task_id + 20000, ".csv"),
                append = append)
     
     
