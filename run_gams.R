@@ -14,10 +14,10 @@
   library(patchwork) # Installed on home directory
 
 # Load data
- load("../gam_cluster_2018-12-20.Rdata")
+ load("../gam_cluster_2018-12-21.Rdata")
  
 ## Read in snps to skip
- skip_these_SNPs <- read_csv("../skip_these_SNPs_2018_12_20.csv")
+# skip_these_SNPs <- read_csv("../skip_these_SNPs_2018_12_20.csv")
 
 # Save functions
 # function to transform from raw to scaled variables
@@ -59,10 +59,10 @@
     snp <- snp_col_names[snp_index]
     
     # Skip SNPs that are already run
-    if(snp %in% skip_these_SNPs$snp){
-      cat("Skipping SNP:", snp, " ... \n")
-      next
-    }
+    # if(snp %in% skip_these_SNPs$snp){
+    #   cat("Skipping SNP:", snp, " ... \n")
+    #   next
+    # }
     
    # Make sure there's at least 2 levels
     if(length(table(dat_snp_unscaled[, snp])) < 2){
@@ -205,31 +205,6 @@
           pred_sub$accession <- as.character(as.numeric(pred_sub$accession) + 1)
         }
 
-  ## Remove extra columns
-      pred_sub <- pred_sub %>%
-        dplyr::select(-tmin_dif_unscaled, -tmin_dif,
-                      -tmax_dif, -tmax_dif_unscaled,
-                      -cwd_dif, -cwd_dif_unscaled,
-                      -bioclim_04_dif, -bioclim_04_dif_unscaled,
-                      -bioclim_15_dif, -bioclim_15_dif_unscaled,
-                      -bioclim_18_dif, -bioclim_18_dif_unscaled,
-                      -bioclim_19_dif, -bioclim_19_dif_unscaled,
-                      -PC3_clim_dif, -PC3_clim_dif_unscaled,
-                      -PC4_clim_dif, -PC4_clim_dif_unscaled,
-                      -PC5_clim_dif, -PC5_clim_dif_unscaled,
-                      -PC6_clim_dif, -PC6_clim_dif_unscaled,
-                      -PC7_clim_dif, -PC7_clim_dif_unscaled,
-                      -PC8_clim_dif, -PC8_clim_dif_unscaled,
-                      -PC9_clim_dif, -PC9_clim_dif_unscaled,
-                      -PC10_clim_dif, -PC10_clim_dif_unscaled,
-                      -tave_dif_unscaled, -tave_dif,
-                      -tmin_winter_dif_unscaled, -tmin_winter_dif,          
-                     -random_dif_unscaled, -random_dif,
-                     -PC3_gen,
-                     -PC1_clim_dif_unscaled, -PC2_clim_dif_unscaled,
-                     -PC1_clim_dif, -PC2_clim_dif)
-
-
   ## Visreg plots
   #  pdf(paste0("./model_plots/", snp,".pdf"), width = 8, height = 5)
 #
@@ -261,9 +236,7 @@
       pred_sub$pred <- gam_preds$fit
       pred_sub$se <- gam_preds$se.fit
 
-
-    
-      
+     
 ### Training and testing validation
       
     cv_cors <- NA # Initialize
@@ -523,7 +496,7 @@
       append = TRUE
     }
     
-      write_csv(gam_mod_summary_df, path = paste0("./model_summaries/gam_summaries_", task_id + 20000, ".csv"),
+      write_csv(gam_mod_summary_df, path = paste0("./model_summaries/gam_summaries_", task_id, ".csv"),
                append = append)
     
 
@@ -532,7 +505,7 @@
         dplyr::mutate(snp = snp) %>%
         dplyr::select(snp, tmax_sum_dif_unscaled, genotype, pred, se)
       
-      write_csv(pred_sub_out, path = paste0("./model_predictions/gam_predictions_", task_id + 20000, ".csv"),
+      write_csv(pred_sub_out, path = paste0("./model_predictions/gam_predictions_", task_id, ".csv"),
                append = append)
     
     

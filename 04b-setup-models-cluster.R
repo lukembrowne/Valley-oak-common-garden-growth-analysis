@@ -203,23 +203,21 @@
   # Set up each climate variable individually
   pred <-  expand.grid(height_2014 = 0,
                       accession = "1",
-                      section_block = "IFG_1",
+                      section_block = "Block1_1",
                       locality = "FHL",
                       PC1_clim =0, PC2_clim = 0,
-                      PC1_gen = 0, PC2_gen = 0, PC3_gen = 0)
+                      PC1_gen = 0, PC2_gen = 0)
   
-  for(var in climate_vars_dif){
+  for(var in "tmax_sum_dif"){
     
     var_unscaled <- paste0(var, "_unscaled")
-    
-    
     
     # Set scaled climate var dif, with a 0 and XXXX degree increase as well
     var_df <- expand.grid(accession = "1",
                           var_temp = c(seq(min(dat_all_clim[ ,var]),
                                            max(dat_all_clim[ ,var]),
-                                           length.out = 50), 0, degree_increase))
-    
+                                           length.out = 150), 0, degree_increase))
+
     # Rename columns and set unscaled climate_var dif
     var_df <- var_df %>%
       rename(!!var_unscaled := var_temp) %>%
