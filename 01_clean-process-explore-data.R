@@ -184,6 +184,8 @@
       # dat_all$rgr <- (log(dat_all$height_2017) - log(dat_all$height_2015))/ 2
       dat_all$rgr <- (log(dat_all$height_2017) - log(dat_all$height_2014)) / 3
       
+      # plot(dat_all$height_2017, (exp(dat_all$rgr * 3)) * dat_all$height_2014)
+      
       summary(dat_all$rgr)
       
       # ## Plots of 2015 vs 2017

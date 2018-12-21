@@ -113,20 +113,19 @@ back_transform <- function(x, var, means, sds){
                  discrete = TRUE, 
                  nthreads = 8,
                  method = "fREML", 
-             #  family = "gaussian",
+              # family = "gaussian",
                family = "tw",
                control = list(trace = FALSE))
   
   summary(gam_all)
  
-  test = summary(gam_all)
-  
   # Plot overall model fit
+    # test = summary(gam_all)
     # test_fit <- dat_all_scaled
     # test_fit$pred <- gam_all$fitted.values
     # 
-    # ggplot(test_fit, aes(y = pred, x = rgr, col = section_block)) + 
-    #   geom_point(alpha = 0.75, pch = 19) + 
+    # ggplot(test_fit, aes(y = pred, x = rgr, col = section_block)) +
+    #   geom_point(alpha = 0.75, pch = 19) +
     #   theme_bw(15) +
     #   xlab("Observed RGR") + ylab("Predicted RGR") +
     #   geom_abline(slope = 1, intercept = 0, lwd = 1.5, col = "forestgreen")
@@ -185,7 +184,7 @@ back_transform <- function(x, var, means, sds){
   v <- visreg(gam_all, xvar = "tmax_sum_dif", 
               scale = "response", rug = FALSE, ylab = "Relative growth rate", plot = FALSE,
               # Set prediction values
-              cond = list(section_block = "IFG_1", 
+              cond = list(section_block = "Block1_1", 
                           locality = "FHL",
                           height_2014 = 0, 
                           PC1_clim = 0,
@@ -245,10 +244,11 @@ back_transform <- function(x, var, means, sds){
                                 y = visregFit), lwd = 1,
                                 col = "forestgreen") +
     scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
+      scale_y_continuous(breaks = seq(.55, .85, .1), limits = c(.55, .85)) +
     ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
-  #  ylab("Relative growth rate") +
+  #  ylab("5 yr height (cm)") +
     xlab("Tmax climate distance") +
-    ylim(c(.25, .4)) +
+      # ylim(c(.25, .4)) +
     theme_bw(10) + 
     theme(panel.border = element_blank(), panel.grid.major = element_blank(),
           panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
@@ -262,7 +262,7 @@ back_transform <- function(x, var, means, sds){
   # ggsave(filename = paste0("./figs_tables/fig1/Figure 1 - transfer function ", Sys.Date(), ".pdf"),
   #        gg,
   #        units = "cm", width = 11, height = 8)
-  
+  # 
   
   
   
@@ -310,6 +310,61 @@ back_transform <- function(x, var, means, sds){
   ## Comparing LGM to 
   (newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[1]] - 
       newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[4]]) / newdata$pred[newdata$tmax_sum_dif_unscaled == degrees[4]] * 100
+  
+  
+  
+  ## Calculate how much loss in height based on % decrease in RGR
+  calc_height <- function(h0, mod, degree_increase, n_years){
+    h1 <- h0
+    cat("Height in year:", round(h1, 2), " : 0 with deg_increase: ", degree_increase, "... \n")
+    
+    for(year in 1:n_years){
+      # Set prediction df
+      newdata2 <- data.frame(#section_block = v$fit$section_block[1],
+                            section_block = "Block1_1",
+                            height_2014 = forward_transform(x = h1,
+                                                            var = "height_2014",
+                                                            means = scaled_var_means_all,
+                                                            sds = scaled_var_sds_all),
+                            accession = v$fit$accession[1],
+                            locality = v$fit$locality[1],
+                            PC1_clim = v$fit$PC1[1],
+                            PC2_clim = v$fit$PC2[1],
+                            tmax_sum_dif_unscaled = degree_increase,
+                            tmax_sum_dif = forward_transform(x = degree_increase,
+                                                             var = "tmax_sum_dif",
+                                                             means = scaled_var_means_all,
+                                                             sds = scaled_var_sds_all))
+      
+      newdata2
+      
+      rgr <- predict(gam_all, newdata = newdata2, type = "response")
+      print(rgr)
+      h1 <- (exp(rgr * 3)) * h1
+      
+      cat("Height in year:", round(h1, 2), " : ", year, " with deg_increase: ", degree_increase, "... \n")
+      
+    } # End year loop
+    
+    return(h1)
+  }
+  
+
+  h0 = 50
+  
+  calc_height(h0 = h0, mod = gam_all, 
+              degree_increase = lgm_mean, 
+              n_years = 1)
+  
+  calc_height(h0 = h0, mod = gam_all, 
+              degree_increase = 0, 
+              n_years = 1)
+  
+  calc_height(h0 = h0, mod = gam_all, 
+              degree_increase = future_85_mean, 
+              n_years = 1)
+  
+  
   
   
 
