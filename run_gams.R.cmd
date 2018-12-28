@@ -73,7 +73,7 @@ set climate_var_dif='tmax_sum_dif'
 # Run the user program
 #
   source /u/local/Modules/default/init/modules.csh
-  module load R/3.4.2
+  module load R/3.5.1
   module li
 #
 

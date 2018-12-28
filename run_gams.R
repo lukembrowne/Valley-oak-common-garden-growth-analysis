@@ -8,16 +8,16 @@
   climate_var_dif <- as.character(args[3])
 
 # Load libraries
-  library(mgcv, lib.loc = "/u/home/l/lukembro/R/x86_64-pc-linux-gnu-library/3.4") # Make sure to load latest version of mgcv
+  library(mgcv, lib.loc = "/u/home/l/lukembro/R/x86_64-pc-linux-gnu-library/3.5") # Make sure to load latest version of mgcv
   library(tidyverse)
-  library(visreg) # Installed on home directory
-  library(patchwork) # Installed on home directory
+  # library(visreg) # Installed on home directory
+  # library(patchwork) # Installed on home directory
 
 # Load data
  load("../gam_cluster_2018-12-21.Rdata")
  
 ## Read in snps to skip
-# skip_these_SNPs <- read_csv("../skip_these_SNPs_2018_12_20.csv")
+ # skip_these_SNPs <- read_csv("../skip_these_SNPs_2018_12_22.csv")
 
 # Save functions
 # function to transform from raw to scaled variables
@@ -35,13 +35,12 @@
   x = 1
   
   ## Convert fixed and random parts of formula to actual formula objetc
-  # No idea why we need to call formula twice, but it works
-  make_formula <- function(fixed, random){
-    return(formula(formula(enquote(paste0(fixed, random)))))
-  }
-  
-   # Formula for random effects
-  random_effects <-  '+ s(accession, bs = "re") + s(locality, bs = "re")'
+    make_formula <- function(fixed, random){
+      return(formula(formula(enquote(paste0(fixed, random)))))
+    }
+    
+  # Formula for random effects
+    random_effects <-  '+ s(accession, bs = "re") + s(locality, bs = "re")'
   
 
   # Loop through snps by index based on task id
@@ -72,33 +71,46 @@
 
     # Convert to factor
     # dat_snp[, snp] <- as.factor(pull(dat_snp, snp))
-     dat_snp_unscaled[, snp] <- as.factor(pull(dat_snp_unscaled, snp))
-
-
-
+    # dat_snp_unscaled[, snp] <- as.factor(pull(dat_snp_unscaled, snp))
     
-
+    # Save sample size per genotype
+    gen_table <-  table(dat_snp_unscaled[, snp])
+    
+   
+    
 # Run gams
    	cat("Working on: ", snp, "... number: ", x, " ...\n" )
 
-  # For SNPS as continuous  
-   # fixed_effects_int <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + te(", snp, ", bs=\"cr\", k = ", k, ") +  te(", climate_var_dif,", bs=\"cr\") + ti(", climate_var_dif,", ",snp,", bs=\"cr\", k =", k," )"))
-
   # For SNPs as factors
-   fixed_effects_int <- paste0("rgr ~ section_block + ", snp, "+ s(height_2014, bs =\"cr\") + s(", climate_var_dif, " , bs = \"cr\") + s(", climate_var_dif,", by = ", snp, ", bs=\"cr\") + s(PC1_clim, bs =\"cr\") + s(PC2_clim, bs =\"cr\") + s(tmax_sum_dif, by = PC1_clim, bs =\"cr\") + s(tmax_sum_dif, by = PC2_clim, bs =\"cr\")")
+   # 	if(length(gen_table) == 3){
+   #   fixed_effects_int <- paste0("rgr ~ section_block + s(", snp, ", bs =\"cr\", k = 3) + s(height_2014, bs =\"cr\") + s(", climate_var_dif, " , bs = \"cr\") + s(", climate_var_dif,", by = ", snp, ", bs=\"cr\") + s(PC1_clim, bs =\"cr\") + s(PC2_clim, bs =\"cr\") + s(tmax_sum_dif, by = PC1_clim, bs =\"cr\") + s(tmax_sum_dif, by = PC2_clim, bs =\"cr\")")
+   # 	}
    
- #  fixed_effects_int <- paste0(paste0("rgr ~ section_block + ", snp, "+ s(height_2014, bs=\"cr\") +  s(", climate_var_dif,", bs=\"cr\") + s(", climate_var_dif,", by = ", snp, ", bs=\"cr\")")) 
-   
-    
+  # if(length(gen_table) == 2){
+     fixed_effects_int <- paste0("rgr ~ section_block + ", snp, " + s(height_2014, bs =\"cr\") + s(", climate_var_dif, " , bs = \"cr\") + s(", climate_var_dif,", by = ", snp, ", bs=\"cr\") + s(PC1_clim, bs =\"cr\") + s(PC2_clim, bs =\"cr\") + s(tmax_sum_dif, by = PC1_clim, bs =\"cr\") + s(tmax_sum_dif, by = PC2_clim, bs =\"cr\")")
+
+  # }
+
     ## Add gen pcs and interactions
    fixed_effects_int <- paste0(fixed_effects_int, paste0(paste0("+ s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC1_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC2_gen, bs=\"cr\")")))
     
    ## Randomize RGR data
-   #  dat_snp_unscaled$rgr <- sample(dat_snp_unscaled$rgr)
+    # dat_snp_unscaled$rgr <- sample(dat_snp_unscaled$rgr)
 
+   ## Randomize Genotype
+   #  dat_snp[, snp] <- sample(pull(dat_snp, snp))
+    #  dat_snp_unscaled[, snp] <- sample(x = c(0, 1 , 2), 
+    #                                    size = nrow(dat_snp_unscaled), 
+    #                                    replace = TRUE)
+    # # dat_snp_unscaled[, snp] <- as.factor(pull(dat_snp_unscaled, snp))
+    #  table(pull(dat_snp_unscaled, snp))
+   
+   ## Impute missing data to mean allele frequency
+   dat_snp[is.na(dat_snp[, snp]), snp] <- 0
+     
   # Gam with interaction effect
     gam_snp_int = bam(formula = make_formula(fixed_effects_int, random_effects),
-                  data = dat_snp_unscaled[!is.na(pull(dat_snp_unscaled, snp)), ],
+                  data = dat_snp,
                   discrete = TRUE,
                   nthreads = 8,
                   method = "fREML", 
@@ -106,6 +118,8 @@
                   family = "tw")
 
     print(summary(gam_snp_int))
+    
+  # visreg(gam_snp_int, xvar = climate_var_dif, by = snp, partial = FALSE, scale = "response")
 
    # Check for convergence
    # if(!gam_snp_int$mgcv.conv){
@@ -127,16 +141,16 @@
  ## Calculate decrease in deviance with SNP data  
     
     # Fit model with no SNP data but with PCs
-      form_no_snp <- formula(paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\") + s(locality, bs = \"re\") + s(accession, bs = \"re\") + s(tmax_sum_dif, by = PC1_clim, bs = \"cr\") + s(tmax_sum_dif, by = PC2_clim, bs = \"cr\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC1_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC2_gen, bs=\"cr\")")))
-      
-      gam_no_snp = bam(formula = form_no_snp,
-                        data = dat_snp_unscaled[!is.na(pull(dat_snp_unscaled, snp)), ],
-                        discrete = TRUE,
-                        nthreads = 8,
-                        method = "fREML",
-                        #   method = "ML",
-                        family = "tw",
-                        control = list(trace = FALSE))
+      # form_no_snp <- formula(paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(", climate_var_dif,", bs=\"cr\") + s(locality, bs = \"re\") + s(accession, bs = \"re\") + s(tmax_sum_dif, by = PC1_clim, bs = \"cr\") + s(tmax_sum_dif, by = PC2_clim, bs = \"cr\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC1_gen, bs=\"cr\") + s(", climate_var_dif,", by = PC2_gen, bs=\"cr\")")))
+      # 
+      # gam_no_snp = bam(formula = form_no_snp,
+      #                   data = dat_snp[!is.na(pull(dat_snp, snp)), ],
+      #                   discrete = TRUE,
+      #                   nthreads = 8,
+      #                   method = "fREML",
+      #                   #   method = "ML",
+      #                   family = "tw",
+      #                   control = list(trace = FALSE))
       
     #  summary(gam_no_snp)
       
@@ -157,24 +171,22 @@
     
   # Save deviance differences and Rsquared into model
     gam_snp_int_summary <- summary(gam_snp_int)
-    gam_no_snp_summary  <- summary(gam_no_snp)
-  #  gam_random_summary  <- summary(gam_random)
+   # gam_no_snp_summary  <- summary(gam_no_snp)
+  # gam_random_summary  <- summary(gam_random)
     
-    gam_snp_int$dev_dif <- gam_snp_int_summary$dev - gam_no_snp_summary$dev
-   # gam_snp_int$dev_dif_random <-  gam_random_summary$dev - gam_no_snp_summary$dev
-    
-    gam_snp_int$rsq_dif <- gam_snp_int_summary$r.sq - gam_no_snp_summary$r.sq
-   # gam_snp_int$rsq_dif_random <- gam_random_summary$r.sq - gam_no_snp_summary$r.sq
-    
-
+  # gam_snp_int$dev_dif <- gam_snp_int_summary$dev - gam_no_snp_summary$dev
+   gam_snp_int$dev_dif <- NA
+ # gam_snp_int$dev_dif_random <-  gam_random_summary$dev - gam_no_snp_summary$dev
+  
+  # gam_snp_int$rsq_dif <- gam_snp_int_summary$r.sq - gam_no_snp_summary$r.sq
+   gam_snp_int$rsq_dif <- NA
+ # gam_snp_int$rsq_dif_random <- gam_random_summary$r.sq - gam_no_snp_summary$r.sq
    
-
- ## Save sample size per genotype
-      gen_table <-  table(dat_snp_unscaled[, snp])
-      
-      gam_snp_int$n_gen0 <- as.numeric(gen_table["0"])
-      gam_snp_int$n_gen1 <- as.numeric(gen_table["1"])
-      gam_snp_int$n_gen2 <- as.numeric(gen_table["2"])
+   # Save sample size per genotype
+   gam_snp_int$n_gen0 <- as.numeric(gen_table["0"])
+   gam_snp_int$n_gen1 <- as.numeric(gen_table["1"])
+   gam_snp_int$n_gen2 <- as.numeric(gen_table["2"])
+    
 
     # Make predictions
 
@@ -195,9 +207,15 @@
     #   dplyr::mutate(!!snp := genotype_scaled)
 
   ## For SNPs as factors
+      # pred_sub <-  pred_sub  %>%
+      #   dplyr::filter(genotype %in% pull(dat_snp_unscaled, snp)) %>%
+      #   dplyr::mutate(!!snp := as.character(genotype)) %>% # Change to character for factoring
+      #   dplyr::mutate(genotype = as.character(genotype))
+      
+  ## For SNPs as continuous
       pred_sub <-  pred_sub  %>%
         dplyr::filter(genotype %in% pull(dat_snp_unscaled, snp)) %>%
-        dplyr::mutate(!!snp := as.character(genotype)) %>% # Change to character for factoring
+        dplyr::mutate(!!snp := genotype_scaled) %>% # Change to character for factoring
         dplyr::mutate(genotype = as.character(genotype))
 
 	# Change accession number if genetic data is missing so we don't get errors in prediction
@@ -216,11 +234,11 @@
   #         ylab = "5 year height (cm)")
   #  
   #  # Without partial residuals
-  #  visreg(gam_snp_int, xvar = climate_var_dif, by = snp,
-  #         overlay = TRUE, partial = FALSE, rug = FALSE,
-  #         breaks = c(unique(pred_sub$genotype_scaled)),
-  #         xtrans = function(x) {(x *  scaled_var_sds_gbs_only[climate_var_dif]) + scaled_var_means_gbs_only[climate_var_dif]},
-  #         ylab = "5 year height (cm)")
+   # visreg(gam_snp_int, xvar = climate_var_dif, by = snp,
+   #        overlay = TRUE, partial = FALSE, rug = FALSE,
+   #        breaks = c(unique(pred_sub$genotype_scaled)),
+   #        xtrans = function(x) {(x *  scaled_var_sds_gbs_only[climate_var_dif]) + scaled_var_means_gbs_only[climate_var_dif]},
+   #        ylab = "5 year height (cm)")
   #  
   #  dev.off()      
 
@@ -239,100 +257,137 @@
      
 ### Training and testing validation
       
-    cv_cors <- NA # Initialize
-    for(fold in 1:length(folds)){
-
-        dat_snp_train <- dat_snp_unscaled[-folds[[fold]], ]      
-        dat_snp_train <-  dat_snp_train[!is.na(pull(dat_snp_train, snp)), ]
-        
-       # dim(dat_snp_train)
-        
-        dat_snp_test <- dat_snp_unscaled[folds[[fold]], ]
-        dat_snp_test <-  dat_snp_test[!is.na(pull(dat_snp_test, snp)), ]
-        
-        # dim(dat_snp_test)
-        
-      # Training model  
-       gam_snp_int_train = bam(formula = make_formula(fixed_effects_int, random_effects),
-                                data = dat_snp_train,
-                                discrete = TRUE, 
-                                nthreads = 8,
-                                method = "fREML",
-                                family = "tw")
-        
-        # print(summary(gam_snp_int_train))
-       
-      # Calculate predicted growth rates of test set based on training set
-        test_rgr = predict(gam_snp_int_train,
-                       newdata = dat_snp_test,
-                       type = "response")
-        
-        # Calculate correlation
-        cv_cors[fold] <- cor(test_rgr, dat_snp_test$rgr)
-
-        # Save summaries
-        # gam_snp_int_train_summary <- summary(gam_snp_int_train)
-        # gam_snp_int_test_summary <- summary(gam_snp_int_test)
-        
       
+      # Select just columns that we will use to speed it up
+    # dat_snp_reduced <- dplyr::select(dat_snp, rgr, section_block, snp, 
+    #                                           height_2014, tmax_sum_dif,
+    #                                           PC1_clim, PC2_clim, PC1_gen, PC2_gen, locality, accession)
+    # 
+    # for(fold in 1:length(folds)){
+    # 
+    #     dat_snp_train <- dat_snp_reduced[-folds[[fold]], ]      
+    #     dat_snp_train <-  dat_snp_train[!is.na(pull(dat_snp_train, snp)), ]
+    #     
+    #    # dim(dat_snp_train)
+    #     
+    #     dat_snp_test <- dat_snp_reduced[folds[[fold]], ]
+    #     dat_snp_test <-  dat_snp_test[!is.na(pull(dat_snp_test, snp)), ]
+    #     
+    #     # Make sure all accessions are represented
+    #     dat_snp_test <- dat_snp_test[dat_snp_test$accession %in% dat_snp_train$accession, ]
+    #     
+    #     # dim(dat_snp_test)
+    #     
+    #   # Training model  
+    #    gam_snp_int_train = bam(formula = make_formula(fixed_effects_int, random_effects),
+    #                             data = dat_snp_train,
+    #                             discrete = TRUE, 
+    #                             nthreads = 8,
+    #                             method = "fREML",
+    #                             family = "tw")
+    #     
+    #     # print(summary(gam_snp_int_train))
+    #    
+    #   # Calculate predicted growth rates of test set based on training set
+    #     test_rgr = predict(gam_snp_int_train,
+    #                    newdata = dat_snp_test,
+    #                    type = "response")
+    #     
+    #     # Calculate correlation separately for each genotype
+    #     dat_snp_test$rgr_predicted <- test_rgr
+    #     
+    #    cv_cors_temp <-  dat_snp_test %>%
+    #       dplyr::select(snp, rgr, rgr_predicted) %>%
+    #       group_by(.dots = snp) %>% # Group by genotype 
+    #      summarise(cv_cor = cor(rgr, rgr_predicted)) 
+    #    
+    #    if(fold == 1){
+    #      cv_cors = cv_cors_temp
+    #    } else {
+    #      cv_cors <- rbind(cv_cors, cv_cors_temp)
+    #    }
+    #     
+    #     # Save summaries
+    #     # gam_snp_int_train_summary <- summary(gam_snp_int_train)
+    #     # gam_snp_int_test_summary <- summary(gam_snp_int_test)
+    #     
+    #   
+    #   
+    #       ## Making predictions
+    #  
+    #       #   # Change accession number if genetic data is missing so we don't get errors in prediction
+    #       #   while(!(pred_sub$accession[1] %in%  gam_snp_int_train$model$accession) | 
+    #       #         !(pred_sub$accession[1] %in%  gam_snp_int_test$model$accession)){
+    #       #     pred_sub$accession <- as.character(as.numeric(pred_sub$accession) + 1)
+    #       #   }
+    #       #   
+    #       #   
+    #       #   # Filter down to exclude gneotypes that are not in model to avoid error in prediction
+    #       #   pred_sub_train <- pred_sub %>%
+    #       #                     dplyr::filter(genotype %in% pull(dat_snp_train, snp))
+    #       #   # table(pred_sub_train$genotype)
+    #       #   
+    #       #   gam_preds_train <-  predict(gam_snp_int_train, 
+    #       #                               newdata = pred_sub_train,
+    #       #                               type = "response",
+    #       #                               se = TRUE)
+    #       #   
+    #       #   pred_sub_train[paste0("pred_train_", fold)] <- gam_preds_train$fit
+    #       #   pred_sub_train[paste0("se_train_", fold)] <- gam_preds_train$se.fit
+    #       #   
+    #       #   # Join back to main prediction df
+    #       #   pred_sub <- left_join(pred_sub, 
+    #       #                        dplyr::select(pred_sub_train, 
+    #       #                                      genotype, tmax_sum_dif, 
+    #       #                                      paste0("pred_train_", fold),
+    #       #                                      paste0("se_train_", fold)))
+    #       #   
+    #       #   
+    #       # ## Testing model
+    #       #  
+    #       #  # Filter down to exclude gneotypes that are not in model to avoid error in prediction
+    #       #  pred_sub_test <- pred_sub %>%
+    #       #    dplyr::filter(genotype %in% pull(dat_snp_test, snp))
+    #       #  table(pred_sub_test$genotype)
+    #       #  
+    #       #  
+    #       #   gam_preds_test <-  predict(gam_snp_int_test, 
+    #       #                              newdata = pred_sub_test,
+    #       #                              type = "response",
+    #       #                              se = TRUE)
+    #       #   
+    #       #   pred_sub_test[paste0("pred_test_", fold)] <- gam_preds_test$fit
+    #       #   pred_sub_test[paste0("se_test_", fold)] <- gam_preds_test$se.fit
+    #       #   
+    #       #   # Join back to main prediction df
+    #       #   pred_sub <- left_join(pred_sub, 
+    #       #                         dplyr::select(pred_sub_test, 
+    #       #                                       genotype, tmax_sum_dif, 
+    #       #                                       paste0("pred_test_", fold),
+    #       #                                       paste0("se_test_", fold)))
+    #         
+    #   } # End cross validation loop
+    # 
+    # ## Average across cross validation folds
+    # cv_cors_avg <- cv_cors %>%
+    #           group_by(.dots = snp) %>%
+    #           summarise(cv_cor = mean(cv_cor))                        
+    # 
+    # cv_cors_avg[, 1] <- back_transform(as.data.frame(cv_cors_avg[, 1]), var = snp,
+    #                                    means = scaled_snps_means, sds = scaled_snps_sds)
+    # 
+    # cv_cor_gen_0 <- as.numeric(cv_cors_avg[pull(cv_cors_avg, snp) == 0, 2])
+    # cv_cor_gen_1 <- as.numeric(cv_cors_avg[pull(cv_cors_avg, snp) == 1, 2])
+    # cv_cor_gen_2 <- as.numeric(cv_cors_avg[pull(cv_cors_avg, snp) == 2, 2])
       
-      ## Making predictions
- 
-      #   # Change accession number if genetic data is missing so we don't get errors in prediction
-      #   while(!(pred_sub$accession[1] %in%  gam_snp_int_train$model$accession) | 
-      #         !(pred_sub$accession[1] %in%  gam_snp_int_test$model$accession)){
-      #     pred_sub$accession <- as.character(as.numeric(pred_sub$accession) + 1)
-      #   }
-      #   
-      #   
-      #   # Filter down to exclude gneotypes that are not in model to avoid error in prediction
-      #   pred_sub_train <- pred_sub %>%
-      #                     dplyr::filter(genotype %in% pull(dat_snp_train, snp))
-      #   # table(pred_sub_train$genotype)
-      #   
-      #   gam_preds_train <-  predict(gam_snp_int_train, 
-      #                               newdata = pred_sub_train,
-      #                               type = "response",
-      #                               se = TRUE)
-      #   
-      #   pred_sub_train[paste0("pred_train_", fold)] <- gam_preds_train$fit
-      #   pred_sub_train[paste0("se_train_", fold)] <- gam_preds_train$se.fit
-      #   
-      #   # Join back to main prediction df
-      #   pred_sub <- left_join(pred_sub, 
-      #                        dplyr::select(pred_sub_train, 
-      #                                      genotype, tmax_sum_dif, 
-      #                                      paste0("pred_train_", fold),
-      #                                      paste0("se_train_", fold)))
-      #   
-      #   
-      # ## Testing model
-      #  
-      #  # Filter down to exclude gneotypes that are not in model to avoid error in prediction
-      #  pred_sub_test <- pred_sub %>%
-      #    dplyr::filter(genotype %in% pull(dat_snp_test, snp))
-      #  table(pred_sub_test$genotype)
-      #  
-      #  
-      #   gam_preds_test <-  predict(gam_snp_int_test, 
-      #                              newdata = pred_sub_test,
-      #                              type = "response",
-      #                              se = TRUE)
-      #   
-      #   pred_sub_test[paste0("pred_test_", fold)] <- gam_preds_test$fit
-      #   pred_sub_test[paste0("se_test_", fold)] <- gam_preds_test$se.fit
-      #   
-      #   # Join back to main prediction df
-      #   pred_sub <- left_join(pred_sub, 
-      #                         dplyr::select(pred_sub_test, 
-      #                                       genotype, tmax_sum_dif, 
-      #                                       paste0("pred_test_", fold),
-      #                                       paste0("se_test_", fold)))
-        
-      } # End cross validation loop
+      # If not running CV
+      cv_cor_gen_0 = NA
+      cv_cor_gen_1 = NA
+      cv_cor_gen_2 = NA
+    
     
     # Factor genotypes
-    pred_sub$genotype <- factor(pred_sub$genotype)
+   # pred_sub$genotype <- factor(pred_sub$genotype)
 
    # Backtransform climate variable
     # dat_snp_trans <- dat_snp %>%
@@ -462,26 +517,53 @@
       # # Use grep to look at the last number of the smooth summary table - 
       # # Should correspond to the genotype
        # # Returns NA if no match
-      p_val_gen_0 = ifelse(length(gam_snp_int_summary$s.table[grep(pattern = "0$",
-                               rownames(gam_snp_int_summary$s.table)), "p-value"]) == 0,
+      # p_val_gen_0 = ifelse(length(gam_snp_int_summary$s.table[grep(pattern = "0$",
+      #                          rownames(gam_snp_int_summary$s.table)), "p-value"]) == 0,
+      #                         yes = NA,
+      #                         no = gam_snp_int_summary$s.table[grep(pattern = "0$",
+      #                          rownames(gam_snp_int_summary$s.table)), "p-value"]),
+      # 
+      # p_val_gen_1 = ifelse(length(gam_snp_int_summary$s.table[grep(pattern = "1$",
+      #                     rownames(gam_snp_int_summary$s.table)), "p-value"]) == 0,
+      #                      yes = NA,
+      #                      no = gam_snp_int_summary$s.table[grep(pattern = "1$",
+      #                      rownames(gam_snp_int_summary$s.table)), "p-value"]),
+      # 
+      # p_val_gen_2 = ifelse(length(gam_snp_int_summary$s.table[grep(pattern = "2$",
+      #                      rownames(gam_snp_int_summary$s.table)), "p-value"]) == 0,
+      #                      yes = NA,
+      #                      no = gam_snp_int_summary$s.table[grep(pattern = "2$",
+      #                       rownames(gam_snp_int_summary$s.table)), "p-value"]),
+     
+     p_val_gen_int = ifelse(length(gam_snp_int_summary$s.table[grep(pattern = ":snp_",                                            rownames(gam_snp_int_summary$s.table)), "p-value"]) == 0,
                               yes = NA,
-                              no = gam_snp_int_summary$s.table[grep(pattern = "0$",
-                               rownames(gam_snp_int_summary$s.table)), "p-value"]),
-      
-      p_val_gen_1 = ifelse(length(gam_snp_int_summary$s.table[grep(pattern = "1$",
-                          rownames(gam_snp_int_summary$s.table)), "p-value"]) == 0,
-                           yes = NA,
-                           no = gam_snp_int_summary$s.table[grep(pattern = "1$",
-                           rownames(gam_snp_int_summary$s.table)), "p-value"]),
-      
-      p_val_gen_2 = ifelse(length(gam_snp_int_summary$s.table[grep(pattern = "2$",
-                           rownames(gam_snp_int_summary$s.table)), "p-value"]) == 0,
-                           yes = NA,
-                           no = gam_snp_int_summary$s.table[grep(pattern = "2$",
-                            rownames(gam_snp_int_summary$s.table)), "p-value"]),
-     # Cross validation correlation
-     cv_cor = mean(cv_cors)
-    
+                              no = gam_snp_int_summary$s.table[grep(pattern = ":snp_",
+                             rownames(gam_snp_int_summary$s.table)), "p-value"]),
+     
+     ## F value for interaction term
+     f_val_gen_int = ifelse(length(gam_snp_int_summary$s.table[grep(pattern = ":snp_",                                            rownames(gam_snp_int_summary$s.table)), "F"]) == 0,
+                            yes = NA,
+                            no = gam_snp_int_summary$s.table[grep(pattern = ":snp_",
+                                                                  rownames(gam_snp_int_summary$s.table)), "F"]),
+     
+     # P and f value for main term
+     p_val_gen_main = ifelse(length(gam_snp_int_summary$p.table[grep(pattern = "snp_",                                            rownames(gam_snp_int_summary$p.table)), "Pr(>|t|)"]) == 0,
+                            yes = NA,
+                            no = gam_snp_int_summary$p.table[grep(pattern = "snp_",
+                                      rownames(gam_snp_int_summary$p.table)), "Pr(>|t|)"]),
+     
+     ## F value for interaction term
+     f_val_gen_main = ifelse(length(gam_snp_int_summary$p.table[grep(pattern = "snp_",                                            rownames(gam_snp_int_summary$p.table)), "t value"]) == 0,
+                            yes = NA,
+                            no = gam_snp_int_summary$p.table[grep(pattern = "snp_",
+                 rownames(gam_snp_int_summary$p.table)), "t value"]),
+     
+     
+     
+     # Cross validation correlation for each genotype
+     cv_cor_gen_0 = cv_cor_gen_0,
+     cv_cor_gen_1 = cv_cor_gen_1,
+     cv_cor_gen_2 = cv_cor_gen_2
     )
     
    print(gam_mod_summary_df)
