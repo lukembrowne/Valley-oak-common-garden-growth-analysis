@@ -6,44 +6,15 @@
 # Read in cluster run output ----------------------------------------------
 
   # Run with predictions
-  path_to_summaries <- "./output/run_1324_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_cv_devdif_ld/model_summaries/"
-  path_to_predictions <- "./output/run_1324_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_cv_devdif_ld/model_predictions/"
+  path_to_summaries <- "./output/run_51702_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_continuous_fvals/model_summaries/"
+  path_to_predictions <- "./output/run_51702_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_continuous_fvals/model_predictions/"
+  
+  # ## Randomized genotypes
+  # path_to_summaries <- "./output/run_51853_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_continuous_fvals_rand/model_summaries/"
+  # path_to_predictions <- "./output/run_51853_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_continuous_fvals_rand/model_predictions/"
+  # 
 
-  
-  ## Randomized phenotypes
-  
-    # # # Run 1 - 0 SNPs passed - tested on Sept 25th 2018
-    #   path_to_summaries <- "./output/run_3826675_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3826675_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-    #   # Run 2 - 0 SNPs passed
-    #   path_to_summaries <- "./output/run_3826678_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3826678_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-    #   # # Run 3 - 0 SNPs passed
-    #   path_to_summaries <- "./output/run_3826681_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3826681_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-    #   # Run 4 - 0 SNPs passed
-    #   path_to_summaries <- "./output/run_3826685_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3826685_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-    #   # Run 5 - 0 SNPs passed
-    #   path_to_summaries <- "./output/run_3826688_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3826688_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-    #   # # Run 6 - 0 SNPs passed
-    #   path_to_summaries <- "./output/run_3888991_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3888991_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-    #   # Run 7 - 0 SNPs passed
-    #   path_to_summaries <- "./output/run_3888992_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3888992_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-    #   # Run 8 - 0 SNPs passed
-    #   path_to_summaries <- "./output/run_3888993_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3888993_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-    #   # Run 9 - 0 SNPs passed
-    #   path_to_summaries <- "./output/run_3888994_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3888994_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-    #   # Run 10 - 0 SNPs passed
-    #   path_to_summaries <- "./output/run_3888995_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_summaries/"
-    #   path_to_predictions <- "./output/run_3888995_tmax_sum_dif_rgr_fREML_discrete_v3_tw_genpc_devdif_ld_rand/model_predictions/"
-    
-      
+
  # Read in files
     sum_df_raw <- plyr::ldply(list.files(path_to_summaries, full = TRUE), read_csv)
     
@@ -57,12 +28,31 @@
   # Find if there indexes if needed to re-run manually or on the cluster
     which(!snp_col_names %in% sum_df_raw$snp)
     snp_col_names[which(!snp_col_names %in% sum_df_raw$snp)]
+    length( which(!snp_col_names %in% sum_df_raw$snp))
     
     ## snp_chr5_22319422 doesn't have 2 levels
     
     ## Write snps that were run to file to rerun missing snps on cluster
       # write_csv(data.frame(snp = snp_col_names[which(snp_col_names %in% sum_df_raw$snp)]),
-      #           path = "./output/skip_these_SNPs_2018_12_20.csv")
+      #           path = "./output/skip_these_SNPs_2018_12_22.csv")
+    
+  # Make sure columns are in right format
+    sum_df_raw <- sum_df_raw %>%
+      mutate(n_gen0 = as.numeric(n_gen0),
+             n_gen1 = as.numeric(n_gen1),
+             n_gen2 = as.numeric(n_gen2),
+             height_change_gen_0 = as.numeric(height_change_gen_0),
+             height_change_gen_1 = as.numeric(height_change_gen_1),
+             height_change_gen_2 = as.numeric(height_change_gen_2),
+             # p_val_gen_0 = as.numeric(p_val_gen_0),
+             # p_val_gen_1 = as.numeric(p_val_gen_1),
+             # p_val_gen_2 = as.numeric(p_val_gen_2),
+             p_val_gen_int = as.numeric(p_val_gen_int),
+             cv_cor_gen_0 = as.numeric(cv_cor_gen_0),
+             cv_cor_gen_1 = as.numeric(cv_cor_gen_1),
+             cv_cor_gen_2 = as.numeric(cv_cor_gen_2))
+    
+    str(sum_df_raw)
     
     
   # For backup
@@ -71,12 +61,16 @@
   # Filter out models that did not converge
   table(sum_df_raw$converged)
   
+  # How many acccession used for prediction
+  table(sum_df_raw$acc_pred)
+  
   
 ## Read in model predictions
   pred_df_raw <- plyr::ldply(list.files(path_to_predictions, full = TRUE), 
                              read_csv)
   pred_df_raw$genotype <- as.character(pred_df_raw$genotype)
   
+  str(pred_df_raw)
   head(pred_df_raw)
   dim(pred_df_raw)
   summary(pred_df_raw)
@@ -92,13 +86,13 @@
   
   head(n_gen_long)
   
-  p_val_long <- sum_df %>%
-      dplyr::select(snp, p_val_gen_0, p_val_gen_1, p_val_gen_2) %>%
-      gather(key = "genotype", value = "p_val", -snp) %>%
-      mutate(genotype = gsub("p_val_gen_", "", genotype))
+  # p_val_long <- sum_df %>%
+  #     dplyr::select(snp, p_val_gen_0, p_val_gen_1, p_val_gen_2) %>%
+  #     gather(key = "genotype", value = "p_val", -snp) %>%
+  #     mutate(genotype = gsub("p_val_gen_", "", genotype))
+  # 
+  #   head(p_val_long)
   
-    head(p_val_long)
-    
   height_change_long <- sum_df %>%
     dplyr::select(snp, height_change_gen_0, height_change_gen_1, height_change_gen_2) %>%
     gather(key = "genotype", value = "height_change", -snp) %>%
@@ -120,35 +114,39 @@
   
   head(height_0_long)
   
+  cv_cor_long <- sum_df %>%
+    dplyr::select(snp, cv_cor_gen_0, cv_cor_gen_1, cv_cor_gen_2) %>%
+    gather(key = "genotype", value = "cv_cor", -snp) %>%
+    mutate(genotype = gsub("cv_cor_gen_", "", genotype))
+  
+  head(cv_cor_long)
+  
 
 ## Join all long dataframes together
-  sum_df_long <- left_join(n_gen_long, p_val_long) %>%
-    left_join(. , height_change_long) %>%
+  sum_df_long <- left_join(n_gen_long, height_change_long) %>%
+  #  left_join(. , p_val_long) %>%
     left_join(., height_4.8_long) %>%
-    left_join(., height_0_long) 
+    left_join(., height_0_long) %>%
+    left_join(., cv_cor_long)
   
   head(sum_df_long)
   dim(sum_df_long)
+  str(sum_df_long)
   
-  ## Add in cv scores
-  sum_df_long <- left_join(sum_df_long, dplyr::select(sum_df, snp, cv_cor))
-    
+ 
   # Filter out based on number of gene copies
-    gen_copies_thresh <- 200
-    
-    sum_df_long <- sum_df_long %>%
+   gen_copies_thresh <- 500
+
+   sum_df_long <- sum_df_long %>%
       dplyr::filter(n_gen >= gen_copies_thresh)
     
   ## Filter out heterozygotes?
-    sum_df_long <- sum_df_long %>%
-      dplyr::filter(genotype != "1")
+   # sum_df_long <- sum_df_long %>%
+  #    dplyr::filter(genotype != "1")
   
   ## Remove those that predictions weren't made on accession 1
-    # sum_df_long <- sum_df_long %>%
-    #   dplyr::filter(acc_pred == 1)
-    
-    
-
+    sum_df_long <- sum_df_long %>%
+      dplyr::filter(acc_pred == 1)
     
   # Subset to just predictions of SNPs that pass filters
     pred_df_sub <- pred_df_raw %>%
@@ -164,12 +162,13 @@
 
     pred_df_long =  pred_df_sub %>%
       dplyr::group_by(snp, genotype) %>%
-      do(data.frame(height_change_warmer = mean((.$pred[.$tmax_sum_dif_unscaled >= 0]  -
+      do(data.frame(height_change_warmer = mean((.$pred[.$tmax_sum_dif_unscaled > 0]  -
                                                .$pred[.$tmax_sum_dif_unscaled == 0] ) /
                                                .$pred[.$tmax_sum_dif_unscaled == 0] ) * 100,
-                    height_change_warmer_base0 = mean((.$pred[.$tmax_sum_dif_unscaled >= 0]
+                    height_change_warmer_base0 = mean((.$pred[.$tmax_sum_dif_unscaled > 0]
                                                        - base0 ) /  base0) * 100,
-                    height_change_warmer_absolute = median(.$pred[.$tmax_sum_dif_unscaled >= 0])))
+                    height_change_warmer_base0_max75 = mean((.$pred[.$tmax_sum_dif_unscaled > 0 & .$tmax_sum_dif_unscaled <= 7.5] - base0) /  base0) * 100,
+                    height_change_warmer_absolute = mean(.$pred[.$tmax_sum_dif_unscaled > 0])))
     
     head(pred_df_long)
     dim(pred_df_long)
@@ -177,9 +176,22 @@
     summary(pred_df_long$height_change_warmer)
     summary(pred_df_long$height_change_warmer_base0)
     
-    plot(pred_df_long$height_change_warmer,pred_df_long$height_change_warmer_base0, pch = "." )
-    abline(a = 0, b = 1)
-    cor.test(pred_df_long$height_change_warmer,pred_df_long$height_change_warmer_base0 )
+    # plot(pred_df_long$height_change_warmer, 
+    #      pred_df_long$height_change_warmer_base0, pch = "." )
+    # abline(a = 0, b = 1)
+    # cor.test(pred_df_long$height_change_warmer,pred_df_long$height_change_warmer_base0 )
+    # 
+    # plot(pred_df_long$height_change_warmer_absolute, 
+    #      pred_df_long$height_change_warmer_base0, pch = "." )
+    # abline(a = 0, b = 1)
+    # cor.test(pred_df_long$height_change_warmer_absolute,
+    #          pred_df_long$height_change_warmer_base0 )
+    # 
+    # plot(pred_df_long$height_change_warmer_base0_max75, 
+    #      pred_df_long$height_change_warmer_base0, pch = "." )
+    # abline(a = 0, b = 1)
+    # cor.test(pred_df_long$height_change_warmer_base0_max75,
+    #          pred_df_long$height_change_warmer_base0 )
     
     
     # Calculate correlations for each snp and genotype in training and testing
@@ -219,41 +231,112 @@
   # Vignette - https://bioconductor.org/packages/release/bioc/vignettes/qvalue/inst/doc/qvalue.pdf
   
   # Calculate q values and adjusted p values
-  qvals <- qvalue(p = sum_df_long_w_preds$p_val,
-                  fdr.level = 0.05)
-  
-  pvals_adj <- p.adjust(sum_df_long_w_preds$p_val, method = "fdr")
-  
-  summary(qvals)
-  summary(pvals_adj)
-  hist(pvals_adj, breaks = 40)
-
-  qvals$pi0 # overall proportion of true null hypotheses
-  table(qvals$significant)
+  # qvals <- qvalue(p = as.numeric(sum_df_long_w_preds$p_val),
+  #                 fdr.level = 0.05, pi0 = 1)
+  # 
+  # pvals_adj <- p.adjust(sum_df_long_w_preds$p_val, method = "fdr")
+  # 
+  # summary(qvals)
+  # summary(pvals_adj)
+  # sum(pvals_adj <= 0.05)
+  # hist(pvals_adj, breaks = 40)
+  # 
+  # qvals$pi0 # overall proportion of true null hypotheses
+  # table(qvals$significant)
   
   # hist(qvals)
   
   # Assign back into DF
-  sum_df_long_w_preds <- sum_df_long_w_preds %>%
-    mutate(q_val = qvals$qvalues) %>%
-    mutate(p_val_adj = pvals_adj)
+  # sum_df_long_w_preds <- sum_df_long_w_preds %>%
+  #   mutate(q_val = qvals$qvalues) %>%
+  #   mutate(p_val_adj = pvals_adj)
+  # 
+  # head(sum_df_long_w_preds)
   
-  head(sum_df_long_w_preds)
+  
+  plot(sum_df$p_val_gen_int, sum_df$f_val_gen_int)
+  cor.test(sum_df$p_val_gen_int, sum_df$f_val_gen_int)
+    
+  ## Adjusting p values on intercept
+  
+  sort(sum_df$p_val_gen_int)[1:100]
+  hist(sum_df$p_val_gen_int, breaks = 40)
+  sum_df$p_val_adj <- p.adjust(sum_df$p_val_gen_int, method = "fdr")
+  summary(sum_df$p_val_adj)
+  hist(sum_df$p_val_adj, breaks = 40)
+  sum(sum_df$p_val_adj <= 0.05, na.rm = TRUE)
+  
+  qvals <- qvalue(p = sum_df$p_val_gen_int)
+                  #p =  c(sort(sum_df$p_val_gen_int)[1:100], sum_df$p_val_gen_int[1:500]))
+  summary(qvals)
+  hist(qvals$qvalues)
+  summary(qvals$qvalues)
+
+  library(fdrtool)
+  test = fdrtool(sum_df$p_val_gen_int, statistic = "pvalue")
+  
+  # Height changes
+  # hist(sum_df_long_w_preds$height_change_warmer_absolute, breaks = 50)
+  # test = fdrtool(c(scale(na.omit(sum_df_long_w_preds$height_change_warmer_absolute))),
+  #                statistic = "normal")
+  
+  # F values
+  hist(sum_df$f_val_gen_int, breaks = 50)
+  test = fdrtool(c(sum_df$f_val_gen_int),
+                 statistic = "normal")
+  
+  # test = fdrtool(rnorm(10000),
+  #               statistic = "normal")
+  
+  summary(test$pval)
+  hist(test$pval, breaks = 40)
+  sum(test$pval < 0.05)
+
+  hist(test$qval, breaks = 40) # Each q-value is the expected proportion of false positives among all SNP effects that are at least as extreme as that observed for the current SNP.
+  sum(test$qval < 0.05) 
+  summary(test$qval)
+  
+  hist(test$lfdr, breaks = 40)
+  sum(test$lfdr < 0.05)
+  summary(test$lfdr)
   
   
+
+  # Join back to main dataframe
   
-## Identify top and bottom XXX% of SNPs
+  # Adjusted p values
+  sum_df$p_val_adj <- test$pval
+  sum_df_long_w_preds <- dplyr::left_join(sum_df_long_w_preds,
+                                          dplyr::select(sum_df, snp, p_val_adj))
   
-  p_val_adj_thresh <- 0.01
-  mad_thresh <- 2.5 # Median absolute deviation for outlier detection
-  train_test_cor_thresh <- 0.8
+  #sum_df_long_w_preds$p_val_adj <- test$qval
   
+  # Raw p values
+  # sum_df$p_val_adj <- sum_df$p_val_gen_int
+  # sum_df_long_w_preds <- dplyr::left_join(sum_df_long_w_preds, 
+  #                                         dplyr::select(sum_df, snp, p_val_adj))
+  # 
+  # 
+  
+########################  
+## Identify top and bottom SNPs #### 
+  
+  # 17 snps for 0.005, mad 3, 0 for 0.001
+  
+  p_val_adj_thresh <- 0.001
+  mad_thresh <- 3 # Median absolute deviation for outlier detection - values of 3 (very conservative), 2.5 (moderately conserva- tive) or even 2 (poorly conservative).
+  train_test_cor_thresh <- 0.80
+  height_metric = "height_change_warmer_base0"
+  
+  (height_median <- median(pull(sum_df_long_w_preds, height_metric)))
+  (height_mad <- mad(pull(sum_df_long_w_preds, height_metric)))
+  
+ # Select top SNPs  
  top_snps_long <-  sum_df_long_w_preds %>%
-    dplyr::filter(p_val_adj < p_val_adj_thresh) %>%
-    dplyr::filter(cv_cor >= train_test_cor_thresh) %>%
-    dplyr::filter(height_change_warmer_absolute >= median(height_change_warmer_absolute) +
-                   mad_thresh * mad(height_change_warmer_absolute))  %>%
-    dplyr::arrange(desc(height_change_warmer_absolute))
+   dplyr::filter(!!as.name(height_metric) >= (height_median +
+                   mad_thresh * height_mad)) %>%
+    dplyr::filter(p_val_adj < p_val_adj_thresh) #%>%
+   # dplyr::filter(cv_cor >= train_test_cor_thresh)
 
  dim(top_snps_long)
    
@@ -266,14 +349,12 @@
  sum(table(top_snps_long$snp) > 1)
  which(table(top_snps_long$snp) > 1)
  
-
- 
  ## Bottom SNPs
  bottom_snps_long <- sum_df_long_w_preds %>%
-   dplyr::filter(p_val_adj < p_val_adj_thresh) %>%
-   dplyr::filter(cv_cor >= train_test_cor_thresh) %>% 
-   dplyr::filter(height_change_warmer_absolute <= median(height_change_warmer_absolute) - 
-                   mad_thresh * mad(height_change_warmer_absolute))
+   dplyr::filter(!!as.name(height_metric) <= (height_median -
+                                                mad_thresh * height_mad)) %>%
+   dplyr::filter(p_val_adj < p_val_adj_thresh)# %>%
+  # dplyr::filter(cv_cor >= train_test_cor_thresh)
 
    bottom_snps_long$bottom_snp = TRUE
    
@@ -287,29 +368,30 @@
  
 # Also make a comparable dataframe of 'random snps'
  
-   set.seed(1) # To make sure same SNPs are chosen everytime - reproducible
-   
-   mid_snps_long <- sum_df_long_w_preds %>%
-     dplyr::filter(p_val_adj <= p_val_adj_thresh) %>%
-     dplyr::filter(cv_cor >= train_test_cor_thresh) %>%
-     dplyr::filter(!snp %in% c(top_snps_long$snp, bottom_snps_long$snp)) %>%
-     sample_n(mean(c(nrow(top_snps_long), nrow(bottom_snps_long))))
-   
-   
-   ## Any Snps sampled 2x?
-   sum(table(mid_snps_long$snp) > 1)
-   
-   dim(mid_snps_long)
-   head(mid_snps_long)
-
-  summary(top_snps_long$n_gen)
-  summary(mid_snps_long$n_gen)
-  summary(bottom_snps_long$n_gen)
-  
+  #  set.seed(1) # To make sure same SNPs are chosen everytime - reproducible
+  #  
+  #  mid_snps_long <- sum_df_long_w_preds %>%
+  #    dplyr::filter(p_val_adj <= p_val_adj_thresh) %>%
+  #    dplyr::filter(cv_cor >= train_test_cor_thresh) %>%
+  #    dplyr::filter(!snp %in% c(top_snps_long$snp, bottom_snps_long$snp)) %>%
+  #    sample_n(mean(c(nrow(top_snps_long), nrow(bottom_snps_long))))
+  #  
+  #  
+  #  ## Any Snps sampled 2x?
+  #  sum(table(mid_snps_long$snp) > 1)
+  #  
+  #  dim(mid_snps_long)
+  #  head(mid_snps_long)
+  # 
+  # summary(top_snps_long$n_gen)
+  # summary(mid_snps_long$n_gen)
+  # summary(bottom_snps_long$n_gen)
+  # 
   
   ## Join back to main DF
-   sum_df_long_outliers <- left_join(sum_df_long_w_preds, dplyr::select(top_snps_long, snp, genotype, top_snp)) %>%
-                  left_join(., dplyr::select(bottom_snps_long, snp, genotype, bottom_snp)) %>%
+   sum_df_long_outliers <- left_join(sum_df_long_w_preds, 
+                             dplyr::select(top_snps_long, snp, genotype, top_snp)) %>%
+            left_join(., dplyr::select(bottom_snps_long, snp, genotype, bottom_snp)) %>%
                   mutate(top_snp = replace_na(top_snp, FALSE),
                          bottom_snp = replace_na(bottom_snp, FALSE))
    
@@ -319,8 +401,8 @@
    table(sum_df_long_outliers$bottom_snp)
    
    
-   hist(top_snps_long$height_change_warmer_absolute, breaks = 30)
-   hist(bottom_snps_long$height_change_warmer_absolute, breaks = 30)
+   hist(top_snps_long$height_change_warmer_base0, breaks = 30)
+   hist(bottom_snps_long$height_change_warmer_base0, breaks = 30)
    
    ## How much overlap of top and bottom snps?
    sum(top_snps_long$snp %in% bottom_snps_long$snp)
@@ -335,15 +417,13 @@
          dplyr::mutate(type = "top_snp") %>%
       bind_rows( dplyr::left_join(bottom_snps_long, pred_df_raw) %>%
          dplyr::mutate(type = "bottom_snp")) %>%
-       bind_rows( dplyr::left_join(mid_snps_long, pred_df_raw) %>%
-                    dplyr::mutate(type = "mid_snp"))%>%
+       # bind_rows( dplyr::left_join(mid_snps_long, pred_df_raw) %>%
+       #              dplyr::mutate(type = "mid_snp"))%>%
          dplyr::mutate(snp_gen = paste0(snp,genotype))
      #    dplyr::filter(type == "bottom_snp") %>%
          
    
    pred_df_outlier %>%
-     # dplyr::filter(snp == "snp_chr12_5582738" | 
-     #                 snp == "snp_chr9_10256977") %>%
    ggplot(., aes(x = tmax_sum_dif_unscaled, y = pred,
                              group = factor(snp_gen),
                               col = factor(type))) +
@@ -363,11 +443,11 @@
      xlab("Tmax transfer distance") +
      theme_bw(10) + 
      scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
-     facet_wrap(~type) +
+   #  facet_wrap(~type) +
    #  facet_wrap(~ type + snp) +
-     scale_color_manual(values = c("#FF6633", "grey50", "#6699CC"), 
-                        labels = c("Detrimental genotypes", "Random genotypes",
-                                  "Beneficial genotypes"),
+     scale_color_manual(values = c("#FF6633", "#6699CC"), 
+                        labels = c("Warm disadvantageous genotypes",
+                                  "Advantageous genotypes"),
                         name = "") + 
      theme(panel.border = element_blank(), panel.grid.major = element_blank(),
            panel.grid.minor = element_blank(), 
@@ -379,10 +459,10 @@
    #        units = "cm",
    #        height = 8, width = 15,
    #        useDingbats = FALSE )
-   
+
   summary(top_snps_long$height_change_warmer_base0)
   summary(bottom_snps_long$height_change_warmer_base0)
-  summary(mid_snps_long$height_change_warmer_base0)
+ # summary(mid_snps_long$height_change_warmer_base0)
 
  
 # Figure 3 - Manhattan plot ---------------------------------------------------------
@@ -396,8 +476,15 @@
   
    head(man_df)
    
+   # Remove genotypes with high p values
+  # man_df <- dplyr::filter(man_df, p_val_adj <= 0.05)
+   
+   # TESTING
+   man_df$p_val_adj <- -log10(man_df$p_val_adj)
+   height_metric = "p_val_adj"
+   
    # Set alpha for p values
-   man_df$p_val_adj_alpha <- ifelse(man_df$p_val_adj < 0.05, 1, .35)
+   man_df$p_val_adj_alpha <- ifelse(man_df$p_val_adj < 0.05, 1, 1)
    
    # Set up shapes
    man_df <- man_df %>%
@@ -430,10 +517,10 @@
    
    # Start plot
    ggplot(man_df, aes(x = index, 
-                    y = height_change_warmer_absolute,
-                  #  y = height_change,
-                    col = height_change_warmer_absolute,
-                  #  col = height_change,
+                  #  y = height_change_warmer_base0,
+                    y = !!as.name(height_metric),
+                  #  col = height_change_warmer_base0,
+                    col = !!as.name(height_metric),
                     label = SNP)) +
   
      # Vertical lines
@@ -449,17 +536,15 @@
      
      # Overplot top and bottom SNPS
      geom_point(data = man_df[man_df$top_snp | man_df$bottom_snp, ],
-                aes(x = index, 
-                    y = height_change_warmer_absolute,
-                    bg = height_change_warmer_absolute),
-                    # y = height_change,
-                    # bg = height_change),
+                aes(x = index,
+                    y = !!as.name(height_metric),
+                    bg = !!as.name(height_metric)),
                     col = "black",
                     pch = man_df[man_df$top_snp | man_df$bottom_snp, ]$pch,
                     size = .65 + .35) +
      
      # Horizontal line
-     geom_hline(yintercept = mean(man_df$height_change_warmer_absolute, na.rm = TRUE), lty = 2, size = .25) +
+     geom_hline(yintercept = mean(man_df[, height_metric], na.rm = TRUE), lty = 2, size = .25) +
      
      # # Add snp names
      #   geom_text_repel(
@@ -487,13 +572,13 @@
    scale_colour_distiller(type = "seq", palette = "RdYlBu", 
                           direction = 1, 
                           aesthetics = c("color", "fill"),
-                          name = "% Change in RGR \n with 4.8°C increase") + 
+                          name = "% change in \nrelative growth rate \n in warmer temperatures") + 
      
      # Theme options
-     scale_x_continuous(expand = c(0.01, 0.01), 
+     scale_x_continuous(expand = c(0.00, 0.00), 
                         breaks = x_axis_breaks$index,
                         labels = x_axis_breaks$chrom) + 
-    # scale_y_continuous(breaks = seq(-30, 20, 5)) + 
+    # scale_y_continuous(breaks = seq(0, 10, 2), limits = c(0, 8)) + 
      ylab("") + 
      xlab("Chromosome") + 
      theme_bw(8) + 
@@ -505,14 +590,14 @@
      NULL
    
    # # Save as file - PNG
-   #   ggsave(paste0("./figs_tables/Figure 2 - manhattan plot interaction term wo labels_",
-   #                        Sys.Date(), ".png"),
-   #            width = 16, height = 4, units = "cm", dpi = 300)
-   #  
-   #   # Save as PDF for legend
-   #   ggsave(paste0("./figs_tables/Figure 2 - manhattan plot interaction term LEGEND",
-   #                 Sys.Date(), ".pdf"),
-   #          width = 10, height = 2)
+     # ggsave(paste0("./figs_tables/fig2/Figure 2 - manhattan plot interaction term wo labels_",
+     #                      Sys.Date(), ".png"),
+     #          width = 16, height = 4, units = "cm", dpi = 300)
+     # 
+     # # Save as PDF for legend
+     # ggsave(paste0("./figs_tables/fig2/Figure 2 - manhattan plot interaction term LEGEND",
+     #               Sys.Date(), ".pdf"),
+     #        width = 10, height = 2)
    
    
    
@@ -565,29 +650,25 @@
   dim(gen_dat_bottom)
   
 ## For middle snps "random snps"
-  gen_dat_mid <- gen_dat_clim_all
-  
-  for(snp in mid_snps_long$snp){
-    
-    # Subset out good genotype
-    ben_gen <- as.numeric(mid_snps_long$genotype[mid_snps_long$snp == snp])
-    
-    if(length(ben_gen) > 1) {
-      stop("length of ben gen shouldn't be more than 1!!")
-    }
-    
-    # Replace genotype
-    gen_dat_mid[, snp] <- apply(gen_dat_clim_all[, snp], 1, function(x) {
-      if(is.na(x)){ NA
-      } else if(x %in% ben_gen){ 1
-    #  } else if(x == 1){ .5 # Set heterozygotes to presence
-      } else {  0
-      }
-    }) # End apply
-    
-  }
-  
-  dim(gen_dat_mid)
+  # gen_dat_mid <- gen_dat_clim_all
+  # 
+  # for(snp in mid_snps_long$snp){
+  #   
+  #   # Subset out good genotype
+  #   ben_gen <- as.numeric(mid_snps_long$genotype[mid_snps_long$snp == snp])
+  #   
+  #   # Replace genotype
+  #   gen_dat_mid[, snp] <- apply(gen_dat_clim_all[, snp], 1, function(x) {
+  #     if(is.na(x)){ NA
+  #     } else if(x %in% ben_gen){ 1
+  #   #  } else if(x == 1){ .5 # Set heterozygotes to presence
+  #     } else {  0
+  #     }
+  #   }) # End apply
+  #   
+  # }
+  # 
+  # dim(gen_dat_mid)
   
   
   
@@ -645,7 +726,6 @@
     mutate(n_top_snps = apply(dplyr::select(., top_snps_long$snp), 1, function(x) sum(x == 1, na.rm = TRUE))) %>%
     dplyr::select(., -c(top_snps_long$snp)) %>%
     dplyr::left_join(., dplyr::select(gen_dat_bottom, accession, bottom_snps_long$snp)) %>%
-    #  mutate(n_bottom_snps = rowSums(dplyr::select(., bottom_snps_long$snp), na.rm = TRUE)) %>%
     mutate(n_bottom_snps = apply(dplyr::select(., bottom_snps_long$snp), 1, function(x) sum(x == 1, na.rm = TRUE))) %>%
     dplyr::select(., -c(bottom_snps_long$snp)) %>%
     mutate(accession = factor(as.character(accession)))
@@ -721,6 +801,11 @@
   ## Plot predictions
   low <- c(0, max(dat_snp_count_unscaled$n_bottom_snps))
   high <-c(max(dat_snp_count_unscaled$n_top_snps), 0)
+  # 
+  # low <- c(quantile(dat_snp_count_unscaled$n_top_snps, 0.00), 
+  #          quantile(dat_snp_count_unscaled$n_bottom_snps, 1))
+  # high <-c(quantile(dat_snp_count_unscaled$n_top_snps, 1), 
+  #          quantile(dat_snp_count_unscaled$n_bottom_snps, 0))
   
   low; high # Print prediction values
   
@@ -815,8 +900,8 @@
     NULL
   
   # Save plot output
-  # ggsave(filename = paste0("./figs_tables/Figure 2 - outlier counts ", Sys.Date(), ".pdf"),
-  #        units = "cm", width = 6, height = 4)
+  ggsave(filename = paste0("./figs_tables/fig2/Figure 2 - outlier counts ", Sys.Date(), ".pdf"),
+         units = "cm", width = 6, height = 4)
   
   
   ## Calculating differences in growth rates
@@ -1018,7 +1103,7 @@
                  geom_bar(width=.35, stat="identity", position = "dodge", col = "black", size = .1) +
                  # geom_text(aes(label=round(number)), vjust=-.5, 
                  #           position=position_dodge(width=0.5)) +
-                 ylim(c(0, 100)) +
+                 ylim(c(0, 200)) +
                  ylab("") + 
                  scale_fill_manual(values = c("#FF6633", "#6699CC")) +
                  theme_bw(2) + theme(legend.position = "none",
@@ -1041,14 +1126,14 @@
 
 ## Make an example plot with axes for legend  
   legend_dat <- split(gen_dat_list, gen_dat_list$locality)[[1]]
-  legend_dat$number <- c(20, 10) ## Known numbers
+  legend_dat$number <- c(100, 50) ## Known numbers
   
   grob_legend <- ggplotGrob(ggplot(legend_dat, aes(x="", y=number, fill=type)) +
                 geom_bar(width=.35, stat="identity",
                          position = "dodge", col = "black", size = .1) +
                               # geom_text(aes(label=round(number)), vjust=-.5,
                               #           position=position_dodge(width=0.35)) +
-                              ylim(c(0, 100)) +
+                              ylim(c(0, 140)) +
                               ylab("") + 
                               scale_fill_manual(values = c("#FF6633", "#6699CC")) +
                               theme_bw(2) + theme(legend.position = "none",
@@ -1149,7 +1234,7 @@
       dplyr::group_by(locality) %>%
     #  dplyr::group_by(id) %>%
       do(data.frame(
-                    height_change_warmer_base0 = mean((.$pred[.$tmax_sum_dif_unscaled >= 0]
+                    height_change_warmer_base0 = mean((.$pred[.$tmax_sum_dif_unscaled > 0]
                                                        - base0 ) /  base0) * 100))
     
     head(preds_by_locality)
@@ -1283,81 +1368,81 @@
 ### Calculate %% presecence across populations
  
  ## Calculate number of top and bottom SNPs 
- gen_dat_perc <- gen_dat_clim_all %>%
-   dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
-                    by = c("id" = "gbs_name")) %>%
-   dplyr::select(id, accession, locality, climate_vars_gam_dist) %>%
-   dplyr::filter(!id %in% exclude_based_on_missing) %>%
-   dplyr::mutate(accession = as.numeric(as.character(accession))) %>% 
-   dplyr::bind_cols(., 
-                    dplyr::select(dplyr::filter(gen_dat_top, !(id %in% 
-                                                                 exclude_based_on_missing)),
-                                  top_snps_long$snp)) %>%
-   dplyr::bind_cols(., 
-                    dplyr::select(dplyr::filter(gen_dat_bottom, !(id %in% 
-                                                                    exclude_based_on_missing)),
-                                  bottom_snps_long$snp)) %>%
-   mutate(accession = factor(as.character(accession)))
- #  dplyr::select(-contains("snp_chr"))
-   # dplyr::group_by(locality) %>% 
-   # summarise_all(mean)
- 
- head(gen_dat_perc)
- 
- latlongs <- gen_dat_perc %>%
-   group_by(locality) %>%
-   dplyr::select(climate_vars_gam_dist) %>%
-   summarise_all(mean)
- 
- 
- test = gen_dat_perc %>%
-   dplyr::group_by(locality) %>%
-   summarise_at(vars(contains("snp_chr")), 
-                function(x) sum(x == 1, na.rm = TRUE)/length(x)) %>%
-   dplyr::left_join(., latlongs) %>%
-   gather(key = "snp", value = "geno_freq", -locality, -climate_vars_gam_dist)
- 
- test$outlier_type <- NA
- test$outlier_type[test$snp %in% top_snps_long$snp] <- "top"
- test$outlier_type[test$snp %in% bottom_snps_long$snp] <- "bottom"
- table(test$outlier_type)
- 
- ggplot(test, aes(outlier_type, geno_freq)) +
-   geom_boxplot() + geom_jitter() +
-   theme_bw(15)
-   
- ggplot(test, aes(geno_freq, fill = outlier_type)) +
-     geom_density( alpha = 0.5) + 
-   theme_bw(15)
- 
- test %>%
-   group_by(locality, outlier_type) %>%
-   summarise_all(mean) %>%
- ggplot(., aes(longitude, latitude, size = geno_freq)) + 
-   geom_point() + facet_wrap(~ outlier_type) + theme_bw(15)
- 
- 
- 
- 
- 
- test_top <- test %>%
-   filter(outlier_type == "top") %>%
-   group_by(locality) %>%
-   summarise_all(mean)
- 
- pairs.panels(dplyr::select(test_top, -snp, -locality, -outlier_type))
-   
- 
- 
- 
- 
- test <-  gen_dat_perc %>%
-   dplyr::group_by(locality) %>%
-   summarise_at(vars(contains("snp_chr")), 
-                function(x) sum(x == 1, na.rm = TRUE)/length(x))
- 
- summary(dplyr::select(test, top_snps_long$snp))
- 
+ # gen_dat_perc <- gen_dat_clim_all %>%
+ #   dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
+ #                    by = c("id" = "gbs_name")) %>%
+ #   dplyr::select(id, accession, locality, climate_vars_gam_dist) %>%
+ #   dplyr::filter(!id %in% exclude_based_on_missing) %>%
+ #   dplyr::mutate(accession = as.numeric(as.character(accession))) %>% 
+ #   dplyr::bind_cols(., 
+ #                    dplyr::select(dplyr::filter(gen_dat_top, !(id %in% 
+ #                                                                 exclude_based_on_missing)),
+ #                                  top_snps_long$snp)) %>%
+ #   dplyr::bind_cols(., 
+ #                    dplyr::select(dplyr::filter(gen_dat_bottom, !(id %in% 
+ #                                                                    exclude_based_on_missing)),
+ #                                  bottom_snps_long$snp)) %>%
+ #   mutate(accession = factor(as.character(accession)))
+ # #  dplyr::select(-contains("snp_chr"))
+ #   # dplyr::group_by(locality) %>% 
+ #   # summarise_all(mean)
+ # 
+ # head(gen_dat_perc)
+ # 
+ # latlongs <- gen_dat_perc %>%
+ #   group_by(locality) %>%
+ #   dplyr::select(climate_vars_gam_dist) %>%
+ #   summarise_all(mean)
+ # 
+ # 
+ # test = gen_dat_perc %>%
+ #   dplyr::group_by(locality) %>%
+ #   summarise_at(vars(contains("snp_chr")), 
+ #                function(x) sum(x == 1, na.rm = TRUE)/length(x)) %>%
+ #   dplyr::left_join(., latlongs) %>%
+ #   gather(key = "snp", value = "geno_freq", -locality, -climate_vars_gam_dist)
+ # 
+ # test$outlier_type <- NA
+ # test$outlier_type[test$snp %in% top_snps_long$snp] <- "top"
+ # test$outlier_type[test$snp %in% bottom_snps_long$snp] <- "bottom"
+ # table(test$outlier_type)
+ # 
+ # ggplot(test, aes(outlier_type, geno_freq)) +
+ #   geom_boxplot() + geom_jitter() +
+ #   theme_bw(15)
+ #   
+ # ggplot(test, aes(geno_freq, fill = outlier_type)) +
+ #     geom_density( alpha = 0.5) + 
+ #   theme_bw(15)
+ # 
+ # test %>%
+ #   group_by(locality, outlier_type) %>%
+ #   summarise_all(mean) %>%
+ # ggplot(., aes(longitude, latitude, size = geno_freq)) + 
+ #   geom_point() + facet_wrap(~ outlier_type) + theme_bw(15)
+ # 
+ # 
+ # 
+ # 
+ # 
+ # test_top <- test %>%
+ #   filter(outlier_type == "top") %>%
+ #   group_by(locality) %>%
+ #   summarise_all(mean)
+ # 
+ # pairs.panels(dplyr::select(test_top, -snp, -locality, -outlier_type))
+ #   
+ # 
+ # 
+ # 
+ # 
+ # test <-  gen_dat_perc %>%
+ #   dplyr::group_by(locality) %>%
+ #   summarise_at(vars(contains("snp_chr")), 
+ #                function(x) sum(x == 1, na.rm = TRUE)/length(x))
+ # 
+ # summary(dplyr::select(test, top_snps_long$snp))
+ # 
  
  
 
@@ -1553,11 +1638,7 @@ library(vegan)
       plot.new()
       # plot.new()
       plotVenn2d(y, labels = c("Spatial", "Current climate"), Colors = "white") 
-      
-      
-      
     } 
-    
     
     calc_varpart(genetic_data = rda_top_scaled, label = "Warm advantageous")
     calc_varpart(genetic_data = rda_bottom_scaled, label = "Warm disadvantageous")
@@ -1571,19 +1652,18 @@ library(vegan)
    # calc_varpart(genetic_data = genetic_data, label = "random snps")
     
     
-    rda_out_full <- rda(as.formula(paste("genetic_data ~ ", 
-                                         paste(c(spatial_vars_rda, 
-                                                 climate_vars_rda_current), collapse = "+"))),
-                        data = rda_all_covariates_scaled,
-                        scale = FALSE)
-    rda_out_full
-    anova(rda_out_full)
+    # rda_out_full <- rda(as.formula(paste("genetic_data ~ ", 
+    #                                      paste(c(spatial_vars_rda, 
+    #                                              climate_vars_rda_current), collapse = "+"))),
+    #                     data = rda_all_covariates_scaled,
+    #                     scale = FALSE)
+    # rda_out_full
+    # anova(rda_out_full)
     
      
    
 
  ## Biplot highlighting outlier SNPs
-    
     
     # Outliers function from Forester et al.
     outliers <- function(loadings, sd_cutoff){
@@ -3212,56 +3292,58 @@ library(vegan)
 # Simulate data to test out interaction effects in gams -------------------
 
   dat <- expand.grid(cat = c(1,2,3),
-                     x = seq(-3, 3, by = .1))
-  dat$cat <- factor(dat$cat)
+                     x = seq(-3, 3, by = .1),
+                     dummy1 = seq(-3, 3, by = .1))
+#  dat$cat <- factor(dat$cat)
   
   y_intercept <- 100
     
     
-  dat$y <- -.5 + -.25*dat$x + -.25*dat$x^2 + rnorm(nrow(dat), sd = .5) + y_intercept
+  dat$y <- -.5 + -.05*dat$x + -.15*dat$x^2 + rnorm(nrow(dat), sd = .5) + y_intercept
   
   # dat$y[dat$cat == 2] <- -.5 + -.25*dat$x[dat$cat == 2] + .25*dat$x[dat$cat == 2]^2 + rnorm(nrow(dat[dat$cat == 2,]), sd = .5)
   
   # Make cat 1 upside down
- # dat$y[dat$cat == 1] <- -.5 + -.25*dat$x[dat$cat == 1] + .25*dat$x[dat$cat == 1]^2 + rnorm(nrow(dat[dat$cat == 1,]), sd = .5)
-  dat$y[dat$cat == 2] <- -.5 + -.25*dat$x[dat$cat == 2] + .25*dat$x[dat$cat == 2]^2 + rnorm(nrow(dat[dat$cat == 2,]), sd = .5) + y_intercept
-  
-  # Make cat 2 a straight line
+  dat$y[dat$cat == 1] <- -.5 + -.05*dat$x[dat$cat == 1] + .05*dat$x[dat$cat == 1]^2 + rnorm(nrow(dat[dat$cat == 1,]), sd = .5) + y_intercept
+
+  # Make cat 3 a straight line
  #  dat$y[dat$cat == 2] <- rnorm(nrow(dat[dat$cat == 2,]), sd = .5)
   # dat$y[dat$cat == 3] <- rnorm(nrow(dat[dat$cat == 3,]), sd = .5)
-   dat$y[dat$cat == 3] <- rnorm(nrow(dat[dat$cat == 3,]), sd = .05) + y_intercept
+  # dat$y[dat$cat == 3] <- rnorm(nrow(dat[dat$cat == 3,]), sd = .05) + y_intercept - 2.5
   # dat$y[dat$cat == 5] <- rnorm(nrow(dat[dat$cat == 5,]), sd = .5) + y_intercept
   # 
-  ggplot(dat, aes(x, y, col = cat, fill = cat)) + geom_point() + 
+  ggplot(dat, aes(x, y, col = factor(cat), fill = factor(cat))) + geom_point() + 
     theme_bw() + geom_smooth()
   
-  
   ## Quadratic model
-  lm1 <- lm(y ~ x + I(x^2) + cat + x * cat + I(x^2)*cat, data = dat)
-  summary(lm1)
-  visreg(lm1, xvar = "x", by = "cat")
-  
-  
-  
+  # lm1 <- lm(y ~ x + I(x^2) + cat + x * cat + I(x^2)*cat, data = dat)
+  # summary(lm1)
+  # visreg(lm1, xvar = "x", by = "cat")
+ 
   # Run model
-  gam1 <- bam(y ~ s(x, bs = "cr") + cat + s(x, by = cat, bs = "cr"), 
-              method = "fREML", discrete = TRUE,
-              data = dat)
-  
-  gam2 <- bam(y ~ s(x, bs = "cr") +cat, 
+  gam1 <- bam(y ~ s(x, bs = "cr") + 
+                s(cat, bs = "cr", k = 2) + 
+                s(x, by = cat, bs = "cr") + 
+                s(dummy1, bs = "cr") + s(x, by = dummy1, bs = "cr"), 
               method = "fREML", discrete = TRUE,
               data = dat)
   
   summary(gam1)
   
-  anova(gam2, gam1, test = "F")
-  
   anova(gam1)
-  anova.gam(gam1, test = "Cp")
+ # anova.gam(gam1, test = "Cp")
   
-  ?visreg(gam1, xvar = "x", by = "cat")
+  visreg(gam1, xvar = "x", by = "cat")
+  visreg(gam1)
   
   gam1$coefficients
+  
+  ## Testing out tensor products
+  gam1 <- bam(y ~ te(x,  k = 2) + te(cat, k = 2) + ti(x, cat, k = 2), 
+              method = "fREML", discrete = TRUE,
+              data = dat)
+  
+  
   
   ## Using s smoother will give a > 0.05 p value when the line is flat
   ## I think m = 1 sets comparison level so that it compares smoothers to each other (https://cran.r-project.org/web/packages/itsadug/vignettes/test.html)
