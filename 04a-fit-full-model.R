@@ -375,8 +375,9 @@ back_transform <- function(x, var, means, sds){
   var = "tmax_sum_dif"
   
   # Set formula for gam
-  form <- formula(paste0("rgr ~ section_block + s(height_2014, bs =\"cr\") + s(", var, " , bs = \"cr\") + s(accession, bs = \"re\")"))
-  
+  form <- formula(paste0("rgr ~ section_block + s(height_2014, bs =\"cr\") + s(", var, " , bs = \"cr\")  + s(locality, bs = \"re\") +  s(accession, bs = \"re\") +  s(PC1_clim, bs = \"cr\") + s(PC2_clim, bs = \"cr\") + s(tmax_sum_dif, by = PC1_clim, bs = \"cr\") + 
+                         s(tmax_sum_dif, by = PC2_clim, bs = \"cr\")"))
+
   gam_all <- bam(formula = form,
                  data = dat_snp_count,
                  discrete = TRUE, 
@@ -388,12 +389,15 @@ back_transform <- function(x, var, means, sds){
   
   visreg(gam_all, partial = FALSE, scale = "response")
 
+  
   # Make new dataset for prediction
-    newdata <-  expand.grid(section_block = "IFG_1",
+    newdata <-  expand.grid(section_block = "Block1_1",
+                            locality = "FHL",
                             height_2014 = 0,
                             accession = "1",
                             tmax_sum_dif = c(seq(-5, 5, # Scaled
-                                                 length.out = 1000)))
+                                                 length.out = 1000)),
+                            PC1_clim = 1, PC2_clim = 0)
     
     dim(newdata)
 
@@ -429,13 +433,15 @@ back_transform <- function(x, var, means, sds){
   high <-c(max(dat_snp_count_unscaled$n_top_snps), 0)
 
   # Set up dataframe for prediction
-  newdata3 <-  expand.grid(section_block = "IFG_1",
+  newdata3 <-  expand.grid(section_block = "Block1_1",
+                           locality = "FHL",
                            height_2014 = 0,
                            accession = "1",
                            tmax_sum_dif = c(seq(-5,
                                                 5,
                                                 length.out = 1000)),
-                           PC1_gen = 0, PC2_gen = 0, PC3_gen = 0, 
+                           PC1_gen = 0, PC2_gen = 0, 
+                           PC1_clim = 0, PC2_clim = 0, 
                            n_top_snps_unscaled = c(low[1], mid[1], high[1]),
                            n_bottom_snps_unscaled = c(low[2], mid[2], high[2]))
   
@@ -505,7 +511,7 @@ back_transform <- function(x, var, means, sds){
     
       ylab("Relative growth rate \n (cm cm-1 yr-1)") +
       xlab("Tmax transfer distance") +
-      ylim(c(.15, .45)) +
+     # ylim(c(.15, .45)) +
       theme_bw(10) + 
       theme(#panel.border = element_blank(), 
             panel.grid.major = element_blank(),
@@ -526,6 +532,9 @@ back_transform <- function(x, var, means, sds){
     
     
 
+    
+    
+    
     
    ### Testing raster calculations
   
