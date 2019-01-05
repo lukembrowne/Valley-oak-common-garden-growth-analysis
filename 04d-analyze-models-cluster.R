@@ -297,21 +297,42 @@
    sum(top_snps_long$snp %in% bottom_snps_long$snp)
    sum(bottom_snps_long$snp %in% top_snps_long$snp)
    
+   ## How many total snps involved?
+   length(unique(c(top_snps_long$snp, bottom_snps_long$snp)))
+   
    
 
 ## Figure 2 - Plot overlay of outlier SNPS ---------------------------------------
    
+   
+   # Make a df of random subsample of other snps
+   random_snps <- c(dplyr::sample_n(dplyr::filter(dplyr::select(sum_df, snp),  # Subsample 100 random snps
+                                                  !snp %in% c(top_snps_long$snp, bottom_snps_long$snp)), size = 100))
+   random_snps <- paste0(random_snps$snp, sample(0:2, size = length(random_snps$snp), replace = TRUE))
+   
+   random_snps_df <-  pred_df_raw %>%
+     dplyr::mutate(snp_gen = paste0(snp,genotype)) %>%
+     dplyr::filter(snp_gen %in% random_snps) %>%
+     dplyr::mutate(type = "Non-outlier")
+   
+   
+   
    # Join outlier dataframes with prediction dataframes
    pred_df_outlier <- dplyr::left_join(top_snps_long, pred_df_raw) %>%
-         dplyr::mutate(type = "top_snp") %>%
+         dplyr::mutate(type = "Warm advantageous") %>%
       bind_rows( dplyr::left_join(bottom_snps_long, pred_df_raw) %>%
-         dplyr::mutate(type = "bottom_snp")) %>%
-       # bind_rows( dplyr::left_join(mid_snps_long, pred_df_raw) %>%
-       #              dplyr::mutate(type = "mid_snp"))%>%
-         dplyr::mutate(snp_gen = paste0(snp,genotype))
-     #    dplyr::filter(type == "bottom_snp") %>%
-         
+         dplyr::mutate(type = "Warm disadvantageous")) %>%
+     dplyr::mutate(snp_gen = paste0(snp,genotype)) %>%
+     dplyr::select(colnames(random_snps_df))
+  
+   # Bind to random df 
+    pred_df_outlier <- bind_rows(pred_df_outlier, random_snps_df)
+    
+    # Order factors
+    pred_df_outlier$type <- factor(pred_df_outlier$type, levels =)
    
+ 
+   # Make plot
    pred_df_outlier %>%
    ggplot(., aes(x = tmax_sum_dif_unscaled, y = pred,
                              group = factor(snp_gen),
@@ -328,33 +349,39 @@
 
      labs(col = "Genotype") +
   #   ylim(.225, .325) +
-     ylab("Relative growth rate") +
+     ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
      xlab("Tmax transfer distance") +
-     theme_bw(10) + 
+     theme_bw(15) + 
      scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
    #  facet_wrap(~type) +
    #  facet_wrap(~ type + snp) +
-     scale_color_manual(values = c("#FF6633", "#6699CC"), 
-                        labels = c("Warm disadvantageous genotypes",
-                                  "Advantageous genotypes"),
+     scale_color_manual(values = c("#228b22", "#6699CC" ,"#FF6633"), 
+                        labels = c( "Non-outlier genotypes", 
+                                  "Warm advantageous genotypes", 
+                                  "Warm disadvantageous genotypes"),
                         name = "") + 
      theme(panel.border = element_blank(), panel.grid.major = element_blank(),
            panel.grid.minor = element_blank(), 
            axis.line = element_line(colour = "black"))   
    
-   # Save to file
-   # ggsave(filename = paste0("./figs_tables/Figure 2 - outlier responses ",
+  # Save to file
+   # ggsave(filename = paste0("./figs_tables/Figure S6 - outlier growth responses ",
    #                          Sys.Date(), ".pdf"),
    #        units = "cm",
-   #        height = 8, width = 15,
+   #        height = 11, width = 20,
    #        useDingbats = FALSE )
+   
+   # ggsave(filename = paste0("./figs_tables/fig1/Figure 1 - transfer function ", Sys.Date(), ".pdf"),
+   #        gg,
+   #        units = "cm", width = 11, height = 8)
+   # 
 
   summary(top_snps_long$height_change_warmer_base0)
   summary(bottom_snps_long$height_change_warmer_base0)
  # summary(mid_snps_long$height_change_warmer_base0)
 
  
-# Figure 3 - Manhattan plot ---------------------------------------------------------
+# Figure 2 - Manhattan plot of Q values ---------------------------------------------------------
   
    man_df1 <- data.frame(SNP = snp_col_names, 
                          snp_pos)
@@ -453,7 +480,140 @@
      #                      Sys.Date(), ".png"),
      #          width = 14, height = 4, units = "cm", dpi = 300)
 
-
+   
+   
+   
+   
+# Figure 2 - Manhattan plot of growth predictions  --------------------------------------------
+   
+   man_df1 <- data.frame(SNP = snp_col_names, 
+                         snp_pos)
+   
+   man_df1$index <- 1:nrow(man_df1) ## For x axis plotting
+   
+   man_df <- left_join(man_df1, sum_df_long_outliers, by = c("SNP" = "snp"))
+   
+   head(man_df)
+   
+   # Set alpha for q values
+   man_df$q_val_alpha <- ifelse(man_df$q_val < q_val_thresh, 1, .35)
+   
+   # Set up shapes
+   man_df <- man_df %>%
+     mutate(pch = ifelse(genotype == 0 | genotype == 2, 16, 16))
+    # mutate(pch = ifelse(genotype == 0 | genotype == 2, 16, 17)) # Circles for homozygotes, trianges for hets
+   
+   man_df <- man_df %>%
+     mutate(pch = ifelse((genotype == 0 & (top_snp | bottom_snp)) | 
+                           (genotype == 2 & ( top_snp | bottom_snp)), 21, pch)) # Outlined shapes
+   
+   man_df <- man_df %>%
+     mutate(pch = ifelse((genotype == 1 & (top_snp | bottom_snp)), 21, pch)) # Outlined shapes
+   
+   table(man_df$pch)
+   
+   ## Clean up chromosome names - clear scaffold names
+   man_df <- man_df %>%
+     mutate(chrom = ifelse(grepl("chr", chrom), chrom, ""))
+   
+   # For labels on x axis 
+   x_axis_breaks <- man_df %>%
+     dplyr::select(index, chrom) %>%
+     group_by(chrom) %>%
+     summarise_all(mean)
+   
+   # For vertical lines showing chromosome sections
+   chrom_breaks <- man_df %>%
+     dplyr::select(index, chrom) %>%
+     group_by(chrom) %>%
+     summarise_all(max)
+   
+   # Start plot
+   ggplot(man_df, aes(x = index, 
+                      y = height_change_warmer_base0,
+                      #  y = height_change,
+                      col = height_change_warmer_base0,
+                      #  col = height_change,
+                      label = SNP)) +
+     
+     # Vertical lines
+     geom_vline(xintercept = chrom_breaks$index, col = "grey50", alpha = 0.8, size = .2) + 
+     
+     
+     
+     # Add points
+     geom_point(pch = man_df$pch, 
+                # col = "black",
+                alpha = man_df$q_val_alpha, 
+                size = .65) +
+     
+     # Overplot top and bottom SNPS
+     geom_point(data = man_df[man_df$top_snp | man_df$bottom_snp, ],
+                aes(x = index, 
+                    y = height_change_warmer_base0,
+                    bg = height_change_warmer_base0),
+                col = "black",
+                pch = man_df[man_df$top_snp | man_df$bottom_snp, ]$pch,
+                size = .65 + .35) +
+     
+     # Horizontal line
+     geom_hline(yintercept = mean(man_df$height_change_warmer_base0, na.rm = TRUE), lty = 2, size = .25) +
+     
+     # # Add snp names
+     #   geom_text_repel(
+     #     aes(index, y = height_change_gen_0),
+     #     data = subset(man_df, height_change_gen_0 > 0 & q_val_gen_0 < 0.05),
+     #     col = "black"
+     #   ) +
+     #   geom_text_repel(
+     #     aes(index, y = height_change_gen_1),
+     #     data = subset(man_df, height_change_gen_1 > 0 & q_val_gen_1 < 0.05),
+     #     col = "black"
+   #   ) +
+   #   geom_text_repel(
+   #     aes(index, y = height_change_gen_2),
+   #     data = subset(man_df, height_change_gen_2 > 0 & q_val_gen_2 < 0.05),
+   #     col = "black"
+   #   ) +
+   
+   # Scale colors
+   # scale_colour_viridis_c(option = "D", direction = -1, name = "% Change in RGR \n w/ 4.8°C increase") + 
+   # scale_fill_viridis_c(option = "D", direction = -1, 
+   #                      name = "% Change in RGR \n w/ 4.8°C increase",
+   #                      guide = FALSE) + 
+   
+   scale_colour_distiller(type = "seq", palette = "RdYlBu", 
+                          direction = 1, 
+                          aesthetics = c("color", "fill"),
+                          name = "% Change in RGR \n with 4.8°C increase") + 
+     
+     # Theme options
+     scale_x_continuous(expand = c(0.01, 0.01), 
+                        breaks = x_axis_breaks$index,
+                        labels = x_axis_breaks$chrom) + 
+     scale_y_continuous(breaks = seq(-30, 20, 5)) + 
+     ylab("") + 
+     xlab("Chromosome") + 
+     theme_bw(8) + 
+     theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+           panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")
+           # legend.position = "none") +
+     )+
+     # axis.text.x=element_blank(), axis.ticks.x=element_blank()) +
+     NULL
+   
+   # # Save as file - PNG
+   #   ggsave(paste0("./figs_tables/fig2/Figure 2 - manhattan plot growth predictions",
+   #                        Sys.Date(), ".png"),
+   #            width = 16, height = 4, units = "cm", dpi = 600)
+   # #  
+   #   # Save as PDF for legend
+   #   ggsave(paste0("./figs_tables/fig2/Figure 2 - manhattan plot growth predictions LEGEND",
+   #                 Sys.Date(), ".pdf"),
+   #          width = 10, height = 2)
+   # 
+   # 
+   
 # Convert outlier SNPs genotypes to precense absence --------------------------
 
  ## For top snps
@@ -1277,7 +1437,7 @@
 
 # RDA  --------------------------------------------------------------------
 
-library(vegan)
+  library(vegan)
  
  # Count % of missing data for full gbs dataset
  missing_all <- data.frame(gen_dat_clim_all[ "id"],
@@ -1494,9 +1654,9 @@ library(vegan)
   
     rda_all_mod
   
-  # anova(rda_out_part_spat, permutations = 99)
-  # anova(rda_out_part_spat, permutations = 99, by = "axis") # Take forever
-  # anova(rda_out_part_spat, permutations = 99, by = "terms")
+  # anova( rda_all_mod, permutations = 99)
+  # anova( rda_all_mod, permutations = 99, by = "axis", cutoff = .05) # Take forever
+  # anova( rda_all_mod, permutations = 99, by = "terms")
 
 # Identify outliers
  loadings <- summary(rda_all_mod)$species # Extracts loadings for each SNP (named species here)
@@ -1557,35 +1717,74 @@ library(vegan)
  
  
  ## How many RDA outliers also snp outliers?
- sum(outlier_snps_names %in% c(top_snps_long$snp, bottom_snps_long$snp))
- outlier_snps_names[outlier_snps_names %in% c(top_snps_long$snp, bottom_snps_long$snp)]
+   sum(outlier_snps_names %in% c(top_snps_long$snp, bottom_snps_long$snp))
+   outlier_snps_names[outlier_snps_names %in% c(top_snps_long$snp, bottom_snps_long$snp)]
+   
+    double_outliers <- outlier_snps_names[outlier_snps_names %in% c(top_snps_long$snp, bottom_snps_long$snp)]
+    
+ # Labels of outlier SNPs
+   snp_labels <- rep("", times = nrow(loadings))
+   snp_labels[rownames(loadings) %in% double_outliers] <- rownames(loadings)[rownames(loadings) %in% double_outliers]
+   snp_labels <- gsub(x = snp_labels, pattern = "snp_", replacement = "")
+   table(snp_labels)
  
- cex_points = 1
+   outlier_snps_names[outlier_snps_names %in% c(top_snps_long$snp)] # Both climate outliers in top snps
+   outlier_snps_names[outlier_snps_names %in% c(bottom_snps_long$snp)]
+ 
+ ## Figure out what climate variable has the strongest correlation
+ "snp_chr8_4017340" %in% names(cand_rda1) # in RDA1
+ "snp_chr8_4017340" %in% names(cand_rda2)
+ 
+ cand_rda1[names(cand_rda1) == "snp_chr8_4017340"]
+ sort(summary(rda_all_mod)$biplot[, "RDA1"])
+ 
+ "snp_chr2_18514913" %in% names(cand_rda1)
+ "snp_chr2_18514913" %in% names(cand_rda2) # in RDA2
+ 
+ cand_rda2[names(cand_rda2) == "snp_chr2_18514913"]
+ sort(summary(rda_all_mod)$biplot[, "RDA2"])
+ 
+ cex_points = 1.1
  
 # Make biplot
  plot(rda_all_mod, type = "n", scaling = 3, 
       xlim = c(-1, 1), ylim = c(-1, 1), las = 1) # Create empty plot 
+ 
+ # All snps
  points(rda_all_mod, display = "species", pch = 21,
         col = "black", bg = "grey95", scaling = 3, cex = cex_points)
+ 
+ # Outlier snps -rda
  points(rda_all_mod, display = "species", pch = 21, # Outliers
         col = "black", bg = "grey50", scaling = 3, cex = cex_points,
         select = rownames(loadings) %in% outlier_snps_names)
+ # Bottom snps
  points(rda_all_mod, display = "species", pch = 21,
         col = "black", bg = "#FF6633", scaling = 3, cex = cex_points,
         select = rownames(loadings) %in% bottom_snps_long$snp)
-  points(rda_all_mod, display = "species", pch = 21, cex = cex_points,
+ 
+ # Top snps
+ points(rda_all_mod, display = "species", pch = 21, cex = cex_points,
         col = "black", bg = "#6699CC", scaling = 3,
         select = rownames(loadings) %in% top_snps_long$snp)
+  
+ # Add double outliers - growth and climate
+  points(rda_all_mod, display = "species", pch = 23, cex = cex_points * 1.75,
+         col = "black", bg = "#6699CC", scaling = 3,
+         select = rownames(loadings) %in% double_outliers)
+  text(rda_all_mod, display = "species", labels = snp_labels, cex = .75, scaling = 3)
+  
+ # Environmental vectors
   text(rda_all_mod, scaling = 3, display = "bp",
        col= arrow_cols,
-       cex = .75) # Environmental vectors
+       cex = .75) 
   
  
   # Save as pdf
   # dev.copy(pdf, paste0("./figs_tables/fig2/Figure 2 - RDA biplot ", Sys.Date(), ".pdf"),
   #          width = 5, height = 5, useDingbats = FALSE)
   # dev.off()
-  # 
+
   
   ## Scalculate sum of loadings for outliers and non outliers
   
