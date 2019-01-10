@@ -383,7 +383,7 @@
  
 # Figure 2 - Manhattan plot of Q values ---------------------------------------------------------
   
-   man_df1 <- data.frame(SNP = snp_col_names, 
+    man_df1 <- data.frame(SNP = snp_col_names, 
                          snp_pos)
    
    man_df1$index <- 1:nrow(man_df1) ## For x axis plotting
@@ -430,7 +430,7 @@
      geom_hline(yintercept = -log10(q_val_thresh), lty = 1, size = .25) +
 
      # Add points
-     geom_point(pch = 19, 
+     geom_point(pch = 16, 
                 col = man_df$color,
                 alpha = .5,
                 size = .65) +
@@ -476,9 +476,9 @@
      NULL
    
    # # Save as file - PNG
-     # ggsave(paste0("./figs_tables/fig2/Figure 2 - manhattan plot interaction term wo labels_",
-     #                      Sys.Date(), ".png"),
-     #          width = 14, height = 4, units = "cm", dpi = 300)
+     ggsave(paste0("./figs_tables/fig2/Figure 2 - manhattan plot interaction term wo labels_",
+                          Sys.Date(), ".png"),
+              width = 19, height = 4, units = "cm", dpi = 600)
 
    
    
@@ -531,20 +531,15 @@
    # Start plot
    ggplot(man_df, aes(x = index, 
                       y = height_change_warmer_base0,
-                      #  y = height_change,
                       col = height_change_warmer_base0,
-                      #  col = height_change,
                       label = SNP)) +
      
      # Vertical lines
      geom_vline(xintercept = chrom_breaks$index, col = "grey50", alpha = 0.8, size = .2) + 
      
-     
-     
-     # Add points
+    # Add points
      geom_point(pch = man_df$pch, 
-                # col = "black",
-                alpha = man_df$q_val_alpha, 
+                alpha = 0.5, 
                 size = .65) +
      
      # Overplot top and bottom SNPS
@@ -554,7 +549,7 @@
                     bg = height_change_warmer_base0),
                 col = "black",
                 pch = man_df[man_df$top_snp | man_df$bottom_snp, ]$pch,
-                size = .65 + .35) +
+                size = .65 + 1) +
      
      # Horizontal line
      geom_hline(yintercept = mean(man_df$height_change_warmer_base0, na.rm = TRUE), lty = 2, size = .25) +
@@ -588,24 +583,24 @@
                           name = "% Change in RGR \n with 4.8°C increase") + 
      
      # Theme options
-     scale_x_continuous(expand = c(0.01, 0.01), 
+     scale_x_continuous(expand = c(0.00, 0.00), 
                         breaks = x_axis_breaks$index,
                         labels = x_axis_breaks$chrom) + 
      scale_y_continuous(breaks = seq(-30, 20, 5)) + 
-     ylab("") + 
+     ylab("-log10(q-value)") + ## Need same y axis as interaction plot so dimensions are exactly the same
      xlab("Chromosome") + 
      theme_bw(8) + 
      theme(panel.border = element_blank(), panel.grid.major = element_blank(),
-           panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")
-           # legend.position = "none") +
-     )+
+           panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
+           legend.position = "none") +
+     #)+
      # axis.text.x=element_blank(), axis.ticks.x=element_blank()) +
      NULL
    
    # # Save as file - PNG
-   #   ggsave(paste0("./figs_tables/fig2/Figure 2 - manhattan plot growth predictions",
-   #                        Sys.Date(), ".png"),
-   #            width = 16, height = 4, units = "cm", dpi = 600)
+     ggsave(paste0("./figs_tables/fig2/Figure 2 - manhattan plot growth predictions",
+                          Sys.Date(), ".png"),
+              width = 19, height = 4, units = "cm", dpi = 600)
    # #  
    #   # Save as PDF for legend
    #   ggsave(paste0("./figs_tables/fig2/Figure 2 - manhattan plot growth predictions LEGEND",
@@ -613,6 +608,10 @@
    #          width = 10, height = 2)
    # 
    # 
+   
+   
+   
+   
    
 # Convert outlier SNPs genotypes to precense absence --------------------------
 
@@ -890,8 +889,8 @@
     NULL
   
   # Save plot output
-  # ggsave(filename = paste0("./figs_tables/fig2/Figure 2 - outlier counts ", Sys.Date(), ".pdf"),
-  #        units = "cm", width = 6, height = 4)
+  ggsave(filename = paste0("./figs_tables/fig2/Figure 2 - outlier counts ", Sys.Date(), ".pdf"),
+         units = "cm", width = 8, height = 5)
   
   
   ## Calculating differences in growth rates
