@@ -130,10 +130,59 @@
       rename(id = ID1 , 
              tmax_sum = Tmax_sm,
              tmin_winter = Tmin_wt,
-             tave = MAT) %>%
+             tave = MAT,
+             cwd = CMD) %>%
       dplyr::select(-ID2, -Latitude, -Longitude, -Elevation)
     
+    # Calculate tmax and tmin
+    wna_current$tmax <- rowMeans(dplyr::select(wna_current, Tmax01,Tmax02,Tmax03,Tmax04,Tmax05,Tmax06,Tmax07,Tmax08,Tmax09,Tmax10,Tmax11,Tmax12))
+    wna_current$tmin <- rowMeans(dplyr::select(wna_current, Tmin01,Tmin02,Tmin03,Tmin04,Tmin05,Tmin06,Tmin07,Tmin08,Tmin09,Tmin10,Tmin11,Tmin12))
+    
     colnames(wna_current)[-1] <- paste0(colnames(wna_current)[-1], "_wna_current")
+    
+    # Calculate bioclim variables
+    bioclim_wna_current = climates::bioclim2(tmin = as.data.frame(dplyr::select(wna_current, Tmin01_wna_current,
+                                                                        Tmin02_wna_current,
+                                                                        Tmin03_wna_current,
+                                                                        Tmin04_wna_current,
+                                                                        Tmin05_wna_current,
+                                                                        Tmin06_wna_current,
+                                                                        Tmin07_wna_current,
+                                                                        Tmin08_wna_current,
+                                                                        Tmin09_wna_current,
+                                                                        Tmin10_wna_current,
+                                                                        Tmin11_wna_current,
+                                                                        Tmin12_wna_current)),
+                                     ## Remove site column
+                                     tmax = as.data.frame(dplyr::select(wna_current, Tmax01_wna_current,
+                                                                        Tmax02_wna_current,
+                                                                        Tmax03_wna_current,
+                                                                        Tmax04_wna_current,
+                                                                        Tmax05_wna_current,
+                                                                        Tmax06_wna_current,
+                                                                        Tmax07_wna_current,
+                                                                        Tmax08_wna_current,
+                                                                        Tmax09_wna_current,
+                                                                        Tmax10_wna_current,
+                                                                        Tmax11_wna_current,
+                                                                        Tmax12_wna_current)),
+                                     prec = as.data.frame(dplyr::select(wna_current, PPT01_wna_current,
+                                                                        PPT02_wna_current,
+                                                                        PPT03_wna_current,
+                                                                        PPT04_wna_current,
+                                                                        PPT05_wna_current,
+                                                                        PPT06_wna_current,
+                                                                        PPT07_wna_current,
+                                                                        PPT08_wna_current,
+                                                                        PPT09_wna_current,
+                                                                        PPT10_wna_current,
+                                                                        PPT11_wna_current,
+                                                                        PPT12_wna_current)),
+                                     files.as.inputs = FALSE)
+    
+    
+    colnames(bioclim_wna_current) <- paste0(colnames(bioclim_wna_current), "_", "wna_current")
+    wna_current <- cbind(wna_current, bioclim_wna_current)
     
     
     # Last 1000 years
@@ -141,7 +190,8 @@
       rename(id = ID1 , 
              tmax_sum = Tmax_sm,
              tmin_winter = Tmin_wt,
-             tave = MAT) %>%
+             tave = MAT,
+             cwd = CMD) %>%
       dplyr::select(-ID2, -Latitude, -Longitude, -Elevation)
     
     colnames(last1000)[-1] <- paste0(colnames(last1000)[-1], "_last1000")
@@ -151,28 +201,150 @@
       rename(id = ID1 , 
              tmax_sum = Tmax_sm,
              tmin_winter = Tmin_wt,
-             tave = MAT) %>%
+             tave = MAT,
+             cwd = CMD) %>%
       dplyr::select(-ID2, -Latitude, -Longitude, -Elevation)
+    
+    # Calculate tmax and tmin
+    lgm$tmax <- rowMeans(dplyr::select(lgm, Tmax01,Tmax02,Tmax03,Tmax04,Tmax05,Tmax06,Tmax07,Tmax08,Tmax09,Tmax10,Tmax11,Tmax12))
+    lgm$tmin <- rowMeans(dplyr::select(lgm, Tmin01,Tmin02,Tmin03,Tmin04,Tmin05,Tmin06,Tmin07,Tmin08,Tmin09,Tmin10,Tmin11,Tmin12))
+    
     
     colnames(lgm)[-1] <- paste0(colnames(lgm)[-1], "_lgm")
     
+    # Calculate bioclim variables
+   bioclim_lgm = climates::bioclim2(tmin = as.data.frame(dplyr::select(lgm, Tmin01_lgm,
+                                                               Tmin02_lgm,
+                                                          Tmin03_lgm,
+                                                          Tmin04_lgm,
+                                                          Tmin05_lgm,
+                                                          Tmin06_lgm,
+                                                          Tmin07_lgm,
+                                                          Tmin08_lgm,
+                                                          Tmin09_lgm,
+                                                          Tmin10_lgm,
+                                                          Tmin11_lgm,
+                                                          Tmin12_lgm)),
+                       ## Remove site column
+                       tmax = as.data.frame(dplyr::select(lgm, Tmax01_lgm,
+                                                          Tmax02_lgm,
+                                                          Tmax03_lgm,
+                                                          Tmax04_lgm,
+                                                          Tmax05_lgm,
+                                                          Tmax06_lgm,
+                                                          Tmax07_lgm,
+                                                          Tmax08_lgm,
+                                                          Tmax09_lgm,
+                                                          Tmax10_lgm,
+                                                          Tmax11_lgm,
+                                                          Tmax12_lgm)),
+                       prec = as.data.frame(dplyr::select(lgm, PPT01_lgm,
+                                                          PPT02_lgm,
+                                                          PPT03_lgm,
+                                                          PPT04_lgm,
+                                                          PPT05_lgm,
+                                                          PPT06_lgm,
+                                                          PPT07_lgm,
+                                                          PPT08_lgm,
+                                                          PPT09_lgm,
+                                                          PPT10_lgm,
+                                                          PPT11_lgm,
+                                                          PPT12_lgm)),
+                       files.as.inputs = FALSE)
+   
+   
+   colnames(bioclim_lgm) <- paste0(colnames(bioclim_lgm), "_", "lgm")
+   lgm <- cbind(lgm, bioclim_lgm)
+   
+   
+   # Future climate - RCP85 with climateWNA
+   rcp85 <- read_csv("./data/gis/climate_data/climateWNA/GBS tree climate data Climate WNA 2018_06_12_15GCM-Ensemble_rcp85_2085MSY.csv") %>%
+     rename(id = ID1 , 
+            tmax_sum = Tmax_sm,
+            tmin_winter = Tmin_wt,
+            tave = MAT,
+            cwd = CMD) %>%
+     dplyr::select(-ID2, -Latitude, -Longitude, -Elevation)
+   
+   # Calculate tmax and tmin
+   rcp85$tmax <- rowMeans(dplyr::select(rcp85, Tmax01,Tmax02,Tmax03,Tmax04,Tmax05,Tmax06,Tmax07,Tmax08,Tmax09,Tmax10,Tmax11,Tmax12))
+   rcp85$tmin <- rowMeans(dplyr::select(rcp85, Tmin01,Tmin02,Tmin03,Tmin04,Tmin05,Tmin06,Tmin07,Tmin08,Tmin09,Tmin10,Tmin11,Tmin12))
+   
+   
+   colnames(rcp85)[-1] <- paste0(colnames(rcp85)[-1], "_rcp85")
+   
+   # Calculate bioclim variables
+   bioclim_rcp85 = climates::bioclim2(tmin = as.data.frame(dplyr::select(rcp85, Tmin01_rcp85,
+                                                                       Tmin02_rcp85,
+                                                                       Tmin03_rcp85,
+                                                                       Tmin04_rcp85,
+                                                                       Tmin05_rcp85,
+                                                                       Tmin06_rcp85,
+                                                                       Tmin07_rcp85,
+                                                                       Tmin08_rcp85,
+                                                                       Tmin09_rcp85,
+                                                                       Tmin10_rcp85,
+                                                                       Tmin11_rcp85,
+                                                                       Tmin12_rcp85)),
+                                    ## Remove site column
+                                    tmax = as.data.frame(dplyr::select(rcp85, Tmax01_rcp85,
+                                                                       Tmax02_rcp85,
+                                                                       Tmax03_rcp85,
+                                                                       Tmax04_rcp85,
+                                                                       Tmax05_rcp85,
+                                                                       Tmax06_rcp85,
+                                                                       Tmax07_rcp85,
+                                                                       Tmax08_rcp85,
+                                                                       Tmax09_rcp85,
+                                                                       Tmax10_rcp85,
+                                                                       Tmax11_rcp85,
+                                                                       Tmax12_rcp85)),
+                                    prec = as.data.frame(dplyr::select(rcp85, PPT01_rcp85,
+                                                                       PPT02_rcp85,
+                                                                       PPT03_rcp85,
+                                                                       PPT04_rcp85,
+                                                                       PPT05_rcp85,
+                                                                       PPT06_rcp85,
+                                                                       PPT07_rcp85,
+                                                                       PPT08_rcp85,
+                                                                       PPT09_rcp85,
+                                                                       PPT10_rcp85,
+                                                                       PPT11_rcp85,
+                                                                       PPT12_rcp85)),
+                                    files.as.inputs = FALSE)
+   
+   
+   colnames(bioclim_rcp85) <- paste0(colnames(bioclim_rcp85), "_", "rcp85")
+   rcp85 <- cbind(rcp85, bioclim_rcp85)
+  
     # Mid-holocene  
     holo <- read_csv("./data/gis/climate_data/climateWNA/GBS tree climate data Climate WNA 2018_06_12_4GCM-Ensemble_midHoloceneMSY.csv") %>%
       rename(id = ID1 , 
              tmax_sum = Tmax_sm,
              tmin_winter = Tmin_wt,
-             tave = MAT) %>%
+             tave = MAT,
+             cwd = CMD) %>%
       dplyr::select(-ID2, -Latitude, -Longitude, -Elevation)
     colnames(holo)[-1] <- paste0(colnames(holo)[-1], "_holo")
     
     
     # Join together in main climate dataset
-    climate_gbs_mom <- left_join(left_join(left_join(left_join(climate_gbs_mom, last1000), lgm),
-                                           holo), 
-                                           wna_current)
+    climate_gbs_mom <- left_join(left_join(left_join(left_join(left_join(climate_gbs_mom, 
+                                                                         last1000), 
+                                                                         lgm),
+                                                                         holo), 
+                                                                         wna_current),
+                                                                         rcp85)
+    
     
     dim(climate_gbs_mom)
-      
+    
+    # Remove datasets no longer needed
+    rm(last1000)  
+    rm(lgm)
+    rm(holo)
+    rm(wna_current)
+    rm(rcp85)
   
       
   ## Add random climate variable for testing
