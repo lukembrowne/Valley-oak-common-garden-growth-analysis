@@ -68,23 +68,23 @@
 # Write file with one column for chrom and one for position and 3rd for position + 1
 
 # Top snps
-  write_tsv(x = data.frame(chrom = unlist(lapply(strsplit(top_snps_long$snp, "_"), 
+  write_tsv(x = data.frame(chrom = unlist(lapply(strsplit(unique(top_snps_long$snp), "_"), 
                                                  function(x) x[[2]])),
-                           pos = unlist(lapply(strsplit(top_snps_long$snp, "_"),
+                           pos = unlist(lapply(strsplit(unique(top_snps_long$snp), "_"),
                                                function(x) x[[3]])),
-                           pos2 = as.numeric(unlist(lapply(strsplit(top_snps_long$snp, "_"),
-                                                           function(x) x[[3]])))),
+                           pos2 = unlist(lapply(strsplit(unique(top_snps_long$snp), "_"),
+                                                function(x) x[[3]]))),
             "./output/finding_closest_genes/top_snps.bed",
             col_names = FALSE)
 
   
 # Bottom snps  
-  write_tsv(x = data.frame(chrom = unlist(lapply(strsplit(bottom_snps_long$snp, "_"), 
+  write_tsv(x = data.frame(chrom = unlist(lapply(strsplit(unique(bottom_snps_long$snp), "_"), 
                                                  function(x) x[[2]])),
-                           pos = unlist(lapply(strsplit(bottom_snps_long$snp, "_"),
+                           pos = unlist(lapply(strsplit(unique(bottom_snps_long$snp), "_"),
                                                function(x) x[[3]])),
-                           pos2 = as.numeric(unlist(lapply(strsplit(bottom_snps_long$snp, "_"),
-                                                           function(x) x[[3]])))),
+                           pos2 =unlist(lapply(strsplit(unique(bottom_snps_long$snp), "_"),
+                                               function(x) x[[3]]))),
             "./output/finding_closest_genes/bottom_snps.bed",
             col_names = FALSE)
   
@@ -126,8 +126,18 @@
       dplyr::left_join(., blasted) %>%
       dplyr::distinct(chrom_a, pos1_a, .keep_all = TRUE) %>%
       dplyr::left_join(., ara_go, by = c("athal_gene_name" = "locus_name")) %>%
-      dplyr::mutate(outlier_type = "Warm advantageous genotype")
+      dplyr::mutate(outlier_type = "Warm advantageous")
     
+    # Add in genotype, q value, and height prediction
+     top_closest_genes <-  top_closest_genes %>%
+        mutate(snp = paste("snp", chrom_a, pos1_a, sep = "_")) %>%
+        dplyr::left_join(., top_snps_long, by = "snp")
+     
+     table(top_closest_genes$genotype)
+     summary(top_closest_genes$q_val)
+     summary(top_closest_genes$height_change_warmer_base0)
+    
+    head(top_closest_genes)
     dim(top_closest_genes)
     
     top_snps_long$snp %in% paste0("snp_", top_closest_genes$chrom_a, "_",
@@ -145,8 +155,18 @@
       dplyr::left_join(., blasted)  %>%
       dplyr::distinct(chrom_a, pos1_a, .keep_all = TRUE)  %>%
       dplyr::left_join(., ara_go, by = c("athal_gene_name" = "locus_name")) %>%
-      dplyr::mutate(outlier_type = "Warm disadvantageous genotype")
+      dplyr::mutate(outlier_type = "Warm disadvantageous")
     
+    # Add in genotype, q value, and height prediction
+    bottom_closest_genes <-  bottom_closest_genes %>%
+      mutate(snp = paste("snp", chrom_a, pos1_a, sep = "_")) %>%
+      dplyr::left_join(., bottom_snps_long, by = "snp")
+    
+    table(bottom_closest_genes$genotype)
+    summary(bottom_closest_genes$q_val)
+    summary(bottom_closest_genes$height_change_warmer_base0)
+    
+    head(bottom_closest_genes)
     dim(bottom_closest_genes)
     
     all(bottom_snps_long$snp %in% paste0("snp_", bottom_closest_genes$chrom_a, "_", bottom_closest_genes$pos1_a)) # Should be all true
@@ -176,8 +196,8 @@
     
   # Select columns we need  
     outlier_genes <- outlier_genes_raw %>%
-      dplyr::select(outlier_type, chrom_a, pos1_a, qlob_gene_name,
-                    distance, athal_gene_name, athal_gene_description, GOslim, GO_term,
+      dplyr::select(outlier_type, chrom_a, pos1_a, genotype, q_val, height_change_warmer_base0, qlob_gene_name, distance,
+                     athal_gene_name, athal_gene_description, GOslim, GO_term,
                     GO_ID)
     
     head(outlier_genes)
@@ -186,19 +206,38 @@
             dplyr::distinct(outlier_type, qlob_gene_name, 
                             athal_gene_name, athal_gene_description, GO_term, 
                             .keep_all = TRUE) %>%
-            dplyr::group_by(outlier_type, chrom_a, pos1_a, qlob_gene_name,
-                            athal_gene_description, distance, 
+            dplyr::group_by(outlier_type, chrom_a, pos1_a, genotype, q_val, height_change_warmer_base0, qlob_gene_name,
+                            distance,  athal_gene_description, 
                           athal_gene_name) %>%
             dplyr::summarise(GO_terms = toString(GO_term)) %>%
             dplyr::ungroup() %>% 
             dplyr::rename(`Outlier type` = outlier_type,
                          Chromosome = chrom_a,
                          Position = pos1_a,
+                         Genotype = genotype,
+                         `Q value` = q_val,
+                         `Change in RGR` = height_change_warmer_base0,
+                         `Distance to gene (bp)` = distance,
                          `Q. lobata gene name` = qlob_gene_name,
-                         `Distance to gene` = distance,
                          `A. thaliana gene name` = athal_gene_name,
                          `Gene description` = athal_gene_description,
                          `GO terms` = GO_terms)
+ 
+ # Add information about climate outliers
+ outlier_genes_formatted <- outlier_genes_formatted %>%
+   mutate(`LGM Climate outlier` = FALSE) %>%
+   dplyr::select(`Outlier type`, Chromosome, Position, 
+                 Genotype, `Q value`, `Change in RGR`, `LGM Climate outlier`,
+                 everything())
+ 
+outlier_genes_formatted$`LGM Climate outlier`[paste("snp", outlier_genes_formatted$Chromosome, 
+      outlier_genes_formatted$Position, sep = "_") %in% double_outliers] <- TRUE
+
+table(outlier_genes_formatted$`LGM Climate outlier`)
+ 
+ head(outlier_genes_formatted)
+ dim(outlier_genes_formatted)
+ 
  
  # write_tsv(outlier_genes_formatted,
  #           paste0("./figs_tables/Table S3 - formatted gene list with go terms ", Sys.Date(), ".txt"))
@@ -207,11 +246,11 @@
  # Quantify distances to genes
  
  # How many located within a gene?
- sum(outlier_genes_formatted$`Distance to gene` == 0) / 
-   length(outlier_genes_formatted$`Distance to gene`)
+ sum(outlier_genes_formatted$`Distance to gene (bp)` == 0) / 
+   length(outlier_genes_formatted$`Distance to gene (bp)`)
  
  # Average distance to gene?
- summary(abs(outlier_genes_formatted$`Distance to gene`))
+ summary(abs(outlier_genes_formatted$`Distance to gene (bp)`))
  
  
  ## Gene distances of all SNPs
@@ -223,15 +262,19 @@ summary(abs(all_genes_sub$distance))
 
 sum(all_genes_sub$distance == 0) / length(all_genes_sub$distance)
 
-wilcox.test(abs(outlier_genes_formatted$`Distance to gene`),
+wilcox.test(abs(outlier_genes_formatted$`Distance to gene (bp)`),
             abs(all_genes_sub$distance))
-            
+
+table(outlier_genes_formatted$`Distance to gene (bp)` <= 5000)
+table(all_genes_sub$distance <= 5000)
+
+fisher.test(rbind(table(outlier_genes_formatted$`Distance to gene (bp)` <= 5000), 
+      table(all_genes_sub$distance <= 5000) ))
 
  
  ## Barplot of GOslim terms
  
  ## Add in total go terms across all blasted genes
- 
  qlob_genes <- left_join(blasted, ara_go, 
                          by = c("athal_gene_name" = "locus_name")) %>%
                dplyr::distinct(qlob_gene_name, GOslim, .keep_all = TRUE) %>%
@@ -239,12 +282,12 @@ wilcox.test(abs(outlier_genes_formatted$`Distance to gene`),
  dim(qlob_genes)
  
  outlier_genes_barchart <- outlier_genes_raw %>%
-   dplyr::filter(distance <= 10000 & distance >= -10000) %>% # Restrict to just 5kb
+   dplyr::filter(distance <= 5000 & distance >= -5000) %>% # Restrict to just 5kb
    dplyr::select(outlier_type, GOslim) %>%
    dplyr::bind_rows(., dplyr::select(qlob_genes, outlier_type, GOslim)) 
  
  ## Filter down to terms that are in both beneficial and detrimental genotypes
- outlier_GOslims <- unique(c(outlier_genes_barchart$GOslim[outlier_genes_barchart$outlier_type == "Warm advantageous genotype"], 
+ outlier_GOslims <- unique(c(outlier_genes_barchart$GOslim[outlier_genes_barchart$outlier_type == "Warm advantageous"], 
         outlier_genes_barchart$GOslim[outlier_genes_barchart$outlier_type == "Warm disadvantageous"]))
  
  outlier_genes_barchart <- outlier_genes_barchart %>%
@@ -269,38 +312,52 @@ wilcox.test(abs(outlier_genes_formatted$`Distance to gene`),
          panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
   
  # Save to file
- ggsave(filename = paste0("./figs_tables/Figure S6 - goslim terms barchart ",
-                          Sys.Date(), ".pdf"),
-        units = "cm",
-        height = 10, width = 30,
-        useDingbats = FALSE )
+ # ggsave(filename = paste0("./figs_tables/Figure S8 - goslim terms barchart ",
+ #                          Sys.Date(), ".pdf"),
+ #        units = "cm",
+ #        height = 12, width = 20,
+ #        useDingbats = FALSE )
 
- 
+
  
  #  Output gene names in arabidopsis format to use for enrichment tests on pantherdb
 outlier_genes_raw %>%
-   dplyr::filter(distance <= 10000 & distance >= -10000) %>% # Restrict to just 5kb
+   dplyr::filter(distance <= 5000 & distance >= -5000) %>% # Restrict to just 5kb
    dplyr::distinct(chrom_a, pos1_a, .keep_all = TRUE) %>%
    dplyr::select(outlier_type, athal_gene_name) %>%
-   dplyr::filter(outlier_type == "Beneficial genotype") %>%
+   dplyr::filter(outlier_type == "Warm advantageous") %>%
    dplyr::select(athal_gene_name) %>%
  write_tsv(. ,
            "./output/finding_closest_genes/top_closest_genes_arath_names.txt", col_names = FALSE)
 
-all_genes_raw %>%
-  dplyr::filter(distance <= 10000 & distance >= -10000) %>% # Restrict to just 5kb
+outlier_genes_raw %>%
+  dplyr::filter(distance <= 5000 & distance >= -5000) %>% # Restrict to just 5kb
   dplyr::distinct(chrom_a, pos1_a, .keep_all = TRUE) %>%
   dplyr::select(outlier_type, athal_gene_name) %>%
-  dplyr::filter(outlier_type == "Detrimental genotype") %>%
+  dplyr::filter(outlier_type == "Warm disadvantageous") %>%
   dplyr::select(athal_gene_name) %>%
   write_tsv(. ,
             "./output/finding_closest_genes/bottom_closest_genes_arath_names.txt", col_names = FALSE)
 
 
- 
- 
- 
- 
+outlier_genes_raw %>%
+  dplyr::filter(distance <= 5000 & distance >= -5000) %>% # Restrict to just 5kb
+  dplyr::distinct(chrom_a, pos1_a, .keep_all = TRUE) %>%
+  dplyr::select(outlier_type, athal_gene_name) %>%
+  dplyr::select(athal_gene_name) %>%
+  write_tsv(. ,
+            "./output/finding_closest_genes/top_and_bottom_closest_genes_arath_names.txt", col_names = FALSE)
+
+# Write list of genes within 5kb of snps
+all_closest_genes %>%
+  dplyr::filter(distance <= 5000 & distance >= -5000) %>% # Restrict to just 5kb
+  dplyr::distinct(chrom_a, pos1_a, .keep_all = TRUE) %>%
+  dplyr::select(athal_gene_name) %>%
+  write_tsv(. ,
+            "./output/finding_closest_genes/all_snps_arath_names.txt", col_names = FALSE)
+
+
+
  
  
  
