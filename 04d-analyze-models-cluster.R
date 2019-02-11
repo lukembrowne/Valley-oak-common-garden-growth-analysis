@@ -189,27 +189,34 @@
   sum(fdr_fvals$pval < 0.05)
   
   
-  # Save histogram of p values
-    # ggplot(as.data.frame(fdr_fvals), aes(pval)) +
-    #   geom_histogram(position = "identity", fill = "steelblue2", col = "black",
-    #                  binwidth = .025) +
-    #   xlab("p-value") +
-    #   theme_bw(10) +
-    #   theme(panel.border = element_blank(), panel.grid.major = element_blank(),
-    #         panel.grid.minor = element_blank(),
-    #         axis.line = element_line(colour = "black"))
+  # Make a panel plot for supplementary info with p values and q values
+    # library(qqman)
     # 
-    # # Save to file
-    # ggsave(filename = paste0("./figs_tables/Figure S5 - histogram of p values ",
-    #                          Sys.Date(), ".png"),
-    #        units = "cm",
-    #        height = 8, width = 15
-    # )
-
+    # par(mfrow = c(2,2))
+    # 
+    # # P values
+    # hist(fdr_fvals$pval, breaks = 40, col = "steelblue2",
+    #     xlab = "p-value", main = "Uncorrected p-values")
+    # qq(fdr_fvals$pval, main = "Uncorrected p-values")
+    # 
+    # # Q values
+    # hist(fdr_fvals$qval, breaks = 40, col = "steelblue2",
+    #      xlab = "q-value", main = "q-values")
+    # qq(fdr_fvals$qval, main = "q-values")
+    # 
+    # dev.copy(pdf, paste0("./figs_tables/Figure S5 - histogram and qqplots of p values ", Sys.Date(), ".pdf"),
+    #          width = 7, height = 7, useDingbats = FALSE)
+    # dev.off()
+    # 
+    # par(mfrow = c(1,1))
+    # 
+    
   # Q values
   hist(fdr_fvals$qval, breaks = 40) # Each q-value is the expected proportion of false positives among all SNP effects that are at least as extreme as that observed for the current SNP.
   sum(fdr_fvals$qval < 0.05) 
   summary(fdr_fvals$qval)
+  
+  qq(fdr_fvals$qval)
   
  
   
