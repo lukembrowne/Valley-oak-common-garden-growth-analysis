@@ -104,8 +104,8 @@
  
  # Filter out based on number of gene copies
     hist(sum_df_long$n_gen, breaks = 50)
-    
-    gen_copies_thresh <- 300
+
+    gen_copies_thresh <- 100
 
    sum_df_long <- sum_df_long %>%
       dplyr::filter(n_gen >= gen_copies_thresh)
@@ -181,7 +181,7 @@
   # F values
   hist(sum_df$f_val_gen_int, breaks = 50)
   fdr_fvals = fdrtool(sum_df$f_val_gen_int,
-                 statistic = "normal")
+                 statistic = "normal", plot = FALSE)
 
   # P values
   summary(fdr_fvals$pval)
@@ -190,14 +190,14 @@
   
   
   # Save histogram of p values
-    # ggplot(as.data.frame(fdr_fvals), aes(pval)) + 
+    # ggplot(as.data.frame(fdr_fvals), aes(pval)) +
     #   geom_histogram(position = "identity", fill = "steelblue2", col = "black",
-    #                  binwidth = .025) + 
+    #                  binwidth = .025) +
     #   xlab("p-value") +
-    #   theme_bw(10) + 
+    #   theme_bw(10) +
     #   theme(panel.border = element_blank(), panel.grid.major = element_blank(),
-    #         panel.grid.minor = element_blank(), 
-    #         axis.line = element_line(colour = "black"))   
+    #         panel.grid.minor = element_blank(),
+    #         axis.line = element_line(colour = "black"))
     # 
     # # Save to file
     # ggsave(filename = paste0("./figs_tables/Figure S5 - histogram of p values ",
@@ -228,12 +228,13 @@
                                           by = "snp")
   summary(sum_df_long_w_preds$q_val)
   
- 
-########################  
-## Identify top and bottom SNPs #### 
+  
+  
 
-  q_val_thresh <- .0001 
-  mad_thresh <- 3 # Median absolute deviation for outlier detection - values of 3 (very conservative), 2.5 (moderately conserva- tive) or even 2 (poorly conservative).
+# Identify top and bottom SNPs --------------------------------------------
+
+  q_val_thresh <- .001 
+  mad_thresh <- 2.5 # Median absolute deviation for outlier detection - values of 3 (very conservative), 2.5 (moderately conserva- tive) or even 2 (poorly conservative).
   train_test_cor_thresh <- 0.80
   height_metric = "height_change_warmer_base0"
   
@@ -261,6 +262,9 @@
    sum(table(top_snps_long$snp) > 1)
    which(table(top_snps_long$snp) > 1)
    
+   ## Number of unique SNPs
+   length(unique(top_snps_long$snp))
+   
  ## Bottom SNPs
  bottom_snps_long <- sum_df_long_w_preds %>%
    dplyr::filter(!!as.name(height_metric) <= (height_median -
@@ -276,6 +280,11 @@
    ## Any SNPs in bottom_snps twice?
    sum(table(bottom_snps_long$snp) > 1)
    which(table(bottom_snps_long$snp) > 1)
+   
+   
+   ## Number of unique SNPs
+   length(unique(bottom_snps_long$snp))
+   
    
 ## Join back to main DF
    sum_df_long_outliers <- left_join(sum_df_long_w_preds, 
@@ -300,20 +309,45 @@
    ## How many total snps involved?
    length(unique(c(top_snps_long$snp, bottom_snps_long$snp)))
    
+   ## Plot interactions at particular genotype
+   pred_snp = dplyr::left_join(dplyr::select(top_snps_long, snp), pred_df_raw)
+   table(pred_snp$snp)
    
-
+   snp_filter = "snp_chr1_28991295"
+   pred_snp %>%
+     dplyr::filter(snp == snp_filter)  %>%
+   ggplot(., aes(x = tmax_sum_dif_unscaled, y = pred, col = factor(genotype))) + 
+     geom_vline(aes(xintercept = 0), lty = 2, size = .25) +
+     geom_vline(xintercept = 4.8, size = .25) +
+     geom_ribbon(aes(ymin = pred - 1.96*se, ymax = pred + 1.96 * se, fill = factor(genotype)), alpha = .25) +
+     geom_line(alpha = 1,
+               show.legend = T, size = 1) + 
+     ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
+     xlab("Tmax transfer distance") +
+     theme_bw(15) + 
+     scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) + 
+     theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+           panel.grid.minor = element_blank(), 
+           axis.line = element_line(colour = "black"))  
+   
+   sum_df_long_w_preds[sum_df_long_w_preds$snp == snp_filter,]
+   table(dat_snp[, snp_filter])
+   
+   
+   
 ## Figure 2 - Plot overlay of outlier SNPS ---------------------------------------
    
-   
    # Make a df of random subsample of other snps
+   set.seed(1)
    random_snps <- c(dplyr::sample_n(dplyr::filter(dplyr::select(sum_df, snp),  # Subsample 100 random snps
-                                                  !snp %in% c(top_snps_long$snp, bottom_snps_long$snp)), size = 100))
+                                                  !snp %in% c(top_snps_long$snp, bottom_snps_long$snp)), size = 50))
    random_snps <- paste0(random_snps$snp, sample(0:2, size = length(random_snps$snp), replace = TRUE))
    
    random_snps_df <-  pred_df_raw %>%
      dplyr::mutate(snp_gen = paste0(snp,genotype)) %>%
      dplyr::filter(snp_gen %in% random_snps) %>%
-     dplyr::mutate(type = "Non-outlier")
+     dplyr::mutate(type = "Non-outlier")Qpwoeiru123
+   ;lkjas;ldkfjasd
    
    
    
@@ -370,17 +404,14 @@
    #        units = "cm",
    #        height = 11, width = 20,
    #        useDingbats = FALSE )
-   
-   # ggsave(filename = paste0("./figs_tables/fig1/Figure 1 - transfer function ", Sys.Date(), ".pdf"),
-   #        gg,
-   #        units = "cm", width = 11, height = 8)
-   # 
+
 
   summary(top_snps_long$height_change_warmer_base0)
   summary(bottom_snps_long$height_change_warmer_base0)
  # summary(mid_snps_long$height_change_warmer_base0)
 
  
+  
 # Figure 2 - Manhattan plot of Q values ---------------------------------------------------------
   
     man_df1 <- data.frame(SNP = snp_col_names, 
@@ -479,8 +510,8 @@
      # ggsave(paste0("./figs_tables/fig2/Figure 2 - manhattan plot interaction term wo labels_",
      #                      Sys.Date(), ".png"),
      #          width = 19, height = 4, units = "cm", dpi = 600)
-     # 
-     # 
+
+
    
    
    
@@ -598,10 +629,10 @@
      NULL
    
    # # Save as file - PNG
-     ggsave(paste0("./figs_tables/fig2/Figure 2 - manhattan plot growth predictions",
-                          Sys.Date(), ".png"),
-              width = 19, height = 4, units = "cm", dpi = 600)
-   # #  
+     # ggsave(paste0("./figs_tables/fig2/Figure 2 - manhattan plot growth predictions",
+     #                      Sys.Date(), ".png"),
+     #          width = 19, height = 4, units = "cm", dpi = 600)
+     #  
    #   # Save as PDF for legend
    #   ggsave(paste0("./figs_tables/fig2/Figure 2 - manhattan plot growth predictions LEGEND",
    #                 Sys.Date(), ".pdf"),
@@ -728,8 +759,8 @@
   cor.test(dat_snp_count$n_bottom_snps, dat_snp_count$n_top_snps)
   
   # Correct for missing data
-  dat_snp_count$n_top_snps <- dat_snp_count$n_top_snps/dat_snp_count$n_top_not_missing*length(top_snps_long$snp)
-  dat_snp_count$n_bottom_snps <- dat_snp_count$n_bottom_snps/dat_snp_count$n_bottom_not_missing*length(bottom_snps_long$snp)
+  # dat_snp_count$n_top_snps <- dat_snp_count$n_top_snps/dat_snp_count$n_top_not_missing*length(unique(top_snps_long$snp))
+  # dat_snp_count$n_bottom_snps <- dat_snp_count$n_bottom_snps/dat_snp_count$n_bottom_not_missing*length(unique(bottom_snps_long$snp))
   
   
   ## Scale number of top and bottom snps 
@@ -788,18 +819,18 @@
   
   
   ## Plot predictions
-  low <- c(0, max(dat_snp_count_unscaled$n_bottom_snps))
-  high <- c(max(dat_snp_count_unscaled$n_top_snps), 0)
+  # low <- c(0, max(dat_snp_count_unscaled$n_bottom_snps))
+  # high <- c(max(dat_snp_count_unscaled$n_top_snps), 0)
   
-  # low <- c(mean(dat_snp_count_unscaled$n_top_snps), 
+  # low <- c(mean(dat_snp_count_unscaled$n_top_snps),
   #          max(dat_snp_count_unscaled$n_bottom_snps))
   # high <- c(max(dat_snp_count_unscaled$n_top_snps),
   #           mean(dat_snp_count_unscaled$n_bottom_snps))
   
-  # low <- c(quantile(dat_snp_count_unscaled$n_top_snps, 0.00), 
-  #          quantile(dat_snp_count_unscaled$n_bottom_snps, 1))
-  # high <-c(quantile(dat_snp_count_unscaled$n_top_snps, 1), 
-  #          quantile(dat_snp_count_unscaled$n_bottom_snps, 0))
+  low <- c(0, round(quantile(dat_snp_count_unscaled$n_bottom_snps, .9)))
+  high <-c(round(quantile(dat_snp_count_unscaled$n_top_snps, .9)), 0)
+  
+ # high <- c(35, 0)
   
   low; high # Print prediction values
   
@@ -898,7 +929,7 @@
   # Save plot output
   # ggsave(filename = paste0("./figs_tables/fig2/Figure 2 - outlier counts ", Sys.Date(), ".pdf"),
   #        units = "cm", width = 8, height = 5)
-  
+
   
   ## Calculating differences in growth rates
   growth_dif =  newdata %>%
@@ -967,67 +998,88 @@
   
 
   # Correct for missing data
-  dat_snp_count_mom$n_top_snps <- dat_snp_count_mom$n_top_snps/dat_snp_count_mom$n_top_not_missing*length(top_snps_long$snp)
-  dat_snp_count_mom$n_bottom_snps <- dat_snp_count_mom$n_bottom_snps/dat_snp_count_mom$n_bottom_not_missing*length(bottom_snps_long$snp)
+  # dat_snp_count_mom$n_top_snps <- dat_snp_count_mom$n_top_snps/dat_snp_count_mom$n_top_not_missing*length(top_snps_long$snp)
+  # dat_snp_count_mom$n_bottom_snps <- dat_snp_count_mom$n_bottom_snps/dat_snp_count_mom$n_bottom_not_missing*length(bottom_snps_long$snp)
   
   summary(dat_snp_count_mom$n_top_snps)
   summary(dat_snp_count_mom$n_bottom_snps)
 
   
   ## Define localities based on distance threshold - rows not in same order as calculation in 03_adding-climate-data.R so must redo
- #  library(geosphere)
- #  
- #  mom_lat_longs <- as.data.frame(dplyr::select(dat_snp_count_mom, longitude, latitude))
- #  dist_mat <- matrix(NA, ncol = nrow(dat_snp_count_mom), nrow = nrow(dat_snp_count_mom))
- #  
- #  for(i in 1:nrow(dist_mat)){
- #    
- #    if(i %% 50 == 0){
- #      cat("Working on row:", i, " ... \n")
- #    }
- #    
- #    for(j in 1:nrow(dist_mat)){
- #     
- #      dist_mat[i, j] <- distHaversine(mom_lat_longs[i, ], 
- #                                      mom_lat_longs[j, ])/ 1000 # To convert to km
- #      
- #    }
- #  }
- # 
- #  
- # dist_mat[1:10, 1:10]
- # 
- # distance_threshold <- 25 ## in km ~ 20 miles = 32.1869 km
- # 
- # 
- # dist_tree = hclust(as.dist(dist_mat))
- # 
- # dist_tree_cut <- cutree(dist_tree, h = distance_threshold)
- # 
- # plot(dist_tree)
- # rect.hclust(dist_tree, h = distance_threshold)
- # 
- # ## Assign as locality
- # dat_snp_count_mom$locality <- as.character(dist_tree_cut)
- # length(table(as.character(dist_tree_cut))) # How many localities
- # 
- # sort(table(dist_tree_cut))
- # 
- # plot(dat_snp_count_mom$longitude, dat_snp_count_mom$latitude,
- #      col  = dat_snp_count_mom$locality, asp = 1, pch = 19)
+  library(geosphere)
+
+  mom_lat_longs <- as.data.frame(dplyr::select(dat_snp_count_mom, longitude, latitude))
+  dist_mat <- matrix(NA, ncol = nrow(dat_snp_count_mom), nrow = nrow(dat_snp_count_mom))
+
+  for(i in 1:nrow(dist_mat)){
+
+    if(i %% 50 == 0){
+      cat("Working on row:", i, " ... \n")
+    }
+
+    for(j in 1:nrow(dist_mat)){
+
+      dist_mat[i, j] <- distHaversine(mom_lat_longs[i, ],
+                                      mom_lat_longs[j, ])/ 1000 # To convert to km
+
+    }
+  }
 
 
+ dist_mat[1:10, 1:10]
+
+ distance_threshold <- 25 ## in km ~ 20 miles = 32.1869 km
+
+
+ dist_tree = hclust(as.dist(dist_mat))
+
+ dist_tree_cut <- cutree(dist_tree, h = distance_threshold)
+
+ plot(dist_tree)
+ rect.hclust(dist_tree, h = distance_threshold)
+
+ ## Assign as locality
+ dat_snp_count_mom$locality <- as.character(dist_tree_cut)
+ length(table(as.character(dist_tree_cut))) # How many localities
+
+ sort(table(dist_tree_cut))
+
+ plot(dat_snp_count_mom$longitude, dat_snp_count_mom$latitude,
+      col  = dat_snp_count_mom$locality, asp = 1, pch = 19)
+
+
+ 
+ 
   # Average by locality
   dat_snp_count_locality <- dat_snp_count_mom %>%
                           dplyr::group_by(locality) %>% 
                           summarise_all(mean)
   
   # Filter down to localities that are in the main dataset
-  dat_snp_count_locality <- dat_snp_count_locality %>%
-                  dplyr::filter(locality %in% dat_snp_count$locality)
+  # dat_snp_count_locality <- dat_snp_count_locality %>%
+  #                 dplyr::filter(locality %in% dat_snp_count$locality)
+  # 
+  # dat_snp_count_mom <- dat_snp_count_mom %>%
+  #   dplyr::filter(locality %in% dat_snp_count$locality)
   
-  dat_snp_count_mom <- dat_snp_count_mom %>%
-    dplyr::filter(locality %in% dat_snp_count$locality)
+  
+  
+  # ## Remove localities with less than ## individuals
+  # count_by_locality <- gen_dat_clim_all %>%
+  #   dplyr::select(id) %>%
+  #   dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality),
+  #                    by = c("id" = "gbs_name")) %>%
+  #   dplyr::select(id, locality) %>%
+  #   dplyr::filter(!id %in% exclude_based_on_missing) %>%
+  #   group_by(locality) %>%
+  #   tally()
+  # 
+  # table(count_by_locality$n)
+  # 
+  # exclude_locality <- count_by_locality$locality[which(count_by_locality$n < 2)]
+  # dat_snp_count_locality <- dat_snp_count_locality %>%
+  #   dplyr::filter(!locality %in% exclude_locality)
+
   
 # Explore data  
   dim(dat_snp_count_mom)
@@ -1179,6 +1231,7 @@
 
     # Set up dataframe for prediction
     newdata <-  expand.grid(locality = dat_snp_count_locality$locality,  # Locality has to be in dataset that original model ran on
+                          # locality = "ALH",
                             #id = dat_snp_count_locality$id,
                             section_block = "Block1_1",
                             height_2014 = 0,
@@ -1221,6 +1274,10 @@
                                                     means = scaled_var_means_gbs_only,
                                                     sds = scaled_var_sds_gbs_only)
     
+    # Refactor locality for predictions
+    newdata$locality_new <- newdata$locality
+    newdata$locality <- "ALH"
+    
     # Make predictions
     newdata$pred <- predict(gam_snp,
                             newdata = newdata,
@@ -1229,6 +1286,9 @@
     newdata$se <- predict(gam_snp,
                           newdata = newdata,
                           se.fit = TRUE, type = "response")$se 
+    
+    # Set back to old locality
+    newdata$locality <- newdata$locality_new
     
     newdata %>%
     ggplot(., aes(tmax_sum_dif_unscaled, pred, group = locality)) + 
@@ -1268,24 +1328,17 @@
                                                                         "height_change_warmer_base0")],
                                                proj4string = CRS("+proj=longlat +datum=WGS84"))
     
-    
-    hist(dat_snp_count_locality$height_change_warmer_base0, breaks = 20)
-    
-    
-    legend_sp <- SpatialPointsDataFrame(data.frame(longitude = -122, latitude = 34), 
-                                             data = data.frame(locality = "legend"),
-                                      proj4string = CRS("+proj=longlat +datum=WGS84"))
-    
+
     
     ## Testing kriging in between points  
     
     library(gstat)
     
     vario <- variogram(height_change_warmer_base0 ~ longitude + latitude,
-                       dat_snp_count_locality_sp)
-    vario_fit <- fit.variogram(vario, vgm("Exp"))
+                       dat_snp_count_locality_sp, width = 10)
     plot(vario)
-    plot(variogramLine(vario_fit, 250), type = "l")
+    vario_fit <- fit.variogram(vario, vgm("Exp"))
+    plot(variogramLine(vario_fit, 300), type = "l", ylim = c(0, 20))
     points(vario[,2:3], pch=20, col='red')
 
     # Use hillshade as template for growth predictions
@@ -1301,7 +1354,7 @@
                   model = vario_fit)
     
     krig
-    spplot(krig[1])
+    # spplot(krig[1])
 
     krig_rast <- rasterFromXYZ(krig)
     krig_rast <- mask(krig_rast, lobata_range_extended)
@@ -1329,7 +1382,7 @@
       tm_shape(lobata_range) + # Fine scale range
       tm_borders("black", lwd = .15) + 
       
-      # Bubble plots
+      # # Bubble plots
       tm_shape(dat_snp_count_locality_sp) +
       tm_bubbles(size = .05,
                  shape = 21,
@@ -1338,34 +1391,34 @@
                  # palette = "RdYlBu",
                border.alpha = 0,
                  # n = 20,
-                 midpoint = NA) +
-      
+                 midpoint = NA) 
+      # 
       # Bar charts
-      tm_shape(dat_snp_count_locality_sp) +
-      tm_symbols(size=.9, shape="locality",
-                 #   just = "top",
-                 shapes=grobs_qlob,
-                 #  sizes.legend=c(5, 10, 30),
-                 scale=1, border.alpha = 0,
-                 legend.size.show = FALSE,
-                 legend.col.show = FALSE,
-                 legend.shape.show = FALSE) +
-    
+      # tm_shape(dat_snp_count_locality_sp) +
+      # tm_symbols(size=.9, shape="locality",
+      #            #   just = "top",
+      #            shapes=grobs_qlob,
+      #            #  sizes.legend=c(5, 10, 30),
+      #            scale=1, border.alpha = 0,
+      #            legend.size.show = FALSE,
+      #            legend.col.show = FALSE,
+      #            legend.shape.show = FALSE) +
+      # 
      # Add bar chart for legend
-      tm_shape(legend_sp) +
-        tm_symbols(size=.9, shape="locality",
-                   shapes=grob_legend,
-                   #  sizes.legend=c(5, 10, 30),
-                   scale=1, border.alpha = 0,
-                   legend.size.show = FALSE,
-                   legend.col.show = FALSE,
-                   legend.shape.show = FALSE)
+      # tm_shape(legend_sp) +
+      #   tm_symbols(size=.9, shape="locality",
+      #              shapes=grob_legend,
+      #              #  sizes.legend=c(5, 10, 30),
+      #              scale=1, border.alpha = 0,
+      #              legend.size.show = FALSE,
+      #              legend.col.show = FALSE,
+      #              legend.shape.show = FALSE)
 
     tm
     
   # Save plot
-   tmap_save(tm, filename = paste0("./figs_tables/fig2/growth_barchart ", Sys.Date(), ".pdf"), 
-             width = 16, height =16, units = "cm", useDingbats=FALSE)
+  # tmap_save(tm, filename = paste0("./figs_tables/fig2/growth_barchart ", Sys.Date(), ".pdf"),
+  #           width = 16, height =16, units = "cm", useDingbats=FALSE)
     
   
 
@@ -1465,34 +1518,12 @@
 
  
 # Format data 
- 
-  ## All snps  
-   rda_all <- gen_dat_clim_all %>%
-     dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
-                      by = c("id" = "gbs_name")) %>%
-     dplyr::filter(!(id %in% exclude_based_on_missing))
-   
-   rda_all_scaled <- flashpcaR::scale2(dplyr::select(rda_all, contains("snp_chr")),
-                                       #-c(top_snps_long$snp), 
-                                       # -c(mid_snps_long$snp)), 
-                                       impute = 2)
-   dim(rda_all_scaled) 
-   
-   # Scale climate and spatial variables
-   rda_all_covariates_scaled <- rda_all %>%
-                               dplyr::select(-contains("snp_chr")) %>%
-                               mutate_if(is.numeric, scale)
-   
-
-# testing RDA -------------------------------------------------------------
-
    rda_df <-  gen_dat_clim %>%
      dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality),
                       by = c("id" = "gbs_name")) %>%
      dplyr::filter(!(id %in% exclude_based_on_missing))
-   
-   
-   # Average allele frequency by locality
+
+   # # Average allele frequency by locality
    # library(multidplyr)
    # rda_df <- rda_df %>%
    #   partition(locality) %>%
@@ -1500,11 +1531,15 @@
    #   collect()
    # 
    # dim(rda_df)
-   
-   ## Remove localities with less than ## individuals
+   # 
+   # # Testing removing laytonville
+   # # rda_df <- rda_df %>%
+   # #   filter(locality != "LAY")
+   # 
+   # ## Remove localities with less than ## individuals
    # count_by_locality <- gen_dat_clim_all %>%
    #   dplyr::select(id) %>%
-   #   dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
+   #   dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality),
    #                    by = c("id" = "gbs_name")) %>%
    #   dplyr::select(id, locality) %>%
    #   dplyr::filter(!id %in% exclude_based_on_missing) %>%
@@ -1528,68 +1563,21 @@
    # exlude_by_unique_count
    # rda_df <- rda_df %>%
    #   dplyr::select(-exlude_by_unique_count)
-   
-   
-   
-   
-   
-  ## Top snps
-  #    rda_top <- gen_dat_clim %>%
-  #      dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality),
-  #                       by = c("id" = "gbs_name")) %>%
-  #      dplyr::filter(!(id %in% exclude_based_on_missing))
-  # 
-  #    dim(rda_top)
-  #    rda_top[1:10, 1000:1010]
-  # 
-  #    rda_top_scaled <- flashpcaR::scale2(dplyr::select(rda_top,
-  #                                                       top_snps_long$snp), impute = 2)
-  #    dim(rda_top_scaled)
-  #    
-  #    # Scale climate and spatial variables
-  #    rda_top_covariates_scaled <- rda_top %>%
-  #      dplyr::select(-contains("snp_chr")) %>%
-  #      mutate_if(is.numeric, scale)
-  #    
-  # 
-  # ## Bottom snps
-  #  rda_bottom <- gen_dat_clim %>%
-  #    dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality),
-  #                     by = c("id" = "gbs_name")) %>%
-  #    dplyr::filter(!(id %in% exclude_based_on_missing))
-  # 
-  #  rda_bottom_scaled <- flashpcaR::scale2(dplyr::select(rda_bottom,
-  #                                                    bottom_snps_long$snp), impute = 2)
-  #  dim(rda_bottom_scaled)
-  #  
-  #  # Scale climate and spatial variables
-  #  rda_bottom_covariates_scaled <- rda_bottom %>%
-  #    dplyr::select(-contains("snp_chr")) %>%
-  #    mutate_if(is.numeric, scale)
 
 
-## Run RDAs  
-
-   # Choose climate variables
+ # Choose climate variables
    climate_vars_core <- climate_vars[!grepl(pattern = "random|PC", x = climate_vars)]
    climate_vars_core
    length(climate_vars_core) # Should be 10
    
-   climate_vars_rda_current <- climate_vars_core
-   length(climate_vars_rda_current)
-   
-   climate_vars_core
    wna_climate_vars <- climate_vars_core
-   
    
    wna_climate_vars_current <- paste0(wna_climate_vars, "_wna_current")
    wna_climate_vars_lgm <- paste0(wna_climate_vars, "_lgm")
    wna_climate_vars_rcp85 <- paste0(wna_climate_vars, "_rcp85")
    
    
-  
-   
-   ## Calculate MEMs
+ ## Calculate MEMs
    
    # Calculate distance matrix
    library(geosphere)
@@ -1619,25 +1607,19 @@
    # Bind eigenvectors
    rda_df <- bind_cols(rda_df, as.data.frame(gf_mems$vectors[, 1:10]))
    
-   mems <- c("PCNM1", "PCNM2", "PCNM3", "PCNM4", "PCNM5", "PCNM6", "PCNM7")
+   mems <- c("PCNM1", "PCNM2", "PCNM3", "PCNM4", "PCNM5",
+             "PCNM6", "PCNM7", "PCNM8", "PCNM9", "PCNM10")
    
    
    # Make separate climate datasets
    clim_dat_lgm <- rda_df[, c(wna_climate_vars_lgm)]
-  # colnames(clim_dat_lgm) <- gsub(pattern = "_lgm", "", colnames(clim_dat_lgm))
    colnames(clim_dat_lgm)
    
    clim_dat_current <- rda_df[, c(wna_climate_vars_current)]
-  # colnames(clim_dat_current) <- gsub(pattern = "_wna_current", "", 
-   #                                   colnames(clim_dat_current))
    colnames(clim_dat_current)
    
    clim_dat_rcp85 <- rda_df[, c(wna_climate_vars_rcp85)]
-  # colnames(clim_dat_rcp85) <- gsub(pattern = "_rcp85", "", 
-  #                                  colnames(clim_dat_rcp85))
    colnames(clim_dat_rcp85)
-   
-   pairs.panels(clim_dat_lgm)
    
    spatial_vars_rda <- names(dplyr::select(rda_df, PCNM1:PCNM10)) # 10
    
@@ -1648,6 +1630,11 @@
      dplyr::select(-contains("snp_chr")) %>%
      mutate_if(is.numeric, scale)
    
+   
+   # Scale genotype data
+   rda_all_scaled <- flashpcaR::scale2(dplyr::select(rda_df, contains("snp_chr")), impute = 2)
+   dim(rda_all_scaled)
+   
    rda_top_scaled <- flashpcaR::scale2(dplyr::select(rda_df, top_snps_long$snp), impute = 2)
    dim(rda_top_scaled) 
    
@@ -1655,225 +1642,187 @@
    dim(rda_bottom_scaled)
    
    rda_outlier_scaled <- flashpcaR::scale2(dplyr::select(rda_df, unique(c(bottom_snps_long$snp,
-                                                                          top_snps_long$snp))), impute = 2)
+                                                                top_snps_long$snp))), impute = 2)
    dim(rda_outlier_scaled)
    
-   rda_all_scaled <- flashpcaR::scale2(dplyr::select(rda_df, contains("snp_chr")), impute = 2)
-   rda_all_scaled <- rda_all_scaled[ ,!colnames(rda_all_scaled) %in% unique(c(top_snps_long$snp, bottom_snps_long$snp))]
-   dim(rda_all_scaled)
-   
-   
-   
-   # Partial out spatial component
-   rda_all_top <- rda(as.formula(paste("rda_outlier_scaled ~ ",
-                                       paste(c(wna_climate_vars_lgm), collapse = "+"),
-                                       "+Condition(",
-                                       paste(spatial_vars_rda, collapse = "+"),")")),
-                      data = rda_all_covariates_scaled,
-                      scale = FALSE)
-   
-   rda_all_top
-   
-   
-   
-   rda_all_bottom <- rda(as.formula(paste("rda_bottom_scaled ~ ",
-                                       paste(c(wna_climate_vars_lgm), collapse = "+"),
-                                       "+Condition(",
-                                       paste(spatial_vars_rda, collapse = "+"),")")),
-                      data = rda_all_covariates_scaled,
-                      scale = FALSE)
-   
-   rda_all_bottom
-   
-   rda_all_all <- rda(as.formula(paste("rda_all_scaled ~ ",
-                                          paste(c(wna_climate_vars_lgm), collapse = "+"),
-                                          "+Condition(",
-                                          paste(spatial_vars_rda, collapse = "+"),")")),
-                         data = rda_all_covariates_scaled,
-                         scale = FALSE)
-   
-   rda_all_all
-   
-   
-   # test
-   rda_all_top <- rda(as.formula(paste("rda_all_scaled ~ ",
-                                       paste(c(wna_climate_vars_lgm), collapse = "+"),
-                                       "+Condition(",
-                                       paste(c(spatial_vars_rda, wna_climate_vars_current), 
-                                             collapse = "+"),")")),
-                      data = rda_all_covariates_scaled,
-                      scale = FALSE)
-   
-   rda_all_top
-   
-   
-   #.0309
-   # .0272
-   
   
-   # climate_vars_rda_current <- paste0(wna_climate_vars, "_wna_current")
-   # climate_vars_rda_lgm <- paste0(wna_climate_vars, "_lgm")
+   climate_vars_rda_current <- paste0(wna_climate_vars, "_wna_current")
+   climate_vars_rda_lgm <- paste0(wna_climate_vars, "_lgm")
+   
+   ## Testing correlations with BCM and climateWNA datasets
+   for(var in wna_climate_vars){
+    test = cor.test(pull(gen_dat_clim_all, var),
+                   pull(gen_dat_clim_all, paste0(var, "_wna_current")))
+    cat(var, ": ", test$estimate, " ... \n")
+    
+   }
+   
    
    
    # Select same number of PCNMs as climate variables
    spatial_vars_rda <- names(dplyr::select(rda_all, PCNM1:PCNM10)) # 10
     
-   length(climate_vars_rda_current) == length(spatial_vars_rda) # Should be true
-#      
-#    library(colorfulVennPlot)
-#   
-#    ## Function to calculate variance partitioning  
-#     calc_varpart <- function(genetic_data, label){
-#       
-#       # With all data
-#       rda_out_full <- rda(as.formula(paste("genetic_data ~ ", 
-#                                            paste(c(spatial_vars_rda, 
-#                                                    climate_vars_rda_current,
-#                                                    climate_vars_rda_lgm), collapse = "+"))),
-#                           data = rda_all_covariates_scaled,
-#                           scale = FALSE)
-#       
-#       # Partial out spatial component
-#       rda_out_part_spat <- rda(as.formula(paste("genetic_data ~ ", 
-#                                            paste(c(climate_vars_rda_current,
-#                                                    climate_vars_rda_lgm), collapse = "+"), 
-#                                            "+Condition(", 
-#                                            paste(spatial_vars_rda, collapse = "+"),")")),
-#                           data = rda_all_covariates_scaled,
-#                           scale = FALSE)
-#       
-#       # Partial out current climate component
-#       rda_out_part_clim_current <- rda(as.formula(paste("genetic_data ~ ", 
-#                                                 paste(c(spatial_vars_rda,
-#                                                 climate_vars_rda_lgm), collapse = "+"), 
-#                                                 "+Condition(", 
-#                                         paste(climate_vars_rda_current, collapse = "+"),")")),
-#                                        data = rda_all_covariates_scaled,
-#                                        scale = FALSE)
-#       
-#       # Partial out lgm climate component
-#       rda_out_part_clim_lgm <- rda(as.formula(paste("genetic_data ~ ", 
-#                                         paste(c(spatial_vars_rda,
-#                                                 climate_vars_rda_current), collapse = "+"), 
-#                                         "+Condition(", 
-#                                         paste(climate_vars_rda_lgm, collapse = "+"),")")),
-#                                    data = rda_all_covariates_scaled,
-#                                    scale = FALSE)
-#       
-#       # Pure Spatial - partial out climate
-#       rda_out_pure_spat <- rda(as.formula(paste("genetic_data ~ ", 
-#                                 paste(spatial_vars_rda, collapse = "+"), 
-#                                 "+Condition(", 
-#                                 paste(c(climate_vars_rda_current, climate_vars_rda_lgm),
-#                                         collapse = "+"),")")),
-#                                data = rda_all_covariates_scaled,
-#                                scale = FALSE)
-#       # Pure current climate
-#       rda_out_pure_clim_current <-  rda_out_pure_spat <- rda(as.formula(paste("genetic_data ~ ", 
-#                                       paste(climate_vars_rda_current, collapse = "+"), 
-#                                       "+Condition(", 
-#                                       paste(c(spatial_vars_rda, climate_vars_rda_lgm),
-#                                             collapse = "+"),")")),
-#                                                              data = rda_all_covariates_scaled,
-#                                                              scale = FALSE)
-#       
-#       # Pure lgm climate
-#       rda_out_pure_clim_lgm <-  rda_out_pure_spat <- rda(as.formula(paste("genetic_data ~ ", 
-#                                       paste(climate_vars_rda_lgm, collapse = "+"), 
-#                                       "+Condition(", 
-#                                       paste(c(spatial_vars_rda, climate_vars_rda_current),
-#                                             collapse = "+"),")")),
-#                                                          data = rda_all_covariates_scaled,
-#                                                          scale = FALSE)
-#       
-#       overall_iner <- summary(rda_out_full)$tot.chi
-#       
-#       ## Set up venn diagram
-# # fit1 <- euler(c("Spatial" = round(summary(rda_out_pure_spat)$constr.chi/overall_iner*100, 1),
-# # "LGM climate" =   round(summary(rda_out_pure_clim_lgm)$constr.chi/overall_iner*100, 1),
-# # "Current climate" = round(summary(rda_out_pure_clim_current)$constr.chi/overall_iner*100, 1),
-# # "Spatial&Current climate" = round(summary(rda_out_part_clim_lgm)$constr.chi/overall_iner*100, 1),
-# # "Spatial&LGM climate" = round(summary(rda_out_part_clim_current)$constr.chi/overall_iner*100, 1),
-# # "Current climate&LGM climate" = round(summary(rda_out_part_spat)$constr.chi/overall_iner*100, 1),
-# # "Spatial&Current climate&LGM climate" = round(summary(rda_out_full)$constr.chi/overall_iner*100, 1)),
-# # shape = "circle")
-# # 
-# #       plot(fit1,
-# #            quantities = TRUE,
-# #          #  fills = list(fill = c("red", "steelblue", "green")),
-# #            main = label)
-# #         #  legend = list(labels = c("Spatial", "Current climate", "LGM climate")))
-# #       
-#       # Equal area venn diagram
-#       y <-  c("100" = round(summary(rda_out_pure_spat)$constr.chi/overall_iner*100, 1),
-#               "010" =   round(summary(rda_out_pure_clim_lgm)$constr.chi/overall_iner*100, 1),
-#               "001" = round(summary(rda_out_pure_clim_current)$constr.chi/overall_iner*100, 1),
-#               "101" = round(summary(rda_out_part_clim_lgm)$constr.chi/overall_iner*100, 1),
-#               "110" = round(summary(rda_out_part_clim_current)$constr.chi/overall_iner*100, 1),
-#               "011" = round(summary(rda_out_part_spat)$constr.chi/overall_iner*100, 1),
-#               "111" = round(summary(rda_out_full)$constr.chi/overall_iner*100, 1))
-#       
-#       plot.new()
-#      # plot.new()
-#       plotVenn3d(y, labels = c("Spatial", "LGM climate", "Current climate"),
-#                  Title = label, Colors = "white")  
-#       
-#       
-#     ## Just current climate and spatial
-#       
-#       y <-  c("10" = round(summary(rda_out_pure_spat)$constr.chi/overall_iner*100, 1),
-#               "01" =   round(summary(rda_out_pure_clim_current)$constr.chi/overall_iner*100, 1),
-#               "11" = round(summary(rda_out_full)$constr.chi/overall_iner*100, 1))
-#       
-#       plot.new()
-#       # plot.new()
-#       plotVenn2d(y, labels = c("Spatial", "Current climate"), Colors = "white") 
-#     } 
-#     
-#     calc_varpart(genetic_data = rda_top_scaled, label = "Warm advantageous")
-#     calc_varpart(genetic_data = rda_bottom_scaled, label = "Warm disadvantageous")
-#     calc_varpart(genetic_data = rda_all_scaled, label = "All SNPs")
-#      
+
+   library(colorfulVennPlot)
+
+   ## Function to calculate variance partitioning
+    calc_varpart <- function(genetic_data, label){
+
+      # With all data
+      rda_out_full <- rda(as.formula(paste("genetic_data ~ ",
+                                           paste(c(spatial_vars_rda,
+                                                   climate_vars_rda_current,
+                                                   climate_vars_rda_lgm), collapse = "+"))),
+                          data = rda_all_covariates_scaled,
+                          scale = FALSE)
+
+      # Partial out spatial component
+      rda_out_part_spat <- rda(as.formula(paste("genetic_data ~ ",
+                                           paste(c(climate_vars_rda_current,
+                                                   climate_vars_rda_lgm), collapse = "+"),
+                                           "+Condition(",
+                                           paste(spatial_vars_rda, collapse = "+"),")")),
+                          data = rda_all_covariates_scaled,
+                          scale = FALSE)
+
+      # Partial out current climate component
+      rda_out_part_clim_current <- rda(as.formula(paste("genetic_data ~ ",
+                                                paste(c(spatial_vars_rda,
+                                                climate_vars_rda_lgm), collapse = "+"),
+                                                "+Condition(",
+                                        paste(climate_vars_rda_current, collapse = "+"),")")),
+                                       data = rda_all_covariates_scaled,
+                                       scale = FALSE)
+
+      # Partial out lgm climate component
+      rda_out_part_clim_lgm <- rda(as.formula(paste("genetic_data ~ ",
+                                        paste(c(spatial_vars_rda,
+                                                climate_vars_rda_current), collapse = "+"),
+                                        "+Condition(",
+                                        paste(climate_vars_rda_lgm, collapse = "+"),")")),
+                                   data = rda_all_covariates_scaled,
+                                   scale = FALSE)
+
+      # Pure Spatial - partial out climate
+      rda_out_pure_spat <- rda(as.formula(paste("genetic_data ~ ",
+                                paste(spatial_vars_rda, collapse = "+"),
+                                "+Condition(",
+                                paste(c(climate_vars_rda_current, climate_vars_rda_lgm),
+                                        collapse = "+"),")")),
+                               data = rda_all_covariates_scaled,
+                               scale = FALSE)
+      # Pure current climate
+      rda_out_pure_clim_current <-  rda_out_pure_spat <- rda(as.formula(paste("genetic_data ~ ",
+                                      paste(climate_vars_rda_current, collapse = "+"),
+                                      "+Condition(",
+                                      paste(c(spatial_vars_rda, climate_vars_rda_lgm),
+                                            collapse = "+"),")")),
+                                                             data = rda_all_covariates_scaled,
+                                                             scale = FALSE)
+
+      # Pure lgm climate
+      rda_out_pure_clim_lgm <-  rda_out_pure_spat <- rda(as.formula(paste("genetic_data ~ ",
+                                      paste(climate_vars_rda_lgm, collapse = "+"),
+                                      "+Condition(",
+                                      paste(c(spatial_vars_rda, climate_vars_rda_current),
+                                            collapse = "+"),")")),
+                                                         data = rda_all_covariates_scaled,
+                                                         scale = FALSE)
+
+      overall_iner <- summary(rda_out_full)$tot.chi
+
+      ## Set up venn diagram
+# fit1 <- euler(c("Spatial" = round(summary(rda_out_pure_spat)$constr.chi/overall_iner*100, 1),
+# "LGM climate" =   round(summary(rda_out_pure_clim_lgm)$constr.chi/overall_iner*100, 1),
+# "Current climate" = round(summary(rda_out_pure_clim_current)$constr.chi/overall_iner*100, 1),
+# "Spatial&Current climate" = round(summary(rda_out_part_clim_lgm)$constr.chi/overall_iner*100, 1),
+# "Spatial&LGM climate" = round(summary(rda_out_part_clim_current)$constr.chi/overall_iner*100, 1),
+# "Current climate&LGM climate" = round(summary(rda_out_part_spat)$constr.chi/overall_iner*100, 1),
+# "Spatial&Current climate&LGM climate" = round(summary(rda_out_full)$constr.chi/overall_iner*100, 1)),
+# shape = "circle")
+#
+#       plot(fit1,
+#            quantities = TRUE,
+#          #  fills = list(fill = c("red", "steelblue", "green")),
+#            main = label)
+#         #  legend = list(labels = c("Spatial", "Current climate", "LGM climate")))
+#
+      # Equal area venn diagram
+      y <-  c("100" = round(summary(rda_out_pure_spat)$constr.chi/overall_iner*100, 2),
+              "001" = round(summary(rda_out_pure_clim_lgm)$constr.chi/overall_iner*100, 2),
+              "010" = round(summary(rda_out_pure_clim_current)$constr.chi/overall_iner*100, 2),
+              "110" = round(summary(rda_out_part_clim_lgm)$constr.chi/overall_iner*100, 2),
+              "101" = round(summary(rda_out_part_clim_current)$constr.chi/overall_iner*100, 2),
+              "011" = round(summary(rda_out_part_spat)$constr.chi/overall_iner*100, 2),
+              "111" = round(summary(rda_out_full)$constr.chi/overall_iner*100, 2))
+
+     # plot.new()
+      graphics.off()
+     # plot.new()
+      plotVenn3d(y, labels = c("Spatial", "Current climate", "LGM climate"),
+                 Title = label,
+                 Colors = c("#99cc66","#9999cc","#ff9999",
+                            "#ffff99","#99ccff","#cc99cc","#ffffff"),
+                 rot = 180)
 
 
+    ## Just current climate and spatial
+
+      # y <-  c("10" = round(summary(rda_out_pure_spat)$constr.chi/overall_iner*100, 1),
+      #         "01" =   round(summary(rda_out_pure_clim_current)$constr.chi/overall_iner*100, 1),
+      #         "11" = round(summary(rda_out_full)$constr.chi/overall_iner*100, 1))
+      # 
+      # plot.new()
+      # # plot.new()
+      # plotVenn2d(y, labels = c("Spatial", "Current climate"), Colors = "white")
+    }
+
+  # Calculate variance partitions
+    calc_varpart(genetic_data = rda_top_scaled, label = "Warm advantageous")
+    calc_varpart(genetic_data = rda_bottom_scaled, label = "Warm disadvantageous")
+    calc_varpart(genetic_data = rda_outlier_scaled, label = "All SNPs")
+    
+  
+  # For all Snps
+    calc_varpart(genetic_data = rda_all_scaled, label = "All SNPs")
+    # dev.copy(pdf, paste0("./figs_tables/fig3/Figure 3 - venn diagram ", Sys.Date(), ".pdf"),
+    #          width = 3, height = 3, useDingbats = FALSE)
+    # dev.off()
+
+  #  RDA on LGM climate
+    rda_all_mod <- rda(as.formula(paste("rda_all_scaled ~ ",
+                                        paste(c(wna_climate_vars_lgm), collapse = "+"),
+                                        "+Condition(",
+                                        paste(c(spatial_vars_rda, wna_climate_vars_current), 
+                                              collapse = "+"),")")),
+                       data = rda_all_covariates_scaled,
+                       scale = FALSE)
+    
+    rda_all_mod
+    
+    # anova(rda_all_mod, permutations = 99)
+    # anova(rda_all_mod, permutations = 99, by = "axis")
+    # anova(rda_all_mod, permutations = 99, by = "terms")
+    
+
+    
  ## Biplot highlighting outlier SNPs
     
-    # Outliers function from Forester et al.
+  # Outliers function from Forester et al.
     outliers <- function(loadings, sd_cutoff){
       # find loadings +/-z sd from mean loading
       lims <- mean(loadings) + c(-1, 1) * sd_cutoff * sd(loadings)
       loadings[loadings < lims[1] | loadings > lims[2]] # locus names in these tails
     }
 
-  # rda_all_mod <-  rda(as.formula(paste("rda_all_scaled ~ ", 
-  #                                      paste(c(spatial_vars_rda, 
-  #                                              climate_vars_rda_current), collapse = "+"))),
-  #                                         data = rda_all_covariates_scaled,
-  #                                         scale = FALSE)
-  # rda_all_mod
-  # 
-    
-# Partial out spatial component
-    rda_all_mod <- rda(as.formula(paste("rda_all_scaled ~ ",
-                                     paste(c(climate_vars_rda_current), collapse = "+"),
-                                     "+Condition(",
-                                     paste(spatial_vars_rda, collapse = "+"),")")),
-                    data = rda_all_covariates_scaled,
-                    scale = FALSE)
-  
-    rda_all_mod
-  
-  # anova( rda_all_mod, permutations = 99)
-  #  anova( rda_all_mod, parallel = 8, permutations = 999, by = "axis") # Take forever
-  #  anova( rda_all_mod, parallel = 8, permutations = 999, by = "terms") # Take forever
 
 # Identify outliers
  loadings <- summary(rda_all_mod)$species # Extracts loadings for each SNP (named species here)
  head(loadings)
  
- cand_rda1 <- outliers(loadings[, 1], sd_cutoff = 3)  # 2.5 used in Forrester et al. 2018
+ cand_rda1 <- outliers(loadings[, 1], sd_cutoff = 2.5)  # 2.5 used in Forrester et al. 2018
  cand_rda1
- cand_rda2 <- outliers(loadings[, 2], sd_cutoff = 3)
+ cand_rda2 <- outliers(loadings[, 2], sd_cutoff = 2.5)
  cand_rda2
  outlier_snps_names <- c(names(cand_rda1), names(cand_rda2))
  length(outlier_snps_names)
@@ -1931,15 +1880,37 @@
    outlier_snps_names[outlier_snps_names %in% c(top_snps_long$snp, bottom_snps_long$snp)]
    
     double_outliers <- outlier_snps_names[outlier_snps_names %in% c(top_snps_long$snp, bottom_snps_long$snp)]
-    double_outliers 
+    double_outliers
+    
+    top_double <- outlier_snps_names[outlier_snps_names %in% c(top_snps_long$snp)]
+    top_double
+    
+    bottom_double <- outlier_snps_names[outlier_snps_names %in% c(bottom_snps_long$snp)]
+    bottom_double
     
     # Make a contingency table
-    fisher.test(matrix(c(2,123,334,11899), ncol = 2, byrow = T))
-    unique(c(top_snps_long$snp, bottom_snps_long$snp))
-    length(unique(outlier_snps_names))
+    fisher.test(matrix(c(length(double_outliers),
+                         length(outlier_snps_names) - length(double_outliers),
+                         length(unique(c(top_snps_long$snp, bottom_snps_long$snp))) - length(double_outliers) ,
+                         length(rda_all_mod$colsum) -length(double_outliers) -  (length(outlier_snps_names) - length(double_outliers)) - (length(unique(c(top_snps_long$snp, bottom_snps_long$snp))) - length(double_outliers))),
+                       ncol = 2, byrow = T))
     
     
+    # Top
+    fisher.test(matrix(c(length(top_double),
+                         length(outlier_snps_names) - length(top_double),
+                         length(unique(c(top_snps_long$snp, bottom_snps_long$snp))) - length(top_double) ,
+                         length(rda_all_mod$colsum) -length(top_double) -  (length(outlier_snps_names) - length(top_double)) - (length(unique(c(top_snps_long$snp, bottom_snps_long$snp))) - length(top_double))),
+                       ncol = 2, byrow = T))
     
+    # Bottom
+    fisher.test(matrix(c(length(bottom_double),
+                         length(outlier_snps_names) - length(bottom_double),
+                         length(unique(c(bottom_snps_long$snp, bottom_snps_long$snp))) - length(bottom_double) ,
+                         length(rda_all_mod$colsum) -length(bottom_double) -  (length(outlier_snps_names) - length(bottom_double)) - (length(unique(c(bottom_snps_long$snp, bottom_snps_long$snp))) - length(bottom_double))),
+                       ncol = 2, byrow = T))
+    
+
  # Labels of outlier SNPs
    snp_labels <- rep("", times = nrow(loadings))
    snp_labels[rownames(loadings) %in% double_outliers] <- rownames(loadings)[rownames(loadings) %in% double_outliers]
@@ -1950,23 +1921,54 @@
    outlier_snps_names[outlier_snps_names %in% c(bottom_snps_long$snp)]
  
  ## Figure out what climate variable has the strongest correlation
- "snp_chr8_4017340" %in% names(cand_rda1) # in RDA1
- "snp_chr8_4017340" %in% names(cand_rda2)
- 
- cand_rda1[names(cand_rda1) == "snp_chr8_4017340"]
- sort(summary(rda_all_mod)$biplot[, "RDA1"])
- 
- "snp_chr2_18514913" %in% names(cand_rda1)
- "snp_chr2_18514913" %in% names(cand_rda2) # in RDA2
- 
- cand_rda2[names(cand_rda2) == "snp_chr2_18514913"]
- sort(summary(rda_all_mod)$biplot[, "RDA2"])
- 
- cex_points = 1.1
- 
+   
+   sort(abs(summary(rda_all_mod)$biplot[, "RDA1"]), decreasing = T)
+   sort(abs(summary(rda_all_mod)$biplot[, "RDA2"]), decreasing = T)
+   
+   rda_outlier_cors <- data.frame(snp = rep(NA, length(double_outliers)),
+                                  rda_axis = rep(NA, length(double_outliers)),
+                                  rda_cor = rep(NA, length(double_outliers)),
+                                  topvar1 = rep(NA, length(double_outliers)),
+                                  topvar1_dir = rep(NA, length(double_outliers)))
+   x = 1
+   
+   for(snp in double_outliers){
+     
+     rda_outlier_cors$snp[x] <- snp
+     
+     # Check if in RDA1
+     if(snp %in% names(cand_rda1)){
+       rda_outlier_cors$rda_axis[x] <- "RDA1"
+       rda_outlier_cors$rda_cor[x] <- cand_rda1[names(cand_rda1) == snp]
+      # Find strongest associations - could speed up by calculate summary outtside function
+       rda_outlier_cors$topvar1[x] <- names(sort(abs(summary(rda_all_mod)$biplot[, "RDA1"]), decreasing = T))[1]
+       rda_outlier_cors$topvar1_dir[x] <- summary(rda_all_mod)$biplot[, "RDA1"][names(summary(rda_all_mod)$biplot[, "RDA1"]) ==  rda_outlier_cors$topvar1[x]]
+     }
+     
+     # Check if in RDA2
+     if(snp %in% names(cand_rda2)){
+       rda_outlier_cors$rda_axis[x] <- "RDA2"
+       rda_outlier_cors$rda_cor[x] <- cand_rda2[names(cand_rda2) == snp]
+       # Find strongest associations - could speed up by calculate summary outtside function
+       rda_outlier_cors$topvar1[x] <- names(sort(abs(summary(rda_all_mod)$biplot[, "RDA2"]), decreasing = T))[1]
+       rda_outlier_cors$topvar1_dir[x] <- summary(rda_all_mod)$biplot[, "RDA2"][names(summary(rda_all_mod)$biplot[, "RDA2"]) ==  rda_outlier_cors$topvar1[x]]
+     }
+     
+     # Plot relationship
+     # plot(c(pull(rda_all_covariates_scaled, rda_outlier_cors$topvar1[x])), 
+     #      rda_all_scaled[, snp], xlab = rda_outlier_cors$topvar1[x], ylab = snp, main = snp, pch = 19, col = "dodgerblue")
+     # abline(lm(rda_all_scaled[, snp] ~ c(pull(rda_all_covariates_scaled, rda_outlier_cors$topvar1[x]))), lwd = 2) 
+     
+     x = x +1
+   }
+   
+   rda_outlier_cors
+   
 # Make biplot
+ cex_points = 1.1
+ axis_lim <- .5
  plot(rda_all_mod, type = "n", scaling = 3, 
-      xlim = c(-1, 1), ylim = c(-1, 1), las = 1) # Create empty plot 
+      xlim = c(-axis_lim, axis_lim), ylim = c(-axis_lim, axis_lim), las = 1) # Create empty plot 
  
  # All snps
  points(rda_all_mod, display = "species", pch = 21,
@@ -1987,21 +1989,23 @@
         select = rownames(loadings) %in% top_snps_long$snp)
   
  # Add double outliers - growth and climate
-  points(rda_all_mod, display = "species", pch = 23, cex = cex_points * 1.75,
+  points(rda_all_mod, display = "species", pch = 23, cex = cex_points * 1.5,
          col = "black", bg = "#6699CC", scaling = 3,
-         select = rownames(loadings) %in% double_outliers)
-  text(rda_all_mod, display = "species", labels = snp_labels, cex = .75, scaling = 3)
+         select = rownames(loadings) %in% top_double)
+  points(rda_all_mod, display = "species", pch = 23, cex = cex_points * 1.5,
+         col = "black", bg = "#FF6633", scaling = 3,
+         select = rownames(loadings) %in% bottom_double)
+  #text(rda_all_mod, display = "species", labels = snp_labels, cex = .75, scaling = 3)
   
  # Environmental vectors
   text(rda_all_mod, scaling = 3, display = "bp",
-       col= arrow_cols,
-       cex = .75) 
+       col= arrow_cols, lwd = 3,
+       cex = 1) 
   
- 
   # Save as pdf
-  # dev.copy(pdf, paste0("./figs_tables/Figure S9 - RDA biplot ", Sys.Date(), ".pdf"),
-  #          width = 5, height = 5, useDingbats = FALSE)
-  # dev.off()
+  dev.copy(pdf, paste0("./figs_tables/fig3/Figure 3 - rda biplot ", Sys.Date(), ".pdf"),
+           width = 5, height = 5, useDingbats = FALSE)
+  dev.off()
 
   
   ## Calculate sum of loadings for outliers and non outliers
@@ -2216,7 +2220,7 @@
       cat("Working on row:", i, " ... \n")
     }
     
-    for(j in 1:nrow(dist_mat)){
+    for(j in 1:nrow(dist_mat_gf)){
       
       dist_mat_gf[i, j] <- distHaversine(mom_lat_longs[i, ], 
                                       mom_lat_longs[j, ])/ 1000 # To convert to km
@@ -2255,9 +2259,9 @@
   ## Factors
     library(tidyimpute)
     gf_top <- dplyr::select(gen_dat_gf, contains("snp_"))
-    gf_top <- gf_top[, !colnames(gf_top) %in% unique(c(bottom_snps_long$snp, top_snps_long$snp))]
+  #  gf_top <- gf_top[, !colnames(gf_top) %in% unique(c(bottom_snps_long$snp, top_snps_long$snp))]
    # gf_top <- dplyr::select(gen_dat_gf, bottom_snps_long$snp)
-    gf_top <- dplyr::select(gen_dat_gf, unique(c(bottom_snps_long$snp, top_snps_long$snp)))
+  #  gf_top <- dplyr::select(gen_dat_gf, unique(c(bottom_snps_long$snp, top_snps_long$snp)))
    # gf_top_imputed <- flashpcaR::scale2(gf_top, impute = 2)
     gf_top_imputed <- tidyimpute::impute_mean(gf_top) # Mean impute
     summary(gf_top_imputed[, 1:20])
@@ -2276,7 +2280,7 @@
                              predictor.vars = colnames(clim_dat_lgm),
                             response.vars = colnames(gf_top_imputed),
                             trace = TRUE,
-                           ntree = 100,
+                           ntree = 10,
                            nbin = 201,
                            maxLevel = maxLevel, # From Fitzpatrick R script
                            corr.threshold = 0.5)
@@ -2367,7 +2371,7 @@
                            s(PCNM5, bs = "cr"),
                       #     s(locality, bs = "re"),
               data = cors)
-    g1 <- gam(height_change_warmer_base0 ~ s(offset, bs = "cr"),
+    g1 <- gam(n_top_snps ~ s(offset, bs = "cr"),
               #     s(locality, bs = "re"),
               data = cors)
     summary(g1)

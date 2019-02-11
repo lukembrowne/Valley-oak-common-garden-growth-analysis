@@ -75,15 +75,34 @@
   
   ## Calculate kinship matrix
   
+      # ## Subset to samples for Alayna
+      # subset <- c(63, 64, 65, 66, 68, 69, 70, 206, 208, 209, 210, 211, 212, 214, 217, 218, 220, 221, 345, 346, 347, 349, 350, 351, 508, 509, 510, 512, 513, 514, 529, 530, 532, 533, 536)
+      # 
+      # subset %in% gen_dat_clim$accession
+      # subset[which(subset %in% gen_dat_clim$accession)]
+      # 
+      # # WHich one's do not have GBS data?
+      # subset[which(!subset %in% gen_dat_clim$accession)]
+      # 
+      # gen_dat_clim <- gen_dat_clim %>%
+      #   filter(accession %in% subset)
+      # dim(gen_dat_clim)
+  
+
   # Need to first convert to -1, 0, 1 matrix
-  
-  
+
   kin_mat <- as.matrix(gen_dat_clim[, snp_col_names])
   kin_mat[kin_mat == 0] <- -1
   kin_mat[kin_mat == 1] <- 0
   kin_mat[kin_mat == 2] <- 1
   
   kin_mat <- A.mat(kin_mat) # Calculate kinship matrix
+  
+  # ## Output kinship matrix for Alanya
+    # rownames(kin_mat) <- gen_dat_clim$accession
+    # colnames(kin_mat) <- gen_dat_clim$accession
+    # write.csv(kin_mat, "./output/kinship matrix for alayna 2018_02_07.csv")
+    # 
   
   ## Calculate PCA on genetic data
   #  pca_gen = prcomp(bglr_gen_scaled, center = FALSE, scale = FALSE)
