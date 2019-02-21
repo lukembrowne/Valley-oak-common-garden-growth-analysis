@@ -37,6 +37,7 @@
 
 
 # Goal is to run an individual gam for each SNP, like a fancy GWAS, and then correct for multiple testing after
+    
 
 # Format and save to .Rdata for cluster -----------------------------------
 
@@ -167,8 +168,8 @@
                       bind_cols(gen_dat_clim[, c("accession", snp_col_names)],
                                          pcs),
                       by = "accession")
-  
-   
+    
+
   # Set up factors  
     dat_snp$accession <- factor(dat_snp$accession)
     dat_snp$section_block <- factor(dat_snp$section_block)
@@ -275,6 +276,7 @@
   # table(dat_snp_unscaled$section_block[folds[[3]]])
   # table(dat_snp_unscaled$section_block[folds[[4]]])
   # table(dat_snp_unscaled$section_block[folds[[5]]])
+  
   
 
 # Save data to file that will be uploaded to cluster  

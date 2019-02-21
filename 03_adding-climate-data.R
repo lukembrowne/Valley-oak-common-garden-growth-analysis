@@ -558,6 +558,19 @@
                                          accession %in% climate_gbs_mom$accession)
       dim(dat_gbs_only_clim)
       
+      
+      # Select a 1/2 subset of adults for taining and testing
+      # set.seed(1)
+      # training_moms <- sample(na.omit(climate_gbs_mom$accession), 
+      #                         size = length(na.omit(climate_gbs_mom$accession))/2)
+      # testing_moms <- na.omit(climate_gbs_mom$accession)[!na.omit(climate_gbs_mom$accession) %in% training_moms]
+      # 
+      # any(training_moms %in% testing_moms) # Should both be false
+      # any(testing_moms %in% training_moms)
+      # 
+      # dat_gbs_only_clim <- dat_gbs_only_clim %>%
+      #   dplyr::filter(accession %in% training_moms)
+      
     
 # Calculating difference in climate variables -----------------------------
 

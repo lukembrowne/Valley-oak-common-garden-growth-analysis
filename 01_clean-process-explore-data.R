@@ -412,7 +412,5 @@
     ## Filtering based on garden
    #  dat_all <- dat_all[dat_all$site == "Chico", ]
     
-
-    ## Filtering based on survival  
-      dim(dat_all)
+   dim(dat_all)
 
