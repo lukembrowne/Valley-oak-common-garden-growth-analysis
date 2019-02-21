@@ -6,11 +6,10 @@
 # Read in cluster run output ----------------------------------------------
 
   # Path to results
-  path <- "run_52188_tmax_sum_dif_continuous_cv_fvals"
+#  path <- "run_52188_tmax_sum_dif_continuous_cv_fvals"
   
-  # randomized genotypes
- # path <- "run_53717_tmax_sum_dif_continuous_cv_fvals_rand"
-
+  path <- "run_383652_tmax_sum_dif_training_set_2019_02_12"
+  
   path_to_summaries <- paste0("./output/", path, "/model_summaries/")
   path_to_predictions <- paste0("./output/", path, "/model_predictions/")
 
@@ -105,7 +104,7 @@
  # Filter out based on number of gene copies
     hist(sum_df_long$n_gen, breaks = 50)
 
-    gen_copies_thresh <- 100
+    gen_copies_thresh <- 100 # Used to be 100
 
    sum_df_long <- sum_df_long %>%
       dplyr::filter(n_gen >= gen_copies_thresh)
@@ -116,9 +115,9 @@
   #    dplyr::filter(genotype != "1")
   
   ## Remove those that predictions weren't made on accession 1
-   table(sum_df_long$acc_pred)
-    sum_df_long <- sum_df_long %>%
-      dplyr::filter(acc_pred == 1)
+   # table(sum_df_long$acc_pred)
+   #  sum_df_long <- sum_df_long %>%
+   #    dplyr::filter(acc_pred == 1)
     
   # Subset prediction dataframe to just predictions of SNPs that pass filters
     pred_df_sub <- pred_df_raw %>%
@@ -180,43 +179,65 @@
 
   # F values
   hist(sum_df$f_val_gen_int, breaks = 50)
-  fdr_fvals = fdrtool(sum_df$f_val_gen_int,
-                 statistic = "normal", plot = FALSE)
 
+  fdr_fvals = fdrtool(c(sum_df$f_val_gen_int),
+                 statistic = "normal", plot = FALSE)
+  
   # P values
   summary(fdr_fvals$pval)
   hist(fdr_fvals$pval, breaks = 40)
   sum(fdr_fvals$pval < 0.05)
+  sort(fdr_fvals$pval)[1:50]
   
+  format.pval(sort(fdr_fvals$pval)[1:50], eps = 2.220446e-32)
   
-  # Make a panel plot for supplementary info with p values and q values
-    # library(qqman)
-    # 
-    # par(mfrow = c(2,2))
-    # 
-    # # P values
-    # hist(fdr_fvals$pval, breaks = 40, col = "steelblue2",
-    #     xlab = "p-value", main = "Uncorrected p-values")
-    # qq(fdr_fvals$pval, main = "Uncorrected p-values")
-    # 
-    # # Q values
-    # hist(fdr_fvals$qval, breaks = 40, col = "steelblue2",
-    #      xlab = "q-value", main = "q-values")
-    # qq(fdr_fvals$qval, main = "q-values")
-    # 
-    # dev.copy(pdf, paste0("./figs_tables/Figure S5 - histogram and qqplots of p values ", Sys.Date(), ".pdf"),
-    #          width = 7, height = 7, useDingbats = FALSE)
-    # dev.off()
-    # 
-    # par(mfrow = c(1,1))
-    # 
+
+  
+  # Calculate genomic control?
+  # library(gap)
+  # 
+  # test = gcontrol2(fdr_fvals$pval)
+  # test$lambda
+  # 
+
+
     
   # Q values
   hist(fdr_fvals$qval, breaks = 40) # Each q-value is the expected proportion of false positives among all SNP effects that are at least as extreme as that observed for the current SNP.
   sum(fdr_fvals$qval < 0.05) 
   summary(fdr_fvals$qval)
+  sort(fdr_fvals$qval, decreasing = F)[1:100]
   
-  qq(fdr_fvals$qval)
+  
+  
+  # Make a panel plot for supplementary info with p values and q values
+  library(qqman)
+  
+  par(mfrow = c(2,2))
+  
+  # P values
+  hist(fdr_fvals$pval, breaks = 40, col = "steelblue2",
+       xlab = "p-value", main = "Uncorrected p-values")
+  qq(fdr_fvals$pval, main = "Uncorrected p-values")
+  
+  # Q values
+  hist(fdr_fvals$qval, breaks = 40, col = "steelblue2",
+       xlab = "q-value", main = "q-values")
+  qq(fdr_fvals$qval, main = "q-values")
+  sort(fdr_fvals$qval, decreasing = T)
+  # 
+  #     dev.copy(pdf, paste0("./figs_tables/Figure S5 - histogram and qqplots of p values ", Sys.Date(), ".pdf"),
+  #              width = 7, height = 7, useDingbats = FALSE)
+  #     dev.off()
+  
+  par(mfrow = c(1,1))
+  
+  
+  
+  
+  
+  
+
   
  
   
@@ -276,7 +297,7 @@
  bottom_snps_long <- sum_df_long_w_preds %>%
    dplyr::filter(!!as.name(height_metric) <= (height_median -
                                                 mad_thresh * height_mad)) %>%
-   dplyr::filter(q_val < q_val_thresh) %>%
+   dplyr::filter(q_val < q_val_thresh)  %>%
    dplyr::filter(cv_cor >= train_test_cor_thresh)
 
    bottom_snps_long$bottom_snp = TRUE
@@ -317,16 +338,20 @@
    length(unique(c(top_snps_long$snp, bottom_snps_long$snp)))
    
    ## Plot interactions at particular genotype
-   pred_snp = dplyr::left_join(dplyr::select(top_snps_long, snp), pred_df_raw)
+   pred_snp = dplyr::left_join(dplyr::select(man_df, SNP), pred_df_raw, by = c("SNP" = "snp"))
+   pred_snp <- pred_snp %>%
+     rename(snp = SNP)
    table(pred_snp$snp)
    
-   snp_filter = "snp_chr1_28991295"
+   snp_filter = "snp_chr8_7837444" # For example of strong interaction
+   snp_filter = "snp_chr2_10328592"
    pred_snp %>%
      dplyr::filter(snp == snp_filter)  %>%
    ggplot(., aes(x = tmax_sum_dif_unscaled, y = pred, col = factor(genotype))) + 
      geom_vline(aes(xintercept = 0), lty = 2, size = .25) +
      geom_vline(xintercept = 4.8, size = .25) +
-     geom_ribbon(aes(ymin = pred - 1.96*se, ymax = pred + 1.96 * se, fill = factor(genotype)), alpha = .25) +
+     geom_ribbon(aes(ymin = pred - 1.96*se, ymax = pred + 1.96 * se, fill = factor(genotype)), alpha = .15, color = NA,
+                 show.legend = F) +
      geom_line(alpha = 1,
                show.legend = T, size = 1) + 
      ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
@@ -335,7 +360,8 @@
      scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) + 
      theme(panel.border = element_blank(), panel.grid.major = element_blank(),
            panel.grid.minor = element_blank(), 
-           axis.line = element_line(colour = "black"))  
+           axis.line = element_line(colour = "black"))   + 
+     labs(color = "Genotype")
    
    sum_df_long_w_preds[sum_df_long_w_preds$snp == snp_filter,]
    table(dat_snp[, snp_filter])
@@ -353,10 +379,7 @@
    random_snps_df <-  pred_df_raw %>%
      dplyr::mutate(snp_gen = paste0(snp,genotype)) %>%
      dplyr::filter(snp_gen %in% random_snps) %>%
-     dplyr::mutate(type = "Non-outlier")Qpwoeiru123
-   ;lkjas;ldkfjasd
-   
-   
+     dplyr::mutate(type = "Non-outlier")
    
    # Join outlier dataframes with prediction dataframes
    pred_df_outlier <- dplyr::left_join(top_snps_long, pred_df_raw) %>%
@@ -396,7 +419,7 @@
      scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
    #  facet_wrap(~type) +
    #  facet_wrap(~ type + snp) +
-     scale_color_manual(values = c("#228b22", "#6699CC" ,"#FF6633"), 
+     scale_color_manual(values = c("#228b22", "#7fbf7b" ,"#af8dc3"), 
                         labels = c( "Non-outlier genotypes", 
                                   "Warm advantageous genotypes", 
                                   "Warm disadvantageous genotypes"),
@@ -453,8 +476,8 @@
    even_chroms <- paste0("chr", seq(2, 12, 2))
    
    man_df$color <- NA
-   man_df$color[man_df$chrom %in% odd_chroms] <- "#75B3A7"
-   man_df$color[man_df$chrom %in% even_chroms] <- "#5D5296"
+   man_df$color[man_df$chrom %in% odd_chroms] <- "#1f78b4"
+   man_df$color[man_df$chrom %in% even_chroms] <- "#a6cee3"
    
    # Start plot
    ggplot(man_df, aes(x = index, 
@@ -615,7 +638,7 @@
    #                      name = "% Change in RGR \n w/ 4.8°C increase",
    #                      guide = FALSE) + 
    
-   scale_colour_distiller(type = "seq", palette = "RdYlBu", 
+   scale_colour_distiller(type = "seq", palette = "PRGn", 
                           direction = 1, 
                           aesthetics = c("color", "fill"),
                           name = "% Change in RGR \n with 4.8°C increase") + 
@@ -639,7 +662,7 @@
      # ggsave(paste0("./figs_tables/fig2/Figure 2 - manhattan plot growth predictions",
      #                      Sys.Date(), ".png"),
      #          width = 19, height = 4, units = "cm", dpi = 600)
-     #  
+
    #   # Save as PDF for legend
    #   ggsave(paste0("./figs_tables/fig2/Figure 2 - manhattan plot growth predictions LEGEND",
    #                 Sys.Date(), ".pdf"),
@@ -719,7 +742,7 @@
                           fill = factor(has_outlier_snp)) )+ 
     geom_boxplot(outlier.shape = NA, alpha = 1) + 
   # geom_jitter(aes(col = factor(has_outlier_snp)), alpha = .5, size = .25, pch = 16) + 
-    scale_fill_manual(values =  c("#6699CC", "#FF6633", "#228b22"), name = "") +
+    scale_fill_manual(values =  c("#7fbf7b", "#af8dc3", "#228b22"), name = "") +
     xlab("") + ylab("Difference in adjusted R-squared") +
     theme_bw(10) +
     #theme(axis.text.x = element_text(angle = 60, hjust = 1))
@@ -738,6 +761,63 @@
   
 
 # Figure 2 - growth vs copies of alleles ##################
+  
+  
+  ## Calculate polygenic risk score
+  # dat_snp_count$prs <- NULL
+  # avg_height <- median(sum_df_long_w_preds$height_change_warmer_base0)
+  # 
+  # x = 1
+  # 
+  # for(snp in unique(c(top_snps_long$snp, bottom_snps_long$snp))){
+  #   
+  #   if(x %% 25 == 0){
+  #     cat("Working on snp: ", x, "... \n")
+  #   }
+  #   
+  #   # Subset to genotypes
+  #   sub <- dplyr::select(dat_snp_unscaled, snp)
+  # 
+  #   preds_sub <- dplyr::filter(sum_df_long_w_preds, snp == top_snps_long$snp[x]) %>%
+  #               dplyr::select(genotype, height_change_warmer_base0)
+  #   
+  #   # Add in median value for missing genotypes
+  #   if(!"0" %in% preds_sub$genotype){
+  #     preds_sub <- rbind(preds_sub, data.frame(genotype = "0", 
+  #                                 height_change_warmer_base0 = avg_height))
+  #   }
+  #   if(!"1" %in% preds_sub$genotype){
+  #     preds_sub <- rbind(preds_sub, data.frame(genotype = "1", 
+  #                                              height_change_warmer_base0 = avg_height))
+  #   }
+  #   if(!"2" %in% preds_sub$genotype){
+  #     preds_sub <- rbind(preds_sub, data.frame(genotype = "2", 
+  #                                              height_change_warmer_base0 = avg_height))
+  #   }
+  #   
+  #   
+  #  prs <-  case_when(
+  #     sub == "0" ~ preds_sub$height_change_warmer_base0[preds_sub$genotype == "0"],
+  #     sub == "1"  ~ preds_sub$height_change_warmer_base0[preds_sub$genotype == "1"],
+  #     sub == "2"  ~ preds_sub$height_change_warmer_base0[preds_sub$genotype == "2"],
+  #     TRUE ~ avg_height
+  #   )
+  #  
+  #  if(x == 1){
+  #    dat_snp_count$prs <- prs
+  #  } else {
+  #    dat_snp_count$prs <- dat_snp_count$prs + prs
+  # 
+  #  }
+  #  
+  #  x = x+1
+  # }
+  # 
+  # hist(dat_snp_count$prs)
+  # dat_snp_count$prs_scaled <- (dat_snp_count$prs - mean(dat_snp_count$prs)) / sd(dat_snp_count$prs)
+  # hist(dat_snp_count$prs_scaled)
+  # 
+
   
   ## Calculate number of top and bottom SNPs 
   dat_snp_count <- dat_snp_unscaled %>%
@@ -786,6 +866,9 @@
   # Set formula
   fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(n_top_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_top_snps, bs=\"cr\") + s(n_bottom_snps, bs=\"cr\") + s(tmax_sum_dif, by = n_bottom_snps, bs=\"cr\") + s(accession, bs = \"re\") + s(locality, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\")  + s(tmax_sum_dif, by = PC1_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC2_gen, bs=\"cr\") + s(PC1_clim, bs=\"cr\") + s(PC2_clim, bs=\"cr\")  + s(tmax_sum_dif, by = PC1_clim, bs=\"cr\") + s(tmax_sum_dif, by = PC2_clim, bs=\"cr\")"))
   
+  # fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(prs_scaled, bs=\"cr\") + s(tmax_sum_dif, by =prs_scaled, bs=\"cr\")  + s(accession, bs = \"re\") + s(locality, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\")  + s(tmax_sum_dif, by = PC1_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC2_gen, bs=\"cr\") + s(PC1_clim, bs=\"cr\") + s(PC2_clim, bs=\"cr\")  + s(tmax_sum_dif, by = PC1_clim, bs=\"cr\") + s(tmax_sum_dif, by = PC2_clim, bs=\"cr\")"))
+  # 
+  # 
   
 # Gam with interaction effect
   gam_snp = bam(formula = formula(fixed_effects),
@@ -916,15 +999,18 @@
     geom_vline(xintercept = -5.2, size = .25) +
     
     
-    geom_ribbon(aes(ymin = pred - 1.96*se, ymax = pred + 1.96 * se, fill = factor(type_count)), alpha = .25) +
+    geom_ribbon(aes(ymin = pred - 1.96*se, ymax = pred + 1.96 * se, fill = factor(type_count)), alpha = .35) +
     geom_line(aes(col = factor(type_count))) + 
     scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
      ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
    # ylab("Relative growth rate") +
-    xlab("Tmax transfer distance") +
+    xlab("Tmax transfer distance (°C)") +
     # ylim(c(.20, .5)) +
-    scale_color_manual(values = c("#FF6633", "#6699CC", "#228b22")) +
-    scale_fill_manual(values =  c("#FF6633", "#6699CC", "#228b22")) +
+    # scale_color_manual(values = c("#af8dc3", "#7fbf7b", "#228b22")) +
+    # scale_fill_manual(values =  c("#af8dc3", "#7fbf7b", "#228b22")) +
+    scale_color_manual(values = c("#af8dc3", "#7fbf7b", "#227eb8")) +
+    scale_fill_manual(values =  c("#af8dc3", "#7fbf7b", "#227eb8")) +
+    
     theme_bw(8) + 
     theme(panel.border = element_blank(), 
           panel.grid.major = element_blank(),
@@ -934,8 +1020,8 @@
     NULL
   
   # Save plot output
-  # ggsave(filename = paste0("./figs_tables/fig2/Figure 2 - outlier counts ", Sys.Date(), ".pdf"),
-  #        units = "cm", width = 8, height = 5)
+  ggsave(filename = paste0("./figs_tables/fig2/Figure 2 - outlier counts ", Sys.Date(), ".pdf"),
+         units = "cm", width = 8, height = 5)
 
   
   ## Calculating differences in growth rates
@@ -1170,7 +1256,7 @@
                  #           position=position_dodge(width=0.5)) +
                  ylim(c(0, 50)) +
                  ylab("") + 
-                 scale_fill_manual(values = c("#FF6633", "#6699CC")) +
+                 scale_fill_manual(values = c("#af8dc3", "#7fbf7b")) +
                  theme_bw(2) + theme(legend.position = "none",
                                      axis.title.x=element_blank(),
                                      axis.text.x=element_blank(),
@@ -1185,6 +1271,7 @@
                                      panel.background = element_rect(fill = "transparent",colour = NA)))
   })
   
+
   names(grobs_qlob) <- dat_snp_count_locality$locality # Add names of localities
   
   plot(grobs_qlob[[1]]) # Example plot
@@ -1200,7 +1287,7 @@
                               #           position=position_dodge(width=0.35)) +
                               ylim(c(0, 50)) +
                               ylab("") + 
-                              scale_fill_manual(values = c("#FF6633", "#6699CC")) +
+                              scale_fill_manual(values = c("#af8dc3", "#7fbf7b")) +
                               theme_bw(2) + theme(legend.position = "none",
               axis.title.x=element_blank(),
               axis.text.x=element_blank(),
@@ -1378,7 +1465,7 @@
       
       # Add kriged raster
       tm_shape(krig_rast) + 
-      tm_raster(palette = "RdYlBu",
+      tm_raster(palette = "PRGn",
                 n = 20,
               # breaks = c(-8, -7, -6, -5, -4),
                 alpha = .95,
@@ -1398,18 +1485,18 @@
                  # palette = "RdYlBu",
                border.alpha = 0,
                  # n = 20,
-                 midpoint = NA) 
+                 midpoint = NA) +
       # 
-      # Bar charts
-      # tm_shape(dat_snp_count_locality_sp) +
-      # tm_symbols(size=.9, shape="locality",
-      #            #   just = "top",
-      #            shapes=grobs_qlob,
-      #            #  sizes.legend=c(5, 10, 30),
-      #            scale=1, border.alpha = 0,
-      #            legend.size.show = FALSE,
-      #            legend.col.show = FALSE,
-      #            legend.shape.show = FALSE) +
+     # Bar charts
+      tm_shape(dat_snp_count_locality_sp) +
+      tm_symbols(size=.9, shape="locality",
+                 #   just = "top",
+                 shapes=grobs_qlob,
+                 #  sizes.legend=c(5, 10, 30),
+                 scale=1, border.alpha = 0,
+                 legend.size.show = FALSE,
+                 legend.col.show = FALSE,
+                 legend.shape.show = FALSE)
       # 
      # Add bar chart for legend
       # tm_shape(legend_sp) +
@@ -1424,8 +1511,11 @@
     tm
     
   # Save plot
-  # tmap_save(tm, filename = paste0("./figs_tables/fig2/growth_barchart ", Sys.Date(), ".pdf"),
+  # tmap_save(tm, filename = paste0("./figs_tables/fig2/growth_barchart no bars ", Sys.Date(), ".pdf"),
   #           width = 16, height =16, units = "cm", useDingbats=FALSE)
+    
+    tmap_save(tm, filename = paste0("./figs_tables/Figure S8 - growth_barchart with bars ", Sys.Date(), ".pdf"),
+              width = 16, height =16, units = "cm", useDingbats=FALSE)
     
   
 
@@ -1529,6 +1619,58 @@
      dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality),
                       by = c("id" = "gbs_name")) %>%
      dplyr::filter(!(id %in% exclude_based_on_missing))
+   
+   
+   rda_df2 <- left_join(rda_df, dplyr::select(dat_snp_count, accession, prs_scaled) %>% distinct(accession, .keep_all = T) %>% mutate(accession = as.numeric(as.character(accession)))) %>%
+     filter(!is.na(accession)) %>%
+     filter(!is.na(prs_scaled))
+     
+   
+   head(rda_df2)
+   
+   pairs.panels(rda_df2[, c("prs_scaled", wna_climate_vars_current)])
+   
+
+   summary(lm(prs_scaled ~ tmax_sum_lgm+tmax_lgm+tmin_lgm+tave_lgm+tmin_winter_lgm+cwd_lgm+bioclim_04_lgm+bioclim_15_lgm+bioclim_18_lgm+bioclim_19_lgm, data = rda_df2))
+   
+   summary(lm(prs_scaled ~ tmax_sum_wna_current+tmax_wna_current+tmin_wna_current+tave_wna_current+tmin_winter_wna_current+cwd_wna_current+bioclim_04_wna_current+bioclim_15_wna_current+bioclim_18_wna_current+bioclim_19_wna_current, data = rda_df2))
+   
+   summary(lm(prs_scaled ~ tmax_sum_rcp85+tmax_rcp85+tmin_rcp85+tave_rcp85+tmin_winter_rcp85+cwd_rcp85+bioclim_04_rcp85+bioclim_15_rcp85+bioclim_18_rcp85+bioclim_19_rcp85, data = rda_df2))
+   
+   # Gams
+   summary(gam(prs_scaled ~ s(tmax_sum_lgm)+s(tmax_lgm)+s(tmin_lgm)+s(tave_lgm)+s(tmin_winter_lgm)+s(cwd_lgm)+s(bioclim_04_lgm)+s(bioclim_15_lgm)+s(bioclim_18_lgm)+s(bioclim_19_lgm), data = rda_df2))
+   
+   
+   summary(gam(prs_scaled ~ s(tmax_sum_wna_current)+s(tmax_wna_current)+s(tmin_wna_current)+s(tave_wna_current)+s(tmin_winter_wna_current)+s(cwd_wna_current)+s(bioclim_04_wna_current)+s(bioclim_15_wna_current)+s(bioclim_18_wna_current)+s(bioclim_19_wna_current), data = rda_df2))
+   
+   summary(gam(prs_scaled ~ s(tmax_sum_rcp85)+s(tmax_rcp85)+s(tmin_rcp85)+s(tave_rcp85)+s(tmin_winter_rcp85)+s(cwd_rcp85)+s(bioclim_04_rcp85)+s(bioclim_15_rcp85)+s(bioclim_18_rcp85)+s(bioclim_19_rcp85), data = rda_df2))
+   
+   
+   paste(paste("s(PCNM", 1:10, ")", sep =""), collapse = "+")
+   paste(paste("PCNM", 1:10, sep =""), collapse = "+")
+   
+  rda_df2$prs_resids <- resid(gam(prs_scaled ~ s(PCNM1)+s(PCNM2)+s(PCNM3)+s(PCNM4)+s(PCNM5)+s(PCNM6)+s(PCNM7)+s(PCNM8)+s(PCNM9)+s(PCNM10) + s(locality, bs = "re"), data = rda_df2))
+  
+  
+  rda_df2$locality <- factor(rda_df2$locality)
+  summary(gam(prs_resids ~ s(tmax_sum_lgm)+s(tmax_lgm)+s(tmin_lgm)+s(tave_lgm)+s(tmin_winter_lgm)+s(cwd_lgm)+s(bioclim_04_lgm)+s(bioclim_15_lgm)+s(bioclim_18_lgm)+s(bioclim_19_lgm), data = rda_df2))
+  
+  
+  library(randomForest)
+  
+  test = randomForest(prs_scaled ~ tmax_sum_lgm+tmax_lgm+tmin_lgm+tave_lgm+tmin_winter_lgm+cwd_lgm+bioclim_04_lgm+bioclim_15_lgm+bioclim_18_lgm+bioclim_19_lgm,
+                      ntree = 1000,
+                      data = rda_df2)
+  
+  test = randomForest(prs_scaled ~PCNM1+PCNM2+PCNM3+PCNM4+PCNM5+PCNM6+PCNM7+PCNM8+PCNM9+PCNM10,
+                      ntree = 1000,
+                      mtry = 3,
+                      data = rda_df2)
+  
+  test
+  importance(test)
+   
+   
 
    # # Average allele frequency by locality
    # library(multidplyr)
@@ -1652,6 +1794,11 @@
                                                                 top_snps_long$snp))), impute = 2)
    dim(rda_outlier_scaled)
    
+   rda_nonoutlier_scaled <- flashpcaR::scale2(dplyr::select(rda_df, snp_col_names[!snp_col_names %in%
+                                                            unique(c(bottom_snps_long$snp,
+                                                                          top_snps_long$snp))]), impute = 2)
+   dim(rda_nonoutlier_scaled)
+   
   
    climate_vars_rda_current <- paste0(wna_climate_vars, "_wna_current")
    climate_vars_rda_lgm <- paste0(wna_climate_vars, "_lgm")
@@ -1667,7 +1814,7 @@
    
    
    # Select same number of PCNMs as climate variables
-   spatial_vars_rda <- names(dplyr::select(rda_all, PCNM1:PCNM10)) # 10
+   spatial_vars_rda <- names(dplyr::select(rda_df, PCNM1:PCNM10)) # 10
     
 
    library(colorfulVennPlot)
@@ -1736,7 +1883,11 @@
                                                          data = rda_all_covariates_scaled,
                                                          scale = FALSE)
 
-      overall_iner <- summary(rda_out_full)$tot.chi
+      # Based on total variance (included unexplained variance)
+   #  overall_iner <- summary(rda_out_full)$tot.chi
+      
+      # Based on explained variance
+      overall_iner <- summary(rda_out_full)$constr.chi
 
       ## Set up venn diagram
 # fit1 <- euler(c("Spatial" = round(summary(rda_out_pure_spat)$constr.chi/overall_iner*100, 1),
@@ -1787,7 +1938,9 @@
   # Calculate variance partitions
     calc_varpart(genetic_data = rda_top_scaled, label = "Warm advantageous")
     calc_varpart(genetic_data = rda_bottom_scaled, label = "Warm disadvantageous")
-    calc_varpart(genetic_data = rda_outlier_scaled, label = "All SNPs")
+    calc_varpart(genetic_data = rda_outlier_scaled, label = "Outlier SNPs")
+    
+    calc_varpart(genetic_data = rda_nonoutlier_scaled, label = "Non-Outlier SNPs")
     
   
   # For all Snps
@@ -1899,8 +2052,7 @@
     fisher.test(matrix(c(length(double_outliers),
                          length(outlier_snps_names) - length(double_outliers),
                          length(unique(c(top_snps_long$snp, bottom_snps_long$snp))) - length(double_outliers) ,
-                         length(rda_all_mod$colsum) -length(double_outliers) -  (length(outlier_snps_names) - length(double_outliers)) - (length(unique(c(top_snps_long$snp, bottom_snps_long$snp))) - length(double_outliers))),
-                       ncol = 2, byrow = T))
+                         length(rda_all_mod$colsum) -length(double_outliers) -  (length(outlier_snps_names) - length(double_outliers)) - (length(unique(c(top_snps_long$snp, bottom_snps_long$snp))) - length(double_outliers))), ncol = 2, byrow = T))
     
     
     # Top
@@ -1987,20 +2139,20 @@
         select = rownames(loadings) %in% outlier_snps_names)
  # Bottom snps
  points(rda_all_mod, display = "species", pch = 21,
-        col = "black", bg = "#FF6633", scaling = 3, cex = cex_points,
+        col = "black", bg = "#af8dc3", scaling = 3, cex = cex_points,
         select = rownames(loadings) %in% bottom_snps_long$snp)
  
  # Top snps
  points(rda_all_mod, display = "species", pch = 21, cex = cex_points,
-        col = "black", bg = "#6699CC", scaling = 3,
+        col = "black", bg = "#7fbf7b", scaling = 3,
         select = rownames(loadings) %in% top_snps_long$snp)
   
  # Add double outliers - growth and climate
   points(rda_all_mod, display = "species", pch = 23, cex = cex_points * 1.5,
-         col = "black", bg = "#6699CC", scaling = 3,
+         col = "black", bg = "#7fbf7b", scaling = 3,
          select = rownames(loadings) %in% top_double)
   points(rda_all_mod, display = "species", pch = 23, cex = cex_points * 1.5,
-         col = "black", bg = "#FF6633", scaling = 3,
+         col = "black", bg = "#af8dc3", scaling = 3,
          select = rownames(loadings) %in% bottom_double)
   #text(rda_all_mod, display = "species", labels = snp_labels, cex = .75, scaling = 3)
   
@@ -2634,7 +2786,7 @@
    stat_density_ridges(quantile_lines = TRUE, quantiles = 2, col = "grey10", alpha = .9) + 
  #  geom_density_ridges(stat = "binline", bins = 20, scale = 0.95, draw_baseline = FALSE) +
    xlim(c(-.1, .25)) +
-   scale_fill_manual(values =  c("#6699CC", "#FF6633",  "grey50")) + 
+   scale_fill_manual(values =  c("#7fbf7b", "#af8dc3",  "grey50")) + 
 #   facet_wrap(~outlier_type, scales = "free_y", ncol = 1) +
    theme_bw(15)
  
@@ -3238,7 +3390,7 @@
     ylab("Allele frequency \n (centered)") + xlab("") + 
     theme_bw(8) + 
     # theme(legend.position="none") +
-       scale_color_manual(values = c("#FF6633", "#6699CC")) + 
+       scale_color_manual(values = c("#af8dc3", "#7fbf7b")) + 
      geom_smooth(aes(group = mode), lwd = .75) +
      facet_wrap(~var, scales = "free_x", ncol = 4) +
     theme(panel.grid.major = element_blank(),
@@ -3597,8 +3749,8 @@
     xlab("% Change in relative growth rate \n in warmer temperatures") + ylab("Frequency") +
     # scale_x_continuous(breaks = c(seq(-10, 5, 2.5)),
     #                    limits = c(-10, 5)) +
-    scale_fill_manual(values = c("#6699CC", "#FF6633", "grey50")) + # Flipped from normal order
-    scale_color_manual(values = c("#6699CC", "#FF6633", "grey50")) + # Flipped from normal order
+    scale_fill_manual(values = c("#7fbf7b", "#af8dc3", "grey50")) + # Flipped from normal order
+    scale_color_manual(values = c("#7fbf7b", "#af8dc3", "grey50")) + # Flipped from normal order
     theme_bw(8) + 
     theme(panel.border = element_blank(), 
           panel.grid.major = element_blank(),
