@@ -203,9 +203,9 @@
     head(outlier_genes)
     
  outlier_genes_formatted = outlier_genes %>%
-            dplyr::distinct(outlier_type, qlob_gene_name, 
-                            athal_gene_name, athal_gene_description, GO_term, 
-                            .keep_all = TRUE) %>%
+            # dplyr::distinct(outlier_type, qlob_gene_name, 
+            #                 athal_gene_name, athal_gene_description, GO_term, 
+            #                 .keep_all = TRUE) %>%
             dplyr::group_by(outlier_type, chrom_a, pos1_a, genotype, q_val, height_change_warmer_base0, qlob_gene_name,
                             distance,  athal_gene_description, 
                           athal_gene_name) %>%
@@ -222,6 +222,7 @@
                          `A. thaliana gene name` = athal_gene_name,
                          `Gene description` = athal_gene_description,
                          `GO terms` = GO_terms)
+ 
  
  # Add information about climate outliers
  outlier_genes_formatted <- outlier_genes_formatted %>%
