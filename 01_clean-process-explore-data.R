@@ -410,7 +410,7 @@
       
 
     ## Filtering based on garden
-   #  dat_all <- dat_all[dat_all$site == "Chico", ]
+    # dat_all <- dat_all[dat_all$site == "IFG", ]
     
    dim(dat_all)
 

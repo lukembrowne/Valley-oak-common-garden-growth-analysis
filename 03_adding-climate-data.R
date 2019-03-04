@@ -495,14 +495,14 @@
 
       ## Save plot of contributions
       
-      # fviz_pca_var(clim_pca_home, axes = c(1, 2), col.var="contrib")
-      # ggsave(filename = paste0("./figs_tables/Figure S2 - climate PCA 1 ", 
+      # fviz_pca_var(clim_pca_home, axes = c(1, 2))
+      # ggsave(filename = paste0("./figs_tables/Figure S3 - climate PCA 1 ",
       #                          Sys.Date(), ".pdf"),
       #        units = "cm",
       #        width = 20, height = 15)
 
 
-    ## Predict PC values for
+    # Predict PC values for
     # 1) Seedlings in common garden
     # 2) Chico  & IFG based on pca of climate of origin
     # 3) GBS moms
@@ -554,24 +554,131 @@
 # Filter down to seedlings with and without GBS data ----------------------
       
       ## Filtering down individuals who's moms don't have climate data and has GBS data
-      dat_gbs_only_clim <- dplyr::filter(dat_all_clim,
+      dat_gbs_all_clim <- dplyr::filter(dat_all_clim,
                                          accession %in% climate_gbs_mom$accession)
-      dim(dat_gbs_only_clim)
+      dim(dat_gbs_all_clim)
       
       
-      # Select a 1/2 subset of adults for taining and testing
-      # set.seed(1)
-      # training_moms <- sample(na.omit(climate_gbs_mom$accession), 
-      #                         size = length(na.omit(climate_gbs_mom$accession))/2)
-      # testing_moms <- na.omit(climate_gbs_mom$accession)[!na.omit(climate_gbs_mom$accession) %in% training_moms]
+# Select a subset of adults for taining and testing, CV Validation
+      
+      
+      # For  path <- "run_448582_tmax_sum_dif_training_set_8020_2019_02_21" 2/21/2019
+      # or
+      # path <- "run_470998_tmax_sum_dif_training_set_resids_8020_2019_02_25"
+      # set.seed(129)
+      # training_moms <- sample(na.omit(climate_gbs_mom$accession),
+      #                         size = length(na.omit(climate_gbs_mom$accession))*0.80)
+      # 
+      # testing_moms <- na.omit(climate_gbs_mom$accession)[!na.omit(climate_gbs_mom$accession)
+      #                                                    %in% training_moms]
       # 
       # any(training_moms %in% testing_moms) # Should both be false
       # any(testing_moms %in% training_moms)
       # 
-      # dat_gbs_only_clim <- dat_gbs_only_clim %>%
+      # 
+      # ## Save two datasets for training and testing
+      # dat_gbs_training_clim <- dat_gbs_all_clim %>%
       #   dplyr::filter(accession %in% training_moms)
+      # dat_gbs_testing_clim <- dat_gbs_all_clim %>%
+      #   dplyr::filter(accession %in% testing_moms)
+      # 
+      # dim(dat_gbs_training_clim)
+      # dim(dat_gbs_testing_clim)
+      # 
+      # table(dat_gbs_testing_clim$section_block)
+      # table(dat_gbs_testing_clim$locality)
+
       
     
+      # For - path <- "run_452409_tmax_sum_dif_training_set_5050family_2019_02_22"
+          # ## Create folds for validation balanced across accessions for - 
+          # set.seed(129)
+          # 
+          # folds <- caret::createFolds(factor(dat_gbs_all_clim$accession), k = 2)
+          # 
+          # table(dat_gbs_all_clim$accession[folds[[1]]])
+          # table(dat_gbs_all_clim$accession[folds[[2]]])
+          # 
+          # ## Save two datasets for training and testing    
+          # dat_gbs_training_clim <- dat_gbs_all_clim[folds[[1]], ]
+          # dat_gbs_testing_clim <- dat_gbs_all_clim[folds[[2]], ]
+          # 
+          # dim(dat_gbs_training_clim)
+          # dim(dat_gbs_testing_clim)
+          # 
+          # table(dat_gbs_testing_clim$section_block)
+          # table(dat_gbs_testing_clim$locality)
+          # table(dat_gbs_testing_clim$accession)
+          # 
+          # table(dat_gbs_training_clim$section_block)
+          # table(dat_gbs_training_clim$locality)
+          # table(dat_gbs_training_clim$accession)
+          # 
+      
+      
+      # 60/40 sampling
+      # For  path <- "run_454506_tmax_sum_dif_training_set_6040_2019_02_22
+      # set.seed(1)
+      # training_moms <- sample(na.omit(climate_gbs_mom$accession),
+      #                         size = length(na.omit(climate_gbs_mom$accession))*0.60)
+      # 
+      # testing_moms <- na.omit(climate_gbs_mom$accession)[!na.omit(climate_gbs_mom$accession)
+      #                                                    %in% training_moms]
+      # 
+      # any(training_moms %in% testing_moms) # Should both be false
+      # any(testing_moms %in% training_moms)
+      # 
+      # 
+      # ## Save two datasets for training and testing
+      # dat_gbs_training_clim <- dat_gbs_all_clim %>%
+      #   dplyr::filter(accession %in% training_moms)
+      # dat_gbs_testing_clim <- dat_gbs_all_clim %>%
+      #   dplyr::filter(accession %in% testing_moms)
+      # 
+      # dim(dat_gbs_training_clim)
+      # dim(dat_gbs_testing_clim)
+      # 
+      # table(dat_gbs_testing_clim$section_block)
+      # table(dat_gbs_testing_clim$locality)
+      # table(dat_gbs_testing_clim$accession)
+      # 
+      # table(dat_gbs_training_clim$section_block)
+      # table(dat_gbs_training_clim$locality)
+      # table(dat_gbs_training_clim$accession)
+      # 
+      # 
+      
+      # 70/30 sampling
+      # For path "run_475547_tmax_sum_dif_training_set_resids_7030_2019_02_26"
+      set.seed(129)
+      training_moms <- sample(na.omit(climate_gbs_mom$accession),
+                              size = length(na.omit(climate_gbs_mom$accession))*0.70)
+      
+      testing_moms <- na.omit(climate_gbs_mom$accession)[!na.omit(climate_gbs_mom$accession)
+                                                         %in% training_moms]
+      
+      any(training_moms %in% testing_moms) # Should both be false
+      any(testing_moms %in% training_moms)
+      
+      
+      ## Save two datasets for training and testing
+      dat_gbs_training_clim <- dat_gbs_all_clim %>%
+        dplyr::filter(accession %in% training_moms)
+      dat_gbs_testing_clim <- dat_gbs_all_clim %>%
+        dplyr::filter(accession %in% testing_moms)
+      
+      dim(dat_gbs_training_clim)
+      dim(dat_gbs_testing_clim)
+      
+      table(dat_gbs_testing_clim$section_block)
+      table(dat_gbs_testing_clim$locality)
+      table(dat_gbs_testing_clim$accession)
+      
+      table(dat_gbs_training_clim$section_block)
+      table(dat_gbs_training_clim$locality)
+      table(dat_gbs_training_clim$accession)
+      
+      
 # Calculating difference in climate variables -----------------------------
 
   climate_vars_dif <- paste(climate_vars, "_dif", sep = "")
@@ -589,11 +696,21 @@
       
       
     # For GBS seedlings  
-      dat_gbs_only_clim[dat_gbs_only_clim$site == "Chico", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "Chico", var]) - dat_gbs_only_clim[dat_gbs_only_clim$site == "Chico", var]
+      dat_gbs_all_clim[dat_gbs_all_clim$site == "Chico", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "Chico", var]) - dat_gbs_all_clim[dat_gbs_all_clim$site == "Chico", var]
       
-      dat_gbs_only_clim[dat_gbs_only_clim$site == "IFG", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "IFG", var]) - dat_gbs_only_clim[dat_gbs_only_clim$site == "IFG", var]
+      dat_gbs_all_clim[dat_gbs_all_clim$site == "IFG", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "IFG", var]) - dat_gbs_all_clim[dat_gbs_all_clim$site == "IFG", var]
       
-   
+      # Testing set
+      dat_gbs_testing_clim[dat_gbs_testing_clim$site == "Chico", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "Chico", var]) - dat_gbs_testing_clim[dat_gbs_testing_clim$site == "Chico", var]
+      
+      dat_gbs_testing_clim[dat_gbs_testing_clim$site == "IFG", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "IFG", var]) - dat_gbs_testing_clim[dat_gbs_testing_clim$site == "IFG", var]
+      
+      # Training set
+      dat_gbs_training_clim[dat_gbs_training_clim$site == "Chico", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "Chico", var]) - dat_gbs_training_clim[dat_gbs_training_clim$site == "Chico", var]
+      
+      dat_gbs_training_clim[dat_gbs_training_clim$site == "IFG", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "IFG", var]) - dat_gbs_training_clim[dat_gbs_training_clim$site == "IFG", var]
+      
+      # Increment counter
       x = x + 1
     }
   
@@ -612,16 +729,25 @@
   # Need to run separately for both full dataset and dataset with only gbs samples
 
   dat_all_scaled <- dat_all_clim
-  dat_gbs_only_scaled <- dat_gbs_only_clim
+  dat_gbs_all_scaled <- dat_gbs_all_clim
+  dat_gbs_testing_scaled <- dat_gbs_testing_clim
+  dat_gbs_training_scaled <- dat_gbs_training_clim
   
   x = 1
-  
-  scaled_var_means_gbs_only <- NA
-  scaled_var_sds_gbs_only <- NA
   
   scaled_var_means_all <- NA
   scaled_var_sds_all <- NA
   
+  scaled_var_means_gbs_all <- NA
+  scaled_var_sds_gbs_all <- NA
+  
+  scaled_var_means_gbs_testing <- NA
+  scaled_var_sds_gbs_testing <- NA
+  
+  scaled_var_means_gbs_training <- NA
+  scaled_var_sds_gbs_training <- NA
+  
+
   to_scale = colnames(dplyr::select(dat_all_clim, climate_vars_dif, 
                                     height_2015, height_2014,
                                     climate_vars))
@@ -634,10 +760,22 @@
       dat_all_scaled[var] <- (dat_all_scaled[var] - scaled_var_means_all[x]) / scaled_var_sds_all[x]
       
     # For seedlings with gbs data  
-      scaled_var_means_gbs_only[x] <- mean(dat_gbs_only_scaled[[var]], na.rm = TRUE)
-      scaled_var_sds_gbs_only[x] <- sd(dat_gbs_only_scaled[[var]], na.rm = TRUE)
-      dat_gbs_only_scaled[var] <- (dat_gbs_only_scaled[var] - scaled_var_means_gbs_only[x]) /
-                                  scaled_var_sds_gbs_only[x]
+      scaled_var_means_gbs_all[x] <- mean(dat_gbs_all_scaled[[var]], na.rm = TRUE)
+      scaled_var_sds_gbs_all[x] <- sd(dat_gbs_all_scaled[[var]], na.rm = TRUE)
+      dat_gbs_all_scaled[var] <- (dat_gbs_all_scaled[var] - scaled_var_means_gbs_all[x]) /
+                                  scaled_var_sds_gbs_all[x]
+      
+    # Testing set  
+      scaled_var_means_gbs_testing[x] <- mean(dat_gbs_testing_scaled[[var]], na.rm = TRUE)
+      scaled_var_sds_gbs_testing[x] <- sd(dat_gbs_testing_scaled[[var]], na.rm = TRUE)
+      dat_gbs_testing_scaled[var] <- (dat_gbs_testing_scaled[var] - scaled_var_means_gbs_testing[x]) /
+        scaled_var_sds_gbs_testing[x]
+      
+    # Training set  
+      scaled_var_means_gbs_training[x] <- mean(dat_gbs_training_scaled[[var]], na.rm = TRUE)
+      scaled_var_sds_gbs_training[x] <- sd(dat_gbs_training_scaled[[var]], na.rm = TRUE)
+      dat_gbs_training_scaled[var] <- (dat_gbs_training_scaled[var] - scaled_var_means_gbs_training[x]) /
+        scaled_var_sds_gbs_training[x]
   
       x = x + 1
   }
@@ -646,43 +784,29 @@
   names(scaled_var_means_all) <- to_scale
   names(scaled_var_sds_all) <- to_scale
   
-  names(scaled_var_means_gbs_only) <- to_scale
-  names(scaled_var_sds_gbs_only) <- to_scale
+  names(scaled_var_means_gbs_all) <- to_scale
+  names(scaled_var_sds_gbs_all) <- to_scale
+  
+  names(scaled_var_means_gbs_training) <- to_scale
+  names(scaled_var_sds_gbs_training) <- to_scale
+  
+  names(scaled_var_means_gbs_testing) <- to_scale
+  names(scaled_var_sds_gbs_testing) <- to_scale
   
 # Check out results
   scaled_var_means_all
-  scaled_var_means_gbs_only
+  scaled_var_means_gbs_all
   
   scaled_var_sds_all
-  scaled_var_sds_gbs_only
+  scaled_var_sds_gbs_all
   
   summary(dat_all_scaled[, to_scale]) ## Means should all be 0
   
-  summary(dat_gbs_only_scaled[, to_scale]) ## Means should all be 0
+  summary(dat_gbs_all_scaled[, to_scale]) ## Means should all be 0
   
-
-
- # pairs.panels(climate_garden_mom[, c("latitude", "longitude", 
- #                                     #"mem1", "mem2", "mem3", 
- #                                     climate_vars)])
- # 
- # pairs.panels(climate_garden_mom[, c("tmax_sum", "tmin_winter", "DD5", "tmax_sum_lgm","tmin_winter_lgm", "DD5_lgm")], ellipses = F)
- # 
- # pairs.panels(climate_garden_mom[, c("tmax_sum",
- #                                     "tmax_sum_lgm",
- #                                     "tmin_winter", 
- #                                     "tmin_winter_lgm",
- #                                     "DD5", 
- #                                     "DD5_lgm")], ellipses = F, cex = 2)
- # 
- # pairs.panels(climate_garden_mom[, c("tmax_sum",
- #                                     "tmax",
- #                                     "DD5",
- #                                     "tave",
- #                                     "bioclim_04")])
- 
- #pairs.panels(dat_all_scaled[, climate_vars_dif])
- 
+  summary(dat_gbs_training_scaled[, to_scale]) ## Means should all be 0
+  summary(dat_gbs_testing_scaled[, to_scale]) ## Means should all be 0
+  
 
 
 

@@ -244,10 +244,10 @@ back_transform <- function(x, var, means, sds){
                                 y = visregFit), lwd = 1,
                                 col = "forestgreen") +
     scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
-      scale_y_continuous(breaks = seq(.55, .85, .1), limits = c(.55, .85)) +
+    scale_y_continuous(breaks = seq(.55, .85, .1), limits = c(.55, .85)) +
     ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
   #  ylab("5 yr height (cm)") +
-    xlab("Tmax climate distance") +
+    xlab("Tmax transfer distance (°C) ") +
       # ylim(c(.25, .4)) +
     theme_bw(10) + 
     theme(panel.border = element_blank(), panel.grid.major = element_blank(),
@@ -262,7 +262,12 @@ back_transform <- function(x, var, means, sds){
   # ggsave(filename = paste0("./figs_tables/fig1/Figure 1 - transfer function ", Sys.Date(), ".pdf"),
   #        gg,
   #        units = "cm", width = 11, height = 8)
+
   # 
+  # ggsave(filename = paste0("./figs_tables/Figure S1 - transfer function IFG", Sys.Date(), ".pdf"),
+  #        gg,
+  #        units = "cm", width = 11, height = 8)
+
   
   
   
@@ -369,7 +374,7 @@ back_transform <- function(x, var, means, sds){
   
 
 
-#  Figure 2 - comparing assisted gene flow to transfer functions ------------
+#  OLD - Figure 2 - comparing assisted gene flow to transfer functions ------------
 
   # Rerun non genetic gam without SNP data to make data sets directly comparing
   var = "tmax_sum_dif"
