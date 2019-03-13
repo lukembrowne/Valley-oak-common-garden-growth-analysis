@@ -104,7 +104,7 @@
                   nthreads = 8,
                   method = "fREML")
                 #  family = "tw")
-
+1
     print(summary(gam_snp_int))
 
 

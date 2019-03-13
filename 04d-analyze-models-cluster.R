@@ -216,10 +216,11 @@
   sort(fdr_fvals$qval, decreasing = T)
   
   # Plot figure
+  ## Need to hand-edit the axis labesl for q values to say Q instead of P
       # dev.copy(pdf, paste0("./figs_tables/Figure S6 - histogram and qqplots of p values ", Sys.Date(), ".pdf"),
       #          width = 7, height = 7, useDingbats = FALSE)
       # dev.off()
-      # 
+
   par(mfrow = c(1,1))
   
   # Local false discovery rate
@@ -237,85 +238,6 @@
   
   
   
-
-# Identify top and bottom SNPs --------------------------------------------
-
-#   q_val_thresh <- .0001
-#   mad_thresh <- 2.5 # Median absolute deviation for outlier detection - values of 3 (very conservative), 2.5 (moderately conserva- tive) or even 2 (poorly conservative).
-#  # train_test_cor_thresh <- 0.80
-#   height_metric = "height_change_warmer_base0"
-#   
-#   (height_median <- median(pull(sum_df_long_w_preds, height_metric), na.rm = TRUE))
-#   (height_mad <- mad(pull(sum_df_long_w_preds, height_metric), na.rm = TRUE))
-#   
-#   height_median + mad_thresh * height_mad # Threshold values
-#   height_median - mad_thresh * height_mad
-#   
-#  # Select top SNPs  
-#    top_snps_long <-  sum_df_long_w_preds %>%
-#      dplyr::filter(!!as.name(height_metric) >= (height_median +
-#                      mad_thresh * height_mad)) %>%
-#       dplyr::filter(q_val < q_val_thresh) # %>%
-#    #   dplyr::filter(cv_cor >= train_test_cor_thresh)
-#   
-#    dim(top_snps_long)
-#      
-#    top_snps_long$top_snp = TRUE # Make a column for T / F of top snp
-#    
-#    dim(top_snps_long)
-#    head(top_snps_long)
-# 
-#    ## Any SNPs in top_snps twice?
-#    sum(table(top_snps_long$snp) > 1)
-#    which(table(top_snps_long$snp) > 1)
-#    
-#    ## Number of unique SNPs
-#    length(unique(top_snps_long$snp))
-#    
-#  ## Bottom SNPs
-#  bottom_snps_long <- sum_df_long_w_preds %>%
-#    dplyr::filter(!!as.name(height_metric) <= (height_median -
-#                                                 mad_thresh * height_mad)) %>%
-#    dplyr::filter(q_val < q_val_thresh) # %>%
-#   # dplyr::filter(cv_cor >= train_test_cor_thresh)
-# 
-#    bottom_snps_long$bottom_snp = TRUE
-#    
-#    head(bottom_snps_long)
-#    dim(bottom_snps_long)
-#    
-#    ## Any SNPs in bottom_snps twice?
-#    sum(table(bottom_snps_long$snp) > 1)
-#    which(table(bottom_snps_long$snp) > 1)
-#    
-#    
-#    ## Number of unique SNPs
-#    length(unique(bottom_snps_long$snp))
-#    
-#    
-# ## Join back to main DF
-#    sum_df_long_outliers <- left_join(sum_df_long_w_preds, 
-#                              dplyr::select(top_snps_long, snp, genotype, top_snp)) %>%
-#             left_join(., dplyr::select(bottom_snps_long, snp, genotype, bottom_snp)) %>%
-#                   mutate(top_snp = replace_na(top_snp, FALSE),
-#                          bottom_snp = replace_na(bottom_snp, FALSE))
-#    
-#    head(sum_df_long_outliers)
-#    
-#    table(sum_df_long_outliers$top_snp)
-#    table(sum_df_long_outliers$bottom_snp)
-#    
-#    
-#    hist(top_snps_long$height_change_warmer_base0, breaks = 30)
-#    hist(bottom_snps_long$height_change_warmer_base0, breaks = 30)
-#    
-#    ## How much overlap of top and bottom snps?
-#    sum(top_snps_long$snp %in% bottom_snps_long$snp)
-#    sum(bottom_snps_long$snp %in% top_snps_long$snp)
-#    
-#    ## How many total snps involved?
-#    length(unique(c(top_snps_long$snp, bottom_snps_long$snp)))
-#    
 #    ## Plot interactions at particular genotype
 #    # pred_snp = dplyr::left_join(dplyr::select(man_df, SNP), pred_df_raw, by = c("SNP" = "snp"))
 #    # pred_snp <- pred_snp %>%
@@ -346,84 +268,10 @@
 #    # table(dat_snp[, snp_filter])
 #    
    
-   
-## Figure 2 - Plot overlay of outlier SNPS ---------------------------------------
-   
- #   # Make a df of random subsample of other snps
- #   set.seed(1)
- #   random_snps <- c(dplyr::sample_n(dplyr::filter(dplyr::select(sum_df, snp),  # Subsample 100 random snps
- #                                                  !snp %in% c(top_snps_long$snp, bottom_snps_long$snp)), size = 50))
- #   random_snps <- paste0(random_snps$snp, sample(0:2, size = length(random_snps$snp), replace = TRUE))
- #   
- #   random_snps_df <-  pred_df_raw %>%
- #     dplyr::mutate(snp_gen = paste0(snp,genotype)) %>%
- #     dplyr::filter(snp_gen %in% random_snps) %>%
- #     dplyr::mutate(type = "Non-outlier")
- #   
- #   # Join outlier dataframes with prediction dataframes
- #   pred_df_outlier <- dplyr::left_join(top_snps_long, pred_df_raw) %>%
- #         dplyr::mutate(type = "Warm advantageous") %>%
- #      bind_rows( dplyr::left_join(bottom_snps_long, pred_df_raw) %>%
- #         dplyr::mutate(type = "Warm disadvantageous")) %>%
- #     dplyr::mutate(snp_gen = paste0(snp,genotype)) %>%
- #     dplyr::select(colnames(random_snps_df))
- #  
- #   # Bind to random df 
- #    pred_df_outlier <- bind_rows(pred_df_outlier, random_snps_df)
- #    
- #    # Order factors
- #    pred_df_outlier$type <- factor(pred_df_outlier$type, levels =)
- #   
- # 
- #   # Make plot
- #   pred_df_outlier %>%
- #   ggplot(., aes(x = tmax_sum_dif_unscaled, y = pred,
- #                             group = factor(snp_gen),
- #                              col = factor(type))) +
- #    # ylim(c(.25, .4)) +
- #     geom_vline(aes(xintercept = 0), lty = 2, size = .25) +
- #     geom_vline(xintercept = 4.8, size = .25) +
- #     geom_line(alpha = 0.2,
- #               show.legend = FALSE, size = .2) +
- #   #  geom_point(alpha = 0.35, size = .25) +
- #     geom_smooth(aes(x = tmax_sum_dif_unscaled,
- #                     y = pred, group = factor(type)),
- #                 se = FALSE, size = .75) +
- # 
- #     labs(col = "Genotype") +
- #  #   ylim(.225, .325) +
- #     ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
- #     xlab("Tmax transfer distance") +
- #     theme_bw(15) + 
- #     scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
- #   #  facet_wrap(~type) +
- #   #  facet_wrap(~ type + snp) +
- #     scale_color_manual(values = c("#228b22", "#7fbf7b" ,"#af8dc3"), 
- #                        labels = c( "Non-outlier genotypes", 
- #                                  "Warm advantageous genotypes", 
- #                                  "Warm disadvantageous genotypes"),
- #                        name = "") + 
- #     theme(panel.border = element_blank(), panel.grid.major = element_blank(),
- #           panel.grid.minor = element_blank(), 
- #           axis.line = element_line(colour = "black"))   
- #   
- #  # Save to file
- #   # ggsave(filename = paste0("./figs_tables/Figure S6 - outlier growth responses ",
- #   #                          Sys.Date(), ".pdf"),
- #   #        units = "cm",
- #   #        height = 11, width = 20,
- #   #        useDingbats = FALSE )
- # 
- # 
- #  summary(top_snps_long$height_change_warmer_base0)
- #  summary(bottom_snps_long$height_change_warmer_base0)
- # # summary(mid_snps_long$height_change_warmer_base0)
-
- 
   
 # Figure 2 - Manhattan plot of Q values ---------------------------------------------------------
   
-    man_df1 <- data.frame(SNP = snp_col_names, 
+   man_df1 <- data.frame(SNP = snp_col_names, 
                          snp_pos)
    
    man_df1$index <- 1:nrow(man_df1) ## For x axis plotting
@@ -474,8 +322,8 @@
      # Add points
      geom_point(pch = 16, 
                 col = man_df$color,
-                alpha = .95,
-                size = 1) +
+                alpha = 1,
+                size = 1.75) +
      
      # # Overplot top and bottom SNPS
      # geom_point(data = man_df[man_df$top_snp | man_df$bottom_snp, ],
@@ -608,8 +456,8 @@
   dim(gen_dat_moms)
   
   # Choose SNPs
-  n_snps_values <- c(100, 250, 500, seq(1000, 12000, by = 1000), length(sum_df$snp))
-  
+   n_snps_values <- c(100, 500, seq(1000, 12000, by = 1000))
+
   gene_copy_thresholds <- c(1, 25, 50, 100, 250)
   
   # Initialize dataframe for output
@@ -734,21 +582,37 @@
   
   prs_df_summary
   
+  prs_df_summary %>%
+    arrange(desc(r2))
   
   ## Plot relationship between # of SNPS used and variance explained in testing set
     ggplot(prs_df_summary, aes(x = n_snps, y = r2)) + 
       geom_point(size = 2) + 
       geom_line() + 
-      xlab("Number of SNPs") + ylab("R2 adjusted in testing set") +
+      xlab("Number of SNPs in GEBV estimation") +
+      #ylab("R2 adjusted in testing set") +
+      ylab(bquote('R'^2[adj]~'training test')) +
       scale_x_continuous(breaks = prs_df_summary$n_snps) +
-      theme_bw(10) + 
+      scale_y_continuous(breaks = seq(0, 0.02, by = 0.0025), limits = c(-0.0015, 0.015)) + 
+      theme_bw(7) + 
+      geom_hline(yintercept = 0, lty = 2) + 
       theme(panel.border = element_blank(), panel.grid.major = element_blank(),
             panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
-            plot.margin = (margin(1.5, 1.5, 1.5, 1.5, "cm"))) +
+            plot.margin = (margin(0, 0, 0, 0, "cm")),
+            axis.text.x = element_text(angle = 60, hjust = 1)) +
       NULL
 
     
-  # Set top PRS
+    # # Save as file
+    # ggsave(paste0("./figs_tables/Figure S3 - testing variance explained by number of snps",
+    #                      Sys.Date(), ".png"),
+    #          width = 10, height = 4, units = "cm", dpi = 300)
+           #useDingbats=FALSE)
+    
+    
+    
+  
+   # Set top PRS
     gen_dat_moms$prs_best <- gen_dat_moms$prs_11000
     
     
@@ -762,13 +626,12 @@
     
     
     
-    
-
+  
 # Plot predictions of PRS -------------------------------------------------
 
     
     ## Calculate number of top and bottom SNPs 
-    dat_snp_count <- dat_snp_all %>%
+    dat_snp_prs <- dat_snp_all %>%
       dplyr::mutate(accession = as.numeric(as.character(accession))) %>%
       dplyr::select(accession, site, locality, tmax_sum, tmax_sum_dif, 
                     rgr, rgr_resids, 
@@ -776,60 +639,97 @@
       dplyr::left_join(., dplyr::select(gen_dat_moms, accession, prs_best, prs_best_scaled)) %>%
       dplyr::mutate(accession = factor(accession))
     
-    head(dat_snp_count)
-    dim(dat_snp_count)
+    head(dat_snp_prs)
+    dim(dat_snp_prs)
     
-    summary(dat_snp_count$prs_best)
-    summary(dat_snp_count$prs_best_scaled)
+    summary(dat_snp_prs$prs_best)
+    summary(dat_snp_prs$prs_best_scaled)
    
-    ## Scale number of top and bottom snps 
-    dat_snp_count_unscaled <- dat_snp_count
+    dat_snp_prs_unscaled <- dat_snp_prs
     
     # Set formula
      fixed_effects <- paste0(paste0("rgr_resids ~ s(prs_best_scaled, bs=\"cr\") + 
                                            s(tmax_sum_dif, by = prs_best_scaled, bs=\"cr\")"))
  
     # Gam with interaction effect
-    gam_snp = bam(formula = formula(fixed_effects),
-                  data = dat_snp_count,
+    gam_prs_all = bam(formula = formula(fixed_effects),
+                  data = dat_snp_prs,
                   discrete = TRUE, 
                   nthreads = 8,
                   method = "fREML",
                #   family = "tw",
                   control = list(trace = FALSE))
     
-    summary(gam_snp)
+    summary(gam_prs_all)
     
     ## Save output
     
-    # Save gam summary to file
-    # sink(file = paste0("./figs_tables/Table S2 - outlier_count_gam_model_summary_",
-    #                    Sys.Date(), ".txt"))
-    # summary(gam_snp)
-    # anova(gam_snp)
-    # sink()
-    
-    ## Run a version of the model without ## of outlier genotypes to use as comparison to mimic the pattern shown without considering genotypes
-    
-    # Set formula
-    fixed_effects_no_gen <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(accession, bs = \"re\") + s(locality, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\")  + s(tmax_sum_dif, by = PC1_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC2_gen, bs=\"cr\") + s(PC1_clim, bs=\"cr\") + s(PC2_clim, bs=\"cr\")  + s(tmax_sum_dif, by = PC1_clim, bs=\"cr\") + s(tmax_sum_dif, by = PC2_clim, bs=\"cr\")"))
-    
-    fixed_effects_no_gen <- paste0(paste0("rgr_resids ~ 
-                                           s(tmax_sum_dif)"))
+   # Save gam summary to file
+   #  sink(file = paste0("./figs_tables/Table S2 - prs_all_gam_model_summary_",
+   #                     Sys.Date(), ".txt"))
+   #  summary(gam_prs_all)
+   # # anova(gam_prs_all)
+   #  sink()
     
     
-    # Gam with interaction effect
-    gam_snp_no_gen = bam(formula = formula(fixed_effects_no_gen),
-                         data = dat_snp_count,
-                         discrete = TRUE, 
-                         nthreads = 8,
-                         method = "fREML",
-                      #   family = "tw",
-                         control = list(trace = FALSE))
     
-    summary(gam_snp_no_gen)
-    
-    
+    # Run models with testing and training set and output model summaries
+        # 
+        # # ## Training  
+        #   dat_snp_training2 <- dat_snp_training %>%
+        #     dplyr::mutate(accession = as.numeric(as.character(accession))) %>%
+        #     dplyr::left_join(.,  dplyr::select(gen_dat_moms, accession, prs_best, prs_best_scaled))
+        # 
+        #   dim(dat_snp_training2)
+        # 
+        #   # Gam with interaction effect
+        #   gam_prs_training = bam(formula = formula(fixed_effects),
+        #                     data = dat_snp_training2,
+        #                     discrete = TRUE,
+        #                     nthreads = 8,
+        #                     method = "fREML",
+        #                     #   family = "tw",
+        #                     control = list(trace = FALSE))
+        # 
+        #   summary(gam_prs_training)
+
+        #   ## Save output
+        #   
+        #   # Save gam summary to file
+        #    sink(file = paste0("./figs_tables/Table S2 - prs_training_gam_model_summary_",
+        #                       Sys.Date(), ".txt"))
+        #    summary(gam_prs_training)
+        #   # anova(gam_prs_training)
+        #    sink()
+        #   
+        # #### Testing   
+        #    dat_snp_testing2 <- dat_snp_testing %>%
+        #      dplyr::mutate(accession = as.numeric(as.character(accession))) %>%
+        #      dplyr::left_join(.,  dplyr::select(gen_dat_moms, accession, prs_best, prs_best_scaled))
+        #    
+        #    dim(dat_snp_testing2)
+        #    
+        #    # Gam with interaction effect
+        #    gam_prs_testing = bam(formula = formula(fixed_effects),
+        #                           data = dat_snp_testing2,
+        #                           discrete = TRUE, 
+        #                           nthreads = 8,
+        #                           method = "fREML",
+        #                           #   family = "tw",
+        #                           control = list(trace = FALSE))
+        #    
+        #    summary(gam_prs_testing)
+        #    
+        #    ## Save output
+        #    
+        #    # Save gam summary to file
+        #    sink(file = paste0("./figs_tables/Table S2 - prs_testing_gam_model_summary_",
+        #                       Sys.Date(), ".txt"))
+        #    summary(gam_prs_testing)
+        #    # anova(gam_prs_testing)
+        #    sink()   
+       
+
     ## Plot predictions
 
     # Set up dataframe for prediction
@@ -845,14 +745,14 @@
                                                                scaled_var_sds_gbs_all)),
                             PC1_gen = 0, PC2_gen = 0,
                             PC1_clim = 0, PC2_clim = 0,
-                            prs_best_scaled = c(-2, 2)) # SD away from average
+                            prs_best_scaled = c(-1, 0, 1)) # SD away from average
     
     # Make predictions
-    newdata$pred <- predict(gam_snp,
+    newdata$pred <- predict(gam_prs_all,
                             newdata = newdata,
                             se.fit = TRUE, type = "response")$fit
     
-    newdata$se <- predict(gam_snp,
+    newdata$se <- predict(gam_prs_all,
                           newdata = newdata,
                           se.fit = TRUE, type = "response")$se
     
@@ -861,31 +761,6 @@
     newdata$pred <- newdata$pred + predict(gam_snp_all,
                                             newdata = newdata,
                                             se.fit = TRUE, type = "response")$fit
-    
-    # Without number of genotypes included
-    newdata_no_gen <- newdata
-    newdata_no_gen$prs_best_scaled <- "no_prs"
-    new_data_no_gen <- newdata_no_gen %>% # Filter to distinct rows based on tmax_sum_dif
-      dplyr::distinct(tmax_sum_dif)
-    
-    newdata_no_gen$pred <- predict(gam_snp_no_gen,
-                                   newdata = newdata,
-                                   se.fit = TRUE, type = "response")$fit
-    
-    newdata_no_gen$se <- predict(gam_snp_no_gen,
-                                 newdata = newdata,
-                                 se.fit = TRUE, type = "response")$se
-    
-    # Add on baseline predictions from model without genetic information
-    newdata_no_gen$pred <-  newdata_no_gen$pred + predict(gam_snp_all,
-                                           newdata = newdata,
-                                           se.fit = TRUE, type = "response")$fit
-    
-    # Merge predictions with and without genotypes
-    newdata <- newdata %>%
-      mutate(prs_best_scaled = as.character(prs_best_scaled)) %>%
-      bind_rows(., newdata_no_gen)
-    
     
     # Plot predictions
     newdata %>%
@@ -902,14 +777,11 @@
                       fill = factor(prs_best_scaled)), alpha = .35) +
       geom_line(aes(col = factor(prs_best_scaled))) + 
       scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
+      scale_y_continuous(breaks = seq(0, 1.75, by = 0.25)) + 
       ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
-      # ylab("Relative growth rate") +
       xlab("Tmax transfer distance (°C)") +
-      # ylim(c(.20, .5)) +
-      # scale_color_manual(values = c("#af8dc3", "#7fbf7b", "#228b22")) +
-      # scale_fill_manual(values =  c("#af8dc3", "#7fbf7b", "#228b22")) +
-      scale_color_manual(values = c("#af8dc3", "#7fbf7b", "#227eb8")) +
-      scale_fill_manual(values =  c("#af8dc3", "#7fbf7b", "#227eb8")) +
+      scale_color_manual(values = c("#af8dc3", "#227eb8", "#7fbf7b")) +
+      scale_fill_manual(values =  c("#af8dc3", "#227eb8", "#7fbf7b")) +
       
       theme_bw(8) + 
       theme(panel.border = element_blank(), 
@@ -922,37 +794,41 @@
     
     
     # Save plot output
-    ggsave(filename = paste0("./figs_tables/fig2/Figure 2 - prs growth ", Sys.Date(), ".pdf"),
-           units = "cm", width = 8, height = 5)
+    # ggsave(filename = paste0("./figs_tables/fig2/Figure 2 - prs growth ", Sys.Date(), ".pdf"),
+    #        units = "cm", width = 8, height = 6)
+    # 
+    
+    
     
     
     ## Calculating differences in growth rates
     growth_dif =  newdata %>%
       dplyr::mutate(tmax_sum_dif_unscaled = back_transform(tmax_sum_dif, var = "tmax_sum_dif",
-                                                         means = scaled_var_means_gbs_all, 
+                                                         means = scaled_var_means_gbs_all,
                                                          sds = scaled_var_sds_gbs_all))
-    
+
     # Comparing high to mid
-    (growth_dif$pred[growth_dif$prs_best_scaled == 2 & growth_dif$tmax_sum_dif_unscaled == 4.8] - 
-        growth_dif$pred[growth_dif$prs_best_scaled == "no_prs" & growth_dif$tmax_sum_dif_unscaled == 4.8]) / 
-      abs(growth_dif$pred[growth_dif$prs_best_scaled == "no_prs" & growth_dif$tmax_sum_dif_unscaled == 4.8]) * 100
-    
+    (growth_dif$pred[growth_dif$prs_best_scaled == 1 & growth_dif$tmax_sum_dif_unscaled == 4.8] -
+        growth_dif$pred[growth_dif$prs_best_scaled == 0 & growth_dif$tmax_sum_dif_unscaled == 4.8]) /
+      abs(growth_dif$pred[growth_dif$prs_best_scaled == 0 & growth_dif$tmax_sum_dif_unscaled == 4.8]) * 100
+
     # Compare high to low
-    (growth_dif$pred[growth_dif$prs_best_scaled == 2 & growth_dif$tmax_sum_dif_unscaled == 4.8] - 
-        growth_dif$pred[growth_dif$prs_best_scaled == -2 & growth_dif$tmax_sum_dif_unscaled == 4.8]) / 
-     abs(growth_dif$pred[growth_dif$prs_best_scaled == -2 & growth_dif$tmax_sum_dif_unscaled == 4.8]) * 100
-    
-    # Compare mid to low
-    (growth_dif$pred[growth_dif$prs_best_scaled == "no_prs" & growth_dif$tmax_sum_dif_unscaled == 4.8] - 
-        growth_dif$pred[growth_dif$prs_best_scaled == -2 & growth_dif$tmax_sum_dif_unscaled == 4.8]) / 
-     abs(growth_dif$pred[growth_dif$prs_best_scaled == -2 & growth_dif$tmax_sum_dif_unscaled == 4.8]) * 100
+    (growth_dif$pred[growth_dif$prs_best_scaled == 1 & growth_dif$tmax_sum_dif_unscaled == 4.8] -
+        growth_dif$pred[growth_dif$prs_best_scaled == -1 & growth_dif$tmax_sum_dif_unscaled == 4.8]) /
+     abs(growth_dif$pred[growth_dif$prs_best_scaled == -1 & growth_dif$tmax_sum_dif_unscaled == 4.8]) * 100
+
     
     
     
     
-    ### Simulate selection based on PRS score like in Hayden & SOD
     
-    ### Run full model and save out residuals for cluster analysis
+    
+    
+    
+#  Simulate selection based on PRS score like in Hayden & SOD -------------
+
+    
+  ### Run full model and save out residuals for cluster analysis
     fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\")  + s(accession, bs = \"re\") + s(locality, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC1_clim, bs=\"cr\") + s(PC2_clim, bs=\"cr\")"))
     
     # Gam with interaction effect
@@ -976,7 +852,7 @@
     summary(dat_snp_all2$rgr_resids)
     
     
-    dat_snp_count2 <- dat_snp_all2 %>%
+    dat_snp_prs2 <- dat_snp_all2 %>%
       dplyr::mutate(accession = as.numeric(as.character(accession))) %>%
       dplyr::select(accession, site, locality, tmax_sum, tmax_sum_dif, 
                     rgr, rgr_resids, 
@@ -986,52 +862,40 @@
       dplyr::mutate(tmax_sum_dif_unscaled = back_transform(tmax_sum_dif, var = "tmax_sum_dif",
                                                            means = scaled_var_means_gbs_all,
                                                            sds = scaled_var_sds_gbs_all))
-    
-    
-   test <-  dat_snp_count2 %>%
-            dplyr::filter(tmax_sum_dif_unscaled > 0 )       
-   
-   dim(test)
-     
-    
-  ## Calculate actual observed RGRs for different quartiles of PRS based on resampling
-  
-   
+
    # Set parameters
+   set.seed(1)
    sample_size = 50
    n_reps <- 10000
    
    # Indices for top and bottom quartiles
-   upper_ind <- which(test$prs_best_scaled >= quantile(dat_snp_count2$prs_best_scaled, .75))
+   upper_ind <- which(dat_snp_prs2$prs_best_scaled >= 1 & 
+                        dat_snp_prs2$tmax_sum_dif_unscaled > 0)
    length(upper_ind)
-   lower_ind <- which(test$prs_best_scaled <= quantile(dat_snp_count2$prs_best_scaled, .25))
+   
+   lower_ind <- which(dat_snp_prs2$prs_best_scaled <= 
+                        quantile(dat_snp_prs2$prs_best_scaled, .25) 
+                       & dat_snp_prs2$tmax_sum_dif_unscaled > 0)
    length(lower_ind)
    
-   colder01 <- dat_snp_count2  %>%
-     dplyr::filter(tmax_sum_dif_unscaled <= 0 & tmax_sum_dif_unscaled >= -2)  
-   dim(colder)
+   random_ind <- which(dat_snp_prs2$tmax_sum_dif_unscaled > 0)
+   length(random_ind)
    
-   colder12 <- dat_snp_count2  %>%
-     dplyr::filter(tmax_sum_dif_unscaled <= -2 & tmax_sum_dif_unscaled >= -4)  
-   dim(colder12)
+   climate_match <- dat_snp_prs2  %>%
+     dplyr::filter(tmax_sum_dif_unscaled <= .5 & tmax_sum_dif_unscaled >= -.5)  
+   dim(climate_match)
    
-   colder23 <- dat_snp_count2  %>%
-     dplyr::filter(tmax_sum_dif_unscaled <= -2 & tmax_sum_dif_unscaled >= -3)  
-   dim(colder23)
-   
-   colder34 <- dat_snp_count2  %>%
-     dplyr::filter(tmax_sum_dif_unscaled <= -3 & tmax_sum_dif_unscaled >= -4)  
-   dim(colder34)
+   climate_colder <- dat_snp_prs2  %>%
+     dplyr::filter(tmax_sum_dif_unscaled <= -2)  
+   dim(climate_colder)
    
    # Initialize output
    output_df <- tibble(rep = 1:n_reps,
                            `Upper quartile GEBV` = NA,
                            `Lower quartile GEBV` = NA,
                            `None` = NA,
-                           `Climate 01` = NA,
-                           `Climate 12` = NA,
-                           `Climate 23` = NA,
-                           `Climate 34` = NA)
+                           `Climate Match` = NA,
+                           `Climate Colder` = NA)
    
    
    for(x in 1:n_reps){
@@ -1042,80 +906,331 @@
      
      upper_sample <- sample(upper_ind, size = sample_size)
      lower_sample <- sample(lower_ind, size = sample_size)
-     avg_sample <- sample(1:nrow(dat_snp_count2), size = sample_size)
-     colder01_sample <- sample(1:nrow(colder01), size = sample_size)
-     colder12_sample <- sample(1:nrow(colder12), size = sample_size)
-     colder23_sample <- sample(1:nrow(colder23), size = sample_size)
-     colder34_sample <- sample(1:nrow(colder34), size = sample_size)
+     avg_sample <- sample(random_ind, size = sample_size)
+     climate_match_sample <- sample(1:nrow(climate_match), size = sample_size)
+     climate_colder_sample <- sample(1:nrow(climate_colder), size = sample_size)
      
      
-     output_df$`Upper quartile GEBV`[x] <-    mean(test$rgr_resids[upper_sample])
-     output_df$`Lower quartile GEBV`[x] <-    mean(test$rgr_resids[lower_sample])
-     output_df$None[x] <-      mean(dat_snp_count2$rgr_resids[avg_sample])
-     output_df$`Climate 01`[x] <- mean(colder01$rgr_resids[colder01_sample])
-     output_df$`Climate 12`[x] <- mean(colder12$rgr_resids[colder12_sample])
-     output_df$`Climate 23`[x] <- mean(colder23$rgr_resids[colder23_sample])
-     output_df$`Climate 34`[x] <- mean(colder34$rgr_resids[colder34_sample])
-     
+     output_df$`Upper quartile GEBV`[x] <-     mean(dat_snp_prs2$rgr_resids[upper_sample])
+     output_df$`Lower quartile GEBV`[x] <-     mean(dat_snp_prs2$rgr_resids[lower_sample])
+     output_df$None[x] <-                      mean(dat_snp_prs2$rgr_resids[avg_sample])
+     output_df$`Climate Match`[x] <-            mean(climate_match$rgr_resids[climate_match_sample])
+     output_df$`Climate Colder`[x] <-          mean(climate_colder$rgr_resids[climate_colder_sample])
+
    }
-   
-   
-   ### CHECK OUT INTERVALS - 01 is actually 0-2
    
    
   # Plot results 
    output_df %>%
      gather(key = type, value = rgr_resid, -rep) %>%
-     mutate(type = factor(type, levels = c("None", "Climate 01", "Climate 12", 
-                                           "Climate 23", "Climate 34",
+     mutate(type = factor(type, levels = c("None", "Climate Match", "Climate Colder",
                                            "Upper quartile GEBV", "Lower quartile GEBV"))) %>%
+     dplyr::filter(type != "Lower quartile GEBV") %>%
      ggplot(., aes(x = type, y = rgr_resid, fill = type)) + 
      geom_hline(yintercept = 0, lty = 2)+
-     geom_violin(draw_quantiles = c(.5)) +
+    # geom_violin(draw_quantiles = c(.5)) +
+     geom_boxplot(outlier.shape = NA) + 
      xlab("Choice criteria") +
-     theme_bw(15) + 
+     ylab("Adjusted Relative Growth Rate") + 
+     scale_fill_manual(values =  c("#227eb8", "#fdc086", "#ffff99", "#7fbf7b")) + # "#af8dc3")) +
+     scale_x_discrete(labels = c("Random", "Climate match \n -0.5° to 0.5°\nTmax transfer", 
+                                 "Climate match \n <= -2°\nTmax transfer",
+                                 "GEBV \n >= 1 SD")) +
+                                 #"GEBV \n Lower quartile")) + 
+     scale_y_continuous(breaks = seq(-.25, .25, by = 0.05),
+                        limits = c(-.1, .15)) +
+     theme_bw(8) + 
      theme(panel.border = element_blank(), 
            panel.grid.major = element_blank(),
            panel.grid.minor = element_blank(), 
            axis.line = element_line(colour = "black"),
+           axis.text.x = element_text(size = 8),
+           axis.title.x = element_text(size = 10),
+           axis.title.y = element_text(size = 10),
            legend.position = "none") +
      NULL
    
-   # Calculate percent increases
-  (mean(output_df$`Upper quartile GEBV`) - mean(output_df$Climate)) / abs(mean(output_df$Climate)) * 100
+   # Save output
+     # ggsave(filename = paste0("./figs_tables/fig2/Figure 2 - rgr predictions by choice ",
+     #                          Sys.Date(), ".pdf"),
+     #        units = "cm",
+     #        width = 9, height = 8)
 
-   library(ggjoy)
    
-   output_df %>%
+   
+  ## Comparing different scenarios 
+  growth_by_scenario <-  output_df %>%
      gather(key = type, value = rgr_resid, -rep) %>%
-     mutate(type = factor(type, levels = c("None", "Climate",
+     mutate(type = factor(type, levels = c("None", "Climate Match", "Climate Colder",
                                            "Upper quartile GEBV", "Lower quartile GEBV"))) %>%
-     ggplot(., aes(y = type, x = rgr_resid, height == ..density.., fill = type)) + 
-  #   geom_hline(yintercept = 0, lty = 2)+
-     geom_density_ridges(alpha = .9) +
-     ylab("Choice criteria") +
-     theme_bw(15) + 
-     theme(panel.border = element_blank(),
-           panel.grid.major = element_blank(),
-           panel.grid.minor = element_blank(),
-           axis.line = element_line(colour = "black"),
-           legend.position = "none") +
-     NULL
-    
-    
-    
-    
-
+     dplyr::filter(type != "Lower quartile GEBV") %>%
+     group_by(type) %>%
+     summarise_all(mean)
+  
+  growth_by_scenario
+  
+  growth_by_scenario$rgr_resid[growth_by_scenario$type == "Upper quartile GEBV"] - growth_by_scenario$rgr_resid[growth_by_scenario$type == "Climate Match"]
+  
+  growth_by_scenario$rgr_resid[growth_by_scenario$type == "Upper quartile GEBV"] - growth_by_scenario$rgr_resid[growth_by_scenario$type == "Climate Colder"]
+  
+  growth_by_scenario$rgr_resid[growth_by_scenario$type == "Upper quartile GEBV"] - growth_by_scenario$rgr_resid[growth_by_scenario$type == "None"]
+  
+  
+   
 # Plotting current distribution of prs  --------------------------
 
+  library(raster)
+  library(factoextra)
+  
+  # Shape outlines
+  cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
+                                proj4string = CRS("+proj=longlat +datum=WGS84"))
+  
+  lobata_range <- readShapePoly("./data/gis/valley_oak_range/qlobata_refined_grouped.shp",
+                                proj4string = CRS("+proj=longlat +datum=WGS84"))
+  
+  lobata_range_rough <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
+                                      proj4string = CRS("+proj=longlat +datum=WGS84"))
+  
+  lobata_range_extended <- readShapePoly("./data/gis/valley_oak_range/qlobata_extended.shp", delete_null_obj = TRUE,
+                                         proj4string = CRS("+proj=longlat +datum=WGS84"))
+  
+  # Elevation map
+  dem <- raster("./data/gis/dem/ClimateNA_DEM_cropped.tif")
+  
+  slope = raster::terrain(dem, opt='slope')
+  aspect = raster::terrain(dem, opt='aspect')
+  hill = hillShade(slope, aspect, 40, 270)
+  hill_cropped <- crop(hill, extent(-125, -113.5, 32, 42.5)) # crop based on california outline
+  
+  # Climate rasters
+  tmax_rast <- raster("./data/gis/climate_data/BCM/historical/1951-1980/tmx1951_1980jja_ave_HST_1513103038/tmx1951_1980jja_ave_HST_1513103038.tif")
+  
+  tmin_winter <- raster("./data/gis/climate_data/BCM/historical/1951-1980/tmn1951_1980djf_ave_HST_1513102910/tmn1951_1980djf_ave_HST_1513102910.tif")
+  
+  aet <- raster("./data/gis/climate_data/BCM/historical/1951-1980/aet1951_1980_ave_HST_1513103180/aet1951_1980_ave_HST_1513103180.tif")
+  cwd <- raster("./data/gis/climate_data/BCM/historical/1951-1980/cwd1951_1980_ave_HST_1513035274/cwd1951_1980_ave_HST_1513035274.tif")
+  bioclim_04 <- raster("./data/gis/climate_data/BCM/historical/1951-1980/bioclim_04.tif")
+  bioclim_15 <- raster("./data/gis/climate_data/BCM/historical/1951-1980/bioclim_15.tif")
+  bioclim_18 <- raster("./data/gis/climate_data/BCM/historical/1951-1980/bioclim_18.tif")
+  bioclim_19 <- raster("./data/gis/climate_data/BCM/historical/1951-1980/bioclim_19.tif")
+  
+  
+  # Function to downscale and project raster 
+  process_raster <- function(rast){
+    rast <- aggregate(rast, fact = 5) # Make smaller by averaging across cells
+    rast_latlon <- projectRaster(rast, crs = CRS("+proj=longlat +datum=WGS84"))
+    plot(rast_latlon)
+    return(rast_latlon)
+  }
+  
+  # Aggregate and project tmax_raster
+  tmax_rast   <- process_raster(tmax_rast)
+  tmin_winter <- process_raster(tmin_winter)
+  aet         <- process_raster(aet)
+  cwd         <- process_raster(cwd)
+  bioclim_04  <- process_raster(bioclim_04)
+  bioclim_15  <- process_raster(bioclim_15)
+  bioclim_18  <- process_raster(bioclim_18)
+  bioclim_19  <- process_raster(bioclim_19)
+  
+  # Match up resolution and extent of DEM to climate rasters
+  dem <- resample(dem, tmax_rast) 
+  bioclim_04 <- resample(bioclim_04, tmax_rast) 
+  bioclim_15 <- resample(bioclim_15, tmax_rast) 
+  bioclim_18 <- resample(bioclim_18, tmax_rast) 
+  bioclim_19 <- resample(bioclim_19, tmax_rast) 
+  
+  compareRaster(tmax_rast, dem) # Make sure rasters are equal
+  
+  # Find lat long points
+  latlon <- xyFromCell(tmax_rast, 1:ncell(tmax_rast))
+  
+  gam_dist_rast_df <- data.frame(cell_id = 1:ncell(tmax_rast),
+                                 longitude = latlon[, 1],
+                                 latitude = latlon[, 2],
+                                 tmax_sum = raster::extract(tmax_rast, 1:ncell(tmax_rast)),
+                                 tmin_winter = raster::extract(tmin_winter, 1:ncell(tmin_winter)),
+                                 aet = raster::extract(aet, 1:ncell(aet)),
+                                 cwd = raster::extract(cwd, 1:ncell(cwd)),
+                                 elevation = raster::extract(dem, 1:ncell(dem)),
+                                 bioclim_04 = raster::extract(bioclim_04, 1:ncell(bioclim_04)),
+                                 bioclim_15 = raster::extract(bioclim_15, 1:ncell(bioclim_15)),
+                                 bioclim_18 = raster::extract(bioclim_18, 1:ncell(bioclim_18)),
+                                 bioclim_19 = raster::extract(bioclim_19, 1:ncell(bioclim_19)),
+                                 random = rnorm(1:ncell(dem)))
+  # gam_dist_rast_df
+  
+  dim(gam_dist_rast_df)
+  
+ 
+  
+  
+  # Remove NAs from dataframe or random forest will complain
+  gam_dist_rast_df_nona <-  gam_dist_rast_df %>%
+    dplyr::filter(!is.na(tmax_sum)) %>%
+    dplyr::filter(!is.na(elevation)) %>%
+    dplyr::filter(!is.na(aet)) %>%
+    dplyr::filter(!is.na(bioclim_04))
+  
+  summary(gam_dist_rast_df_nona)
+  dim(gam_dist_rast_df_nona)
+  
+  
+  
+  ## Remove cells that are out of climate range
+  
+  # # # Calculate ranges
+  # tmax_sum_range <- range(unlist(raster::extract(tmax_rast, lobata_range_rough)), na.rm = TRUE)
+  # tmin_winter_range <- range(unlist(raster::extract(tmin_winter, lobata_range_rough)),
+  #                            na.rm = TRUE)
+  # aet_range <- range(unlist(raster::extract(aet, lobata_range_rough)), na.rm = TRUE)
+  # cwd_range <- range(unlist(raster::extract(cwd, lobata_range_rough)), na.rm = TRUE)
+  # elevation_range <- range(unlist(raster::extract(dem, lobata_range_rough)), na.rm = TRUE)
+  # bioclim_04_range <- range(unlist(raster::extract(bioclim_04, lobata_range_rough)),
+  #                           na.rm = TRUE)
+  # bioclim_15_range <- range(unlist(raster::extract(bioclim_15, lobata_range_rough)),
+  #                           na.rm = TRUE)
+  # bioclim_18_range <- range(unlist(raster::extract(bioclim_18, lobata_range_rough)),
+  #                           na.rm = TRUE)
+  # bioclim_19_range <- range(unlist(raster::extract(bioclim_19, lobata_range_rough)),
+  #                           na.rm = TRUE)
+  # 
+  # 
+  # # # Set percentage threshold for range extension of climate and spatial variables
+  # range_thresh <- 0.0
+  # 
+  # gam_dist_rast_df_nona <- gam_dist_rast_df_nona %>%
+  #   dplyr::filter(tmax_sum >= tmax_sum_range[1] - (abs(tmax_sum_range[1]) * range_thresh) &
+  #                   tmax_sum <= tmax_sum_range[2] + (abs(tmax_sum_range[1]) * range_thresh)) %>%
+  #   dplyr::filter(tmin_winter >= tmin_winter_range[1] - (abs(tmin_winter_range[1]) * range_thresh) &
+  #                   tmin_winter <= tmin_winter_range[2] + (abs(tmin_winter_range[1]) * range_thresh)) %>%
+  #   dplyr::filter(cwd >= cwd_range[1] - (abs(cwd_range[1]) * range_thresh) &
+  #                   cwd <= cwd_range[2] + (abs(cwd_range[1]) * range_thresh)) %>%
+  #   dplyr::filter(bioclim_04 >= bioclim_04_range[1] - (abs(bioclim_04_range[1]) * range_thresh) &
+  #                   bioclim_04 <= bioclim_04_range[2] + (abs(bioclim_04_range[1]) * range_thresh)) %>%
+  #   dplyr::filter(bioclim_15 >= bioclim_15_range[1] - (abs(bioclim_15_range[1]) * range_thresh) &
+  #                   bioclim_15 <= bioclim_15_range[2] + (abs(bioclim_15_range[1]) * range_thresh)) %>%
+  #   dplyr::filter(bioclim_18 >= bioclim_18_range[1] - (abs(bioclim_18_range[1]) * range_thresh) &
+  #                   bioclim_18 <= bioclim_18_range[2] + (abs(bioclim_18_range[1]) * range_thresh)) %>%
+  #   dplyr::filter(elevation >= elevation_range[1] - (abs(elevation_range[1]) * range_thresh) &
+  #                   elevation <= elevation_range[2] + (abs(elevation_range[1]) * range_thresh)) %>%
+  #   dplyr::filter(longitude >= extent(lobata_range_rough)@xmin - (abs(extent(lobata_range_rough)@xmin) * range_thresh) &
+  #                   longitude <= extent(lobata_range_rough)@xmax + (abs(extent(lobata_range_rough)@xmax) * range_thresh)) %>%
+  #   dplyr::filter(latitude >= extent(lobata_range_rough)@ymin - (abs(extent(lobata_range_rough)@ymin) * range_thresh) &
+  #                   latitude <= extent(lobata_range_rough)@ymax + (abs(extent(lobata_range_rough)@ymax) * range_thresh))
+  # 
+  # dim(gam_dist_rast_df_nona)
+  # 
+
+  
+  # Choose climate variables   
+  climate_vars_gam_dist <-  c("tmax_sum", 
+                              "tmin_winter", 
+                              "cwd",
+                            #     "aet",
+                            #     "bioclim_04",
+                              "bioclim_15",
+                              "bioclim_18",
+                              # "bioclim_19", # R = 0.79 with aet; R = 0.84 with bioclim_18
+                              "elevation",
+                              "latitude",
+                              "longitude") # R = -0.84 with latitude
+  #   "random")
+  
+  # Check variance inflation factor
+  car::vif(lm(snp_chr8_30946730 ~ . , 
+              data = gen_dat_clim[, c("snp_chr8_30946730", climate_vars_gam_dist)]))
+  
+  pairs.panels(gen_dat_clim[, climate_vars_gam_dist])
+  
+  
+  # Remove invididuals based on missing data
   # Count % of missing data for full gbs dataset
   missing_all <- data.frame(gen_dat_clim_all[ "id"],
-             missing = apply(dplyr::select(gen_dat_clim_all, snp_col_names),
-                             MARGIN = 1, function(x) sum(is.na(x)))/length(snp_col_names))
+                            missing = apply(dplyr::select(gen_dat_clim_all, snp_col_names),
+                                            MARGIN = 1, function(x) sum(is.na(x)))/length(snp_col_names))
   
   # Get list of samples to exclude because of missing data
-  exclude_based_on_missing <- missing_all$id[which(missing_all$missing > .2)]
+  exclude_based_on_missing <- missing_all$id[which(missing_all$missing > .20)]
   
+  
+  
+  
+  rda_df <-  gen_dat_clim %>%
+    dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality),
+                     by = c("id" = "gbs_name")) %>%
+    dplyr::filter(!(id %in% exclude_based_on_missing))
+  
+  
+  rda_df2 <- left_join(rda_df, dplyr::select(gen_dat_moms, accession, prs_best_scaled) %>% 
+                         distinct(accession, .keep_all = T) %>% 
+                         mutate(accession = as.numeric(as.character(accession)))) %>%
+     filter(!is.na(accession)) %>%
+    filter(!is.na(prs_best_scaled))
+  
+  pairs.panels(rda_df2[, climate_vars_gam_dist])
+  
+  car::vif(lm(snp_chr8_30946730 ~ . , 
+              data = rda_df2[, c("snp_chr8_30946730", climate_vars_gam_dist)]))
+  
+  
+  rda_df2$locality <- factor(rda_df2$locality)
+
+  gam_dist <- gam(prs_best_scaled ~ s(tmax_sum, bs = "cr") +
+                    s(tmin_winter, bs = "cr") +
+                    s(cwd, bs = "cr") + 
+                   #     s(bioclim_04, bs = "cr") + 
+                    s(bioclim_15, bs = "cr") + 
+                    s(bioclim_18, bs = "cr") +  
+                    s(elevation, bs = "cr") + 
+                    s(latitude, bs = "cr") + 
+                    s(longitude, bs = "cr"),
+                #   te(latitude, longitude, bs = "cr"),
+                  #  s(locality, bs = "re"),
+                  #  method = "fREML",
+                  # discrete = TRUE,
+                  #  select = TRUE,
+                  data = rda_df2)
+  
+  summary(gam_dist)
+  
+  #   ## Save output
+  #   
+    # Save gam summary to file
+    #  sink(file = paste0("./figs_tables/Table S3 - gam_dist_summary_",
+    #                     Sys.Date(), ".txt"))
+    #  summary(gam_dist)
+    # anova(gam_dist)
+    #  sink()
+
+
+  
+  
+  
+  #  visreg(gam_dist)
+  
+  gam_dist_rast_df_nona$locality <- "FHL"
+  
+  ## Predict across a raster and add to stack
+  gam_dist_rast_df_nona$pred = predict(gam_dist,
+                                       gam_dist_rast_df_nona, 
+                                       type = "response")
+  
+  gam_dist_rast_df_temp <- left_join(gam_dist_rast_df,
+                                     gam_dist_rast_df_nona[, c("cell_id", "pred")])
+  
+  rast <- tmax_rast # Initialize
+  values(rast) <- gam_dist_rast_df_temp$pred
+  names(rast) <- snp_name # Name the raster
+  
+  
+  prs_rast_gam <- mask(rast, lobata_range_extended)
+  plot(prs_rast_gam)
+  
+  hist(prs_rast_gam, breaks = 50)
+  
+
   
   # Choose climate variables
   climate_vars_core <- climate_vars[!grepl(pattern = "random|PC", x = climate_vars)]
@@ -1123,7 +1238,7 @@
   length(climate_vars_core) # Should be 10
 
   ## Calculate number of top and bottom SNPs for moms
-  dat_snp_count_mom <- gen_dat_clim_all %>%
+  dat_snp_prs_mom <- gen_dat_clim_all %>%
     dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
                      by = c("id" = "gbs_name")) %>%
     dplyr::select(id, accession, locality, longitude, latitude, climate_vars_core) %>%
@@ -1131,199 +1246,475 @@
     dplyr::mutate(accession = as.numeric(as.character(accession))) %>% 
     dplyr::left_join(., dplyr::select(gen_dat_moms, id, prs_best_scaled))
     
-    head(dat_snp_count_mom)
+    head(dat_snp_prs_mom)
       
-    summary(dat_snp_count_mom$prs_best_scaled)
-    hist(dat_snp_count_mom$prs_best_scaled, breaks = 50)
+    summary(dat_snp_prs_mom$prs_best_scaled)
+    hist(dat_snp_prs_mom$prs_best_scaled, breaks = 50)
 
-  ## Define localities based on distance threshold - rows not in same order as calculation in 03_adding-climate-data.R so must redo
-  library(geosphere)
-
-  mom_lat_longs <- as.data.frame(dplyr::select(dat_snp_count_mom, longitude, latitude))
-  dist_mat <- matrix(NA, ncol = nrow(dat_snp_count_mom), nrow = nrow(dat_snp_count_mom))
-
-  for(i in 1:nrow(dist_mat)){
-
-    if(i %% 50 == 0){
-      cat("Working on row:", i, " ... \n")
-    }
-
-    for(j in 1:nrow(dist_mat)){
-
-      dist_mat[i, j] <- distHaversine(mom_lat_longs[i, ],
-                                      mom_lat_longs[j, ])/ 1000 # To convert to km
-
-    }
-  }
-
-
- dist_mat[1:10, 1:10]
-
- distance_threshold <- 25 ## in km ~ 20 miles = 32.1869 km
-
-
- dist_tree = hclust(as.dist(dist_mat))
-
- dist_tree_cut <- cutree(dist_tree, h = distance_threshold)
-
- plot(dist_tree)
- rect.hclust(dist_tree, h = distance_threshold)
-
- ## Assign as locality
- dat_snp_count_mom$locality <- as.character(dist_tree_cut)
- length(table(as.character(dist_tree_cut))) # How many localities
-
- sort(table(dist_tree_cut))
-
- plot(dat_snp_count_mom$longitude, dat_snp_count_mom$latitude,
-      col  = dat_snp_count_mom$locality, asp = 1, pch = 19)
-
-
-
+ 
+    
+  ## Exclude localities not in main dataset
+   dat_snp_prs_mom <-  dat_snp_prs_mom %>%
+      dplyr::filter(locality %in% dat_snp_prs$locality)
+   
+   ## Exclude accessions not in main dataset
+   dat_snp_prs_mom <-  dat_snp_prs_mom %>%
+     dplyr::filter(!is.na(accession))
+   
   # Average by locality
-  dat_snp_count_locality <- dat_snp_count_mom %>%
+  dat_snp_prs_locality_mean <- dat_snp_prs_mom %>%
                           dplyr::group_by(locality) %>% 
                           summarise_all(mean)
   
-  # Filter down to localities that are in the main dataset
-  # dat_snp_count_locality <- dat_snp_count_locality %>%
-  #                 dplyr::filter(locality %in% dat_snp_count$locality)
-  # 
-  # dat_snp_count_mom <- dat_snp_count_mom %>%
-  #   dplyr::filter(locality %in% dat_snp_count$locality)
   
-  
-  
-  # ## Remove localities with less than ## individuals
-  # count_by_locality <- gen_dat_clim_all %>%
-  #   dplyr::select(id) %>%
-  #   dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality),
-  #                    by = c("id" = "gbs_name")) %>%
-  #   dplyr::select(id, locality) %>%
-  #   dplyr::filter(!id %in% exclude_based_on_missing) %>%
-  #   group_by(locality) %>%
-  #   tally()
-  # 
-  # table(count_by_locality$n)
-  # 
-  # exclude_locality <- count_by_locality$locality[which(count_by_locality$n < 2)]
-  # dat_snp_count_locality <- dat_snp_count_locality %>%
-  #   dplyr::filter(!locality %in% exclude_locality)
-
-  
-# Explore data  
-  dim(dat_snp_count_mom)
-  head(dat_snp_count_mom)
-
-  dim(dat_snp_count_locality)
-  head(dat_snp_count_locality)
-  
-  
-  # pairs.panels(dplyr::select(dat_snp_count_mom, -id, -accession)) # No strong correlations
-  # pairs.panels(dplyr::select(dat_snp_count_locality, -id, -accession)) # No strong correlations
-
-## Bar chart of top and bottom snps per locality
- library(tmap)
- 
- # Shape outlines
- cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
-                               proj4string = CRS("+proj=longlat +datum=WGS84"))
- 
- lobata_range <- readShapePoly("./data/gis/valley_oak_range/qlobata_refined_grouped.shp",
-                               proj4string = CRS("+proj=longlat +datum=WGS84"))
- 
- lobata_range_rough <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
-                                     proj4string = CRS("+proj=longlat +datum=WGS84"))
- 
- lobata_range_extended <- readShapePoly("./data/gis/valley_oak_range/qlobata_extended.shp", delete_null_obj = TRUE,
-                                        proj4string = CRS("+proj=longlat +datum=WGS84"))
- 
- dem <- raster("./data/gis/dem/ClimateNA_DEM_cropped.tif")
- 
- slope = raster::terrain(dem, opt='slope')
- aspect = raster::terrain(dem, opt='aspect')
- hill = hillShade(slope, aspect, 40, 270)
- hill_cropped <- crop(hill, extent(-125, -113.5, 32, 42.5)) # crop based on california outline
- 
  # Set up spatial dataframe
-  dat_snp_count_locality_sp <- SpatialPointsDataFrame(dat_snp_count_locality[, c("longitude", "latitude")],
-                                      data = dat_snp_count_locality[, c("locality", "prs_best_scaled")],
+  dat_snp_prs_locality_sp <- SpatialPointsDataFrame(dat_snp_prs_locality_mean[, c("longitude", "latitude")],
+                                      data = dat_snp_prs_locality_mean[, c("locality", "prs_best_scaled", "latitude", "longitude")],
                                       proj4string = CRS("+proj=longlat +datum=WGS84"))
   
-    ## Testing kriging in between points  
-    
-    library(gstat)
-    
-    vario <- variogram(prs_best_scaled ~ longitude + latitude,
-                       dat_snp_count_locality_sp, width = 10)
-    plot(vario)
-    vario_fit <- fit.variogram(vario, vgm("Exp"))
-    plot(variogramLine(vario_fit, 300), type = "l", las = 1)
-    points(vario[,2:3], pch=20, col='red')
-
-    # Use hillshade as template for growth predictions
-    hill_test <- hill_cropped
-    krig <- as(hill_test, 'SpatialPointsDataFrame')
-    krig
-    crs(krig) <- "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0 "
-    colnames(krig@coords) <- c("longitude", "latitude")
-    
-    krig <- krige(formula = prs_best_scaled ~ longitude + latitude, 
-                  locations =  dat_snp_count_locality_sp,
-                  newdata = krig,
-                  model = vario_fit)
-    
-    krig
-    # spplot(krig[1])
-
-    krig_rast <- rasterFromXYZ(krig)
-    krig_rast <- mask(krig_rast, lobata_range_extended)
-    
-    hist(krig_rast)
-    
-    tm <-  tm_shape(hill_cropped)+ 
-           tm_grid(lwd = .1, labels.inside.frame = TRUE) + # Add lat long lines
-           tm_xlab("Longitude") + tm_ylab("Latitude") + # Add axis labels
-           tm_raster(palette = gray.colors(n= 9), legend.show = FALSE) + # Add hillshade
-      tm_shape(cali_outline) +
-      tm_borders("black") +
-     # tm_fill("white", alpha = .25) +
-      
-      # Add kriged raster
-      tm_shape(krig_rast) + 
-      tm_raster(palette = "PRGn",
-                n = 20,
-              # breaks = c(-8, -7, -6, -5, -4),
-                alpha = .95,
-                midpoint = NA) + 
-      
-      tm_shape(lobata_range_extended) + 
-      tm_borders("black") +
-      tm_shape(lobata_range) + # Fine scale range
-      tm_borders("black", lwd = .15) + 
-      
-      # # Bubble plots
-      tm_shape(dat_snp_count_locality_sp) +
-      tm_bubbles(size = .05,
-                 shape = 21,
-               #  col = "height_change_warmer_base0",
-               col = "black",
-                 # palette = "RdYlBu",
-               border.alpha = 0,
-                 # n = 20,
-                 midpoint = NA)
-
-    tm
-    
-  # Save plot
-  # tmap_save(tm, filename = paste0("./figs_tables/fig2/growth_barchart no bars ", Sys.Date(), ".pdf"),
-  #           width = 16, height =16, units = "cm", useDingbats=FALSE)
-    
-    tmap_save(tm, filename = paste0("./figs_tables/Figure S8 - growth_barchart with bars ", Sys.Date(), ".pdf"),
-              width = 16, height =16, units = "cm", useDingbats=FALSE)
-    
   
+  
+# Make spatial predictions across landscape for number of alleles vs growth ------------------
+  ## Recreating Wang et al. 2010 graphs
+    
+    
+    ## Calculate number of top and bottom SNPs for moms
+    dat_snp_prs_mom <- gen_dat_clim_all %>%
+      dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality), 
+                       by = c("id" = "gbs_name")) %>%
+      dplyr::select(id, accession, locality, longitude, latitude, climate_vars_core) %>%
+      dplyr::filter(!id %in% exclude_based_on_missing) %>%
+      dplyr::mutate(accession = as.numeric(as.character(accession))) %>% 
+      dplyr::left_join(., dplyr::select(gen_dat_moms, id, prs_best_scaled))
+    
+    head(dat_snp_prs_mom)
+    
+    summary(dat_snp_prs_mom$prs_best_scaled)
+    hist(dat_snp_prs_mom$prs_best_scaled, breaks = 50)
+    
+    # Average by locality
+    dat_snp_prs_locality_mean <- dat_snp_prs_mom %>%
+      dplyr::group_by(locality) %>% 
+      summarise_all(mean)
+ 
+    # Set up dataframe   
+    dat_snp_prs_locality_sp <- SpatialPointsDataFrame(dat_snp_prs_locality_mean[, c("longitude", "latitude")],
+                                                          data = dat_snp_prs_locality_mean[, c("locality", "prs_best_scaled", "latitude", "longitude")],
+                                                          proj4string = CRS("+proj=longlat +datum=WGS84"))
+    
+    
 
+    library(raster)
+    library(rasterVis)
+
+    ## Read in elevation dem and create a hillshade for mapping
+    dem <- raster("./data/gis/dem/ClimateNA_DEM_cropped.tif")
+
+    slope = raster::terrain(dem, opt='slope')
+    aspect = raster::terrain(dem, opt='aspect')
+    hill = hillShade(slope, aspect, 40, 270)
+
+    hill_cropped <- crop(hill, extent(-125, -113.5, 32, 42.5)) # crop based on california outline
+
+    ## Load in california outline
+    cali_outline <- readShapePoly("./data/gis/california_outline/california_outline.shp",
+                                  proj4string = CRS("+proj=longlat +datum=WGS84"))
+
+    lobata_range <- readShapePoly("./data/gis/valley_oak_range/qlobata_refined_grouped.shp",
+                                  proj4string = CRS("+proj=longlat +datum=WGS84"))
+
+    lobata_range_rough <- readShapePoly("./data/gis/valley_oak_range/querloba.shp",
+                                        proj4string = CRS("+proj=longlat +datum=WGS84"))
+
+    lobata_range_extended <- readShapePoly("./data/gis/valley_oak_range/qlobata_extended.shp", delete_null_obj = TRUE,
+                                           proj4string = CRS("+proj=longlat +datum=WGS84"))
+    
+    
+    
+    # Function to downscale and project raster 
+    process_raster <- function(rast){
+      rast <- aggregate(rast, fact = 5) # Make smaller by averaging across cells
+      rast_latlon <- projectRaster(rast, crs = CRS("+proj=longlat +datum=WGS84"))
+      rast_latlon <- mask(rast_latlon, lobata_range_extended)
+      plot(rast_latlon)
+      return(rast_latlon)
+    }
+    
+   
+  ## Creates vector with list of file paths to all .tif raster files
+    ## Directory path where future climate scenarios are located
+    dir_name <- "./data/gis/climate_data/BCM/future/"
+    raster_files <- list.files(dir_name, full.names = TRUE, recursive = TRUE)
+    raster_files <- raster_files[grep("*[[:digit:]].tif$", raster_files)] # Only those with .tif extension
+    raster_files <- raster_files[grep("jja_ave", raster_files)] # Only tmax sum files
+
+    ## Select only 85 scenario
+    raster_files <- raster_files[grep("rcp85", raster_files)]
+    
+    raster_files
+    
+    future_stack <- stack()
+    x = 1
+    
+    ## Loop through raster files and add to stack
+    for(file in raster_files){
+      
+      # Load in raster
+      raster_temp <- raster(file)
+      
+      cat("Working on file:", file, "...\n")
+      
+      ## Aggregate, project to lat long, and crop to area of interest
+      raster_temp <- process_raster(raster_temp)
+      
+      # Check to see if extent is different, if it is - change it
+      if(x > 1 & !compareRaster(future_stack, raster_temp, stopiffalse = FALSE)){
+        extent(raster_temp) <- extent(future_stack)
+      }
+      
+      future_stack <- raster::stack(future_stack, raster_temp)
+      x = x + 1
+    }
+    
+    future_stack
+    
+    ## Clean up names
+    names(future_stack) <-  unlist(lapply(strsplit(x = gsub(pattern = "tmx2070_2099jja_ave_", 
+                                                            replacement = "", names(future_stack)),
+                                                   split = "_1"), "[", 1))
+    
+    # Load in contemporary Tmax raster
+    tmax_rast <- raster("./data/gis/climate_data/BCM/historical/1951-1980/tmx1951_1980jja_ave_HST_1513103038/tmx1951_1980jja_ave_HST_1513103038.tif")
+    
+    tmax_rast <- process_raster(tmax_rast)
+    
+    
+  # Calculate difference between future and current
+    future_stack_tmax_dif <- future_stack - tmax_rast
+    names(future_stack_tmax_dif) <- names(future_stack) # Reassign name
+    
+    # Scale values
+    future_stack_tmax_dif_scaled <- (future_stack_tmax_dif - 
+                                       scaled_var_means_gbs_all["tmax_sum_dif"]) /
+                                      scaled_var_sds_gbs_all["tmax_sum_dif"]
+   
+    
+  ## Resample PRS Raster to match with tmax rasters
+
+      # From gam predictions
+      prs_rast_mean <- resample(prs_rast_gam, tmax_rast) # From gam predictions
+      
+      compareRaster(tmax_rast, prs_rast_mean) # Make sure rasters are equal
+      
+      
+      # Set up scenario where we pick the highest PRS score within a XXXX radius of the point
+
+      ## Change to equal area projection and resolution to 1km
+        prs_rast_mean2 <- projectRaster(from = prs_rast_mean,
+                                        crs = "+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=37.5 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m", 
+                                        res = 1000) # Resolution of 1km
+        prs_rast_mean2
+        
+        
+        buffer = focalWeight(prs_rast_mean2, d =  25000, # 25 km radius
+                             type = "circle")
+      
+        buffer[buffer > 0] <- 1 # Set all non 0 buffer weights to 1
+        buffer
+        dim(buffer)
+        
+        # Run focal statistics to find max values within radius
+          prs_rast_mean_focal = focal(prs_rast_mean2, w = buffer, fun = max, na.rm = T)
+          
+          plot( prs_rast_mean_focal)
+          
+        # Project back to lat long
+          prs_rast_mean_focal <- projectRaster(from =  prs_rast_mean_focal, 
+                                to = prs_rast_mean)
+    
+          prs_rast_mean_focal <- mask( prs_rast_mean_focal, lobata_range_extended)
+          plot( prs_rast_mean_focal)
+        
+        # Check to make sure all positive values
+          hist( prs_rast_mean_focal -  prs_rast_mean)
+          summary(values( prs_rast_mean_focal -  prs_rast_mean))
+        
+        # Check to make sure max values aren't above
+          summary(values( prs_rast_mean))
+          summary(values( prs_rast_mean_focal))
+          
+      # Save raster    
+        prs_rast_max <-  prs_rast_mean_focal
+  
+        
+   ## Get null prediction of height with no change in tmax
+
+     future_null <- tmax_rast
+     names(future_null) <- "tmax_sum_dif"
+     
+     # Need to scale tmax when actual transfer distance is 0
+     future_null[!is.na(future_null)] <- forward_transform(0, var = "tmax_sum_dif",
+                                                           means = scaled_var_means_gbs_all,
+                                                           sds = scaled_var_sds_gbs_all)
+     
+     future_null_stack <- stack(future_null, prs_rast_mean) #
+     
+     
+     names(future_null_stack) <- c("tmax_sum_dif", "prs_best_scaled") # Rename so predict function works
+     future_null_stack
+     
+     future_null_height_prs <- predict(future_null_stack,
+                                       model = gam_prs_all,
+                                       progress = "text",
+                                       type = "response")
+     
+     future_null_height_prs
+     plot(future_null_height_prs)
+     summary(future_null_height_prs)
+     
+     ## Add baseline data
+     
+     # Make data frame for prediction - one for top and one for bottom
+     newdata_rast_const <- data.frame(section_block = "Block1_1",
+                                      height_2014 = 0,
+                                      accession = "6",
+                                      PC1_gen = 0, PC2_gen = 0, 
+                                      PC1_clim = 0, PC2_clim = 0,
+                                      locality = "FHL")
+     
+     
+     future_null_height_prs <- future_null_height_prs +  predict(future_null_stack,
+             model = gam_snp_all,
+             const = newdata_rast_const,
+             progress = "text",
+             type = "response")
+     
+
+   # Initialize stack for height changes
+       future_stack_height_change_prs <- future_stack_tmax_dif
+       future_stack_height_change_prs_selection <- future_stack_tmax_dif
+   
+  
+    # Loop over scenarios
+    for(scenario in 1:nlayers(future_stack_tmax_dif)){
+      
+      cat("Working on scenario:", names(future_stack_tmax_dif)[scenario], "... \n")
+      
+      ## Use scaled raster
+        rast_temp <- future_stack_tmax_dif_scaled[[scenario]]
+        rast_temp <- stack(rast_temp, prs_rast_mean)
+        
+        names(rast_temp) <- c("tmax_sum_dif", "prs_best_scaled") # Rename so predict function works
+        rast_temp
+        
+        # Calculate baseline Rgr
+        baseline_temp <- predict(rast_temp,
+                                 model = gam_snp_all,
+                                 const = newdata_rast_const,
+                                 progress = "text",
+                                 type = "response")
+        
+        
+        
+        rast_temp_height_prs <- predict(rast_temp,
+                                        model = gam_prs_all,
+                                        progress = "text",
+                                        type = "response")
+        
+        ## Add baseline RGR
+        rast_temp_height_prs <- rast_temp_height_prs + baseline_temp
+        
+      
+      ## Use selection raster
+        rast_temp <- future_stack_tmax_dif_scaled[[scenario]]
+        rast_temp <- stack(rast_temp, prs_rast_max)
+        
+        names(rast_temp) <- c("tmax_sum_dif", "prs_best_scaled") # Rename so predict function works
+        rast_temp
+        
+        rast_temp_height_prs_selection <- predict(rast_temp,
+                                        model = gam_prs_all,
+                                        progress = "text",
+                                        type = "response")
+        # Add baseline RGR
+        rast_temp_height_prs_selection <- rast_temp_height_prs_selection + baseline_temp
+
+      # Dif bw top and null 
+     rast_temp_height_change_prs <- (rast_temp_height_prs - future_null_height_prs) / abs(future_null_height_prs) * 100
+     # rast_temp_height_change_prs <- rast_temp_height_prs - future_null_height_prs 
+     #   rast_temp_height_change_prs <- rast_temp_height_prs
+      plot(rast_temp_height_change_prs, main = scenario)
+      future_stack_height_change_prs[[scenario]] <- rast_temp_height_change_prs
+      names(future_stack_height_change_prs)[scenario] <- names(future_stack_tmax_dif)[scenario] 
+      
+      
+      # Selection
+   #  rast_temp_height_change_prs_selection <- rast_temp_height_prs_selection - future_null_height_prs
+   #   rast_temp_height_change_prs_selection <- rast_temp_height_prs_selection
+      rast_temp_height_change_prs_selection <- (rast_temp_height_prs_selection - future_null_height_prs) / abs(future_null_height_prs) * 100
+      plot(rast_temp_height_change_prs_selection,
+           main = paste0(scenario, " | selection"))
+      future_stack_height_change_prs_selection[[scenario]] <- rast_temp_height_change_prs_selection
+      names(future_stack_height_change_prs_selection)[scenario] <- names(future_stack_tmax_dif)[scenario] 
+      
+
+    } # End scenario loop
+     
+    
+    # Average across scenarios
+     future_stack_height_change_prs_avg <- mean(future_stack_height_change_prs, na.rm = TRUE)
+     
+     future_stack_height_change_prs_selection_avg <- mean(future_stack_height_change_prs_selection,
+                                                          na.rm = TRUE)
+     
+     hist(future_stack_height_change_prs_avg)
+     hist(future_stack_height_change_prs_selection_avg)
+     
+     
+     height_change_dif = future_stack_height_change_prs_selection_avg - future_stack_height_change_prs_avg
+     plot(height_change_dif)
+     hist(height_change_dif)
+     
+     # Find min across both rasters
+     rast_min <- min(c(min(values(future_stack_height_change_prs_avg), na.rm = T), 
+                    min(values(future_stack_height_change_prs_selection_avg), na.rm = T)))
+     rast_max <- max(c(max(values(future_stack_height_change_prs_avg), na.rm = T), 
+                       max(values(future_stack_height_change_prs_selection_avg), na.rm = T)))
+     
+     
+     hill_cropped <- crop(hill, extent(-125, -118, 33, 42.1)) # crop based on california outline
+   
+     
+     
+     
+     
+     
+  # Plot of baseline PRS scores  
+    # Plot map
+     tm <-  tm_shape(hill_cropped)+
+       tm_grid(lwd = .025, labels.inside.frame = TRUE) + # Add lat long lines
+       tm_xlab("Longitude") + tm_ylab("Latitude") + # Add axis labels
+       tm_raster(palette = gray.colors(n= 9), legend.show = FALSE) + # Add hillshade
+       tm_shape(cali_outline) +
+       tm_borders("black") +
+       # tm_fill("white", alpha = .25) +
+
+       # Add kriged raster
+     #  tm_shape(future_stack_height_change_prs_selection_avg) +
+       tm_shape(prs_rast_mean) +
+       tm_raster(palette = "PRGn",
+             #    breaks = seq(rast_min, rast_max, length.out = 10),
+                breaks = seq(-2, 2, by = 0.5),
+                 alpha = .95,
+              midpoint = NA) +
+
+       tm_shape(lobata_range_extended) +
+       tm_borders("black") +
+       tm_shape(lobata_range) + # Fine scale range
+       tm_borders("black", lwd = .15) +
+
+       # # Bubble plots
+       tm_shape(dat_snp_prs_locality_sp) +
+       tm_bubbles(size = .025,
+                  shape = 21,
+                  col = "black",
+                  border.alpha = 0,
+                  midpoint = NA)
+     
+     tm
+
+     tmap_save(tm, filename = paste0("./figs_tables/fig3/Figure 3 - prs map ", Sys.Date(), ".pdf"),
+               width = 12, height =12, units = "cm", useDingbats=FALSE)
+     
+    
+     
+     
+      
+   ## Plot of predicted growth rates in 2080 based on current PRS distribution
+     
+   # Plot map
+     tm <-  tm_shape(hill_cropped)+
+       tm_grid(lwd = .025, labels.inside.frame = TRUE) + # Add lat long lines
+       tm_xlab("Longitude") + tm_ylab("Latitude") + # Add axis labels
+       tm_raster(palette = gray.colors(n= 9), legend.show = FALSE) + # Add hillshade
+       tm_shape(cali_outline) +
+       tm_borders("black") +
+       # tm_fill("white", alpha = .25) +
+       
+       # Add kriged raster
+       tm_shape(future_stack_height_change_prs_avg) +
+       tm_raster(palette = "YlGn",
+               #      breaks = seq(rast_min, rast_max, length.out = 20),
+                 breaks = seq(-10, 10, by = 2),
+                 alpha = .95,
+                 midpoint = NA) +
+       
+       tm_shape(lobata_range_extended) +
+       tm_borders("black") +
+       tm_shape(lobata_range) + # Fine scale range
+       tm_borders("black", lwd = .15)  +
+       
+       # # # Bubble plots
+       tm_shape(dat_snp_prs_locality_sp) +
+       tm_bubbles(size = .025,
+                  shape = 21,
+                  col = "black",
+                  border.alpha = 0,
+                  midpoint = NA)
+     tm
+     
+     
+     # tmaptools::palette_explorer()
+     
+     # Save plot
+     tmap_save(tm, filename = paste0("./figs_tables/fig3/Figure 3 - growth 2080 map ", Sys.Date(), ".pdf"),
+               width = 12, height =12, units = "cm", useDingbats=FALSE)
+     
+     
+     
+     
+     ## Plot of predicted growth rates in 2080 based on MAX PRS
+     
+     # Plot map
+     tm <-  tm_shape(hill_cropped)+
+       tm_grid(lwd = .025, labels.inside.frame = TRUE) + # Add lat long lines
+       tm_xlab("Longitude") + tm_ylab("Latitude") + # Add axis labels
+       tm_raster(palette = gray.colors(n= 9), legend.show = FALSE) + # Add hillshade
+       tm_shape(cali_outline) +
+       tm_borders("black") +
+       # tm_fill("white", alpha = .25) +
+       
+       # Add kriged raster
+       tm_shape(future_stack_height_change_prs_selection_avg) +
+       tm_raster(palette = "YlGn",
+                 #      breaks = seq(rast_min, rast_max, length.out = 20),
+                 breaks = seq(-10, 10, by = 2),
+                 alpha = .95,
+                 midpoint = NA) +
+       
+       tm_shape(lobata_range_extended) +
+       tm_borders("black") +
+       tm_shape(lobata_range) + # Fine scale range
+       tm_borders("black", lwd = .15)  +
+       
+       # # # Bubble plots
+       tm_shape(dat_snp_prs_locality_sp) +
+       tm_bubbles(size = .025,
+                  shape = 21,
+                  col = "black",
+                  border.alpha = 0,
+                  midpoint = NA)
+     tm
+     
+     
+     # tmaptools::palette_explorer()
+     
+     # Save plot
+     tmap_save(tm, filename = paste0("./figs_tables/fig3/Figure 3 - growth PRS selection 2080 map ", Sys.Date(), ".pdf"),
+               width = 12, height =12, units = "cm", useDingbats=FALSE)
+     
+    
+    
 # RDA  --------------------------------------------------------------------
 
  library(vegan)
@@ -1347,152 +1738,14 @@
    rda_df2 <- left_join(rda_df, dplyr::select(gen_dat_moms, accession, prs_best_scaled) %>% 
                           distinct(accession, .keep_all = T) %>% 
                           mutate(accession = as.numeric(as.character(accession)))) %>%
-   #  filter(!is.na(accession)) %>%
+     filter(!is.na(accession)) %>%
      filter(!is.na(prs_best_scaled))
      
    
    head(rda_df2)
    dim(rda_df2)
    
-  ## Choose climate variables # Choose climate variables
-   climate_vars_core <- climate_vars[!grepl(pattern = "random|PC", x = climate_vars)]
-   climate_vars_core
-   
-   # Remove correlated variables
-   climate_vars_core <- climate_vars_core[!climate_vars_core %in% c("tave", "tmax", "tmin",
-                                                                    "cwd")]
-   
-   climate_vars_core <- c("tmax_sum", "tmin_winter", "bioclim_04")
-   
-   length(climate_vars_core) # Should be 10
-   
-   wna_climate_vars <- climate_vars_core
-   
-   wna_climate_vars_current <- paste0(wna_climate_vars, "_wna_current")
-   wna_climate_vars_lgm <- paste0(wna_climate_vars, "_lgm")
-   wna_climate_vars_rcp85 <- paste0(wna_climate_vars, "_rcp85")
-   
-   wna_climate_vars_current <- c(wna_climate_vars_current,
-                                 "PCNM1", "PCNM2", "PCNM3")
-   
-   wna_climate_vars_lgm <- c(wna_climate_vars_lgm,
-                                 "PCNM1", "PCNM2", "PCNM3")
-   
-   car::vif(lm(prs_best_scaled ~ ., data = dplyr::select(rda_df2, prs_best_scaled, 
-                                                         wna_climate_vars_current)))
-   
-   
-     pairs.panels(rda_df2[, c("prs_best_scaled", wna_climate_vars_current)])
-   
-     rda_df3 <- dplyr::select(rda_df2, locality, prs_best_scaled, wna_climate_vars_lgm) %>%
-       dplyr::group_by(locality) %>% summarise_all(mean) %>% dplyr::select(-locality)
-   
-   lm_lgm <- lm(prs_best_scaled ~ ., 
-                data =rda_df3)
-   summary(lm_lgm)
-   lm_lgm$data <-rda_df3
-   
-   visreg(lm_lgm)
-   
-   plot(rda_df3$tmax_sum_lgm, rda_df3$prs_best_scaled, pch = 19)
-   abline(lm_lgm, lwd = 3)
-   
-   summary(lm(resid(lm_lgm) ~ tmax_sum_wna_current + tmin_winter_wna_current + bioclim_04_wna_current + PCNM1 + PCNM2 + PCNM3, data = rda_df2))
-   
-   
-   
-   
-   
-   visreg(lm(prs_best_scaled ~ tmax_sum_wna_current + tmin_winter_wna_current + bioclim_04_wna_current + PCNM1 + PCNM2 + PCNM3, data = rda_df2), partial = F)
-   
-
-   
-   
-   
-   
-   summary(lm(prs_best_scaled ~ tmax_sum_lgm+tmax_lgm+tmin_lgm+tave_lgm+tmin_winter_lgm+cwd_lgm+bioclim_04_lgm+bioclim_15_lgm+bioclim_18_lgm+bioclim_19_lgm, data = rda_df2))
-   
-   summary(lm(prs_best_scaled ~ PC1_clim + PC2_clim + PC3_clim + PC4_clim + PC5_clim, data = rda_df2))
-   
-   summary(lm(prs_best_scaled ~ tmax_sum_wna_current+tmax_wna_current+tmin_wna_current+tave_wna_current+tmin_winter_wna_current+cwd_wna_current+bioclim_04_wna_current+bioclim_15_wna_current+bioclim_18_wna_current+bioclim_19_wna_current, data = rda_df2))
-   
-   summary(lm(prs_best_scaled ~ tmax_sum_rcp85+tmax_rcp85+tmin_rcp85+tave_rcp85+tmin_winter_rcp85+cwd_rcp85+bioclim_04_rcp85+bioclim_15_rcp85+bioclim_18_rcp85+bioclim_19_rcp85, data = rda_df2))
-   
-   # Gams
-   summary(gam(prs_best_scaled ~ s(tmax_sum_lgm)+s(tmax_lgm)+s(tmin_lgm)+s(tave_lgm)+s(tmin_winter_lgm)+s(cwd_lgm)+s(bioclim_04_lgm)+s(bioclim_15_lgm)+s(bioclim_18_lgm)+s(bioclim_19_lgm), data = rda_df2))
-   
-   
-   summary(gam(prs_best_scaled ~ s(tmax_sum_wna_current)+s(tmax_wna_current)+s(tmin_wna_current)+s(tave_wna_current)+s(tmin_winter_wna_current)+s(cwd_wna_current)+s(bioclim_04_wna_current)+s(bioclim_15_wna_current)+s(bioclim_18_wna_current)+s(bioclim_19_wna_current), data = rda_df2))
-   
-   summary(gam(prs_best_scaled ~ s(tmax_sum_rcp85)+s(tmax_rcp85)+s(tmin_rcp85)+s(tave_rcp85)+s(tmin_winter_rcp85)+s(cwd_rcp85)+s(bioclim_04_rcp85)+s(bioclim_15_rcp85)+s(bioclim_18_rcp85)+s(bioclim_19_rcp85), data = rda_df2))
-   
-   
-   paste(paste("s(PCNM", 1:10, ")", sep =""), collapse = "+")
-   paste(paste("PCNM", 1:10, sep =""), collapse = "+")
-   
-  rda_df2$prs_best_scaled_resids <- resid(gam(prs_best_scaled ~ s(PCNM1)+s(PCNM2)+s(PCNM3)+s(PCNM4)+s(PCNM5)+s(PCNM6)+s(PCNM7)+s(PCNM8)+s(PCNM9)+s(PCNM10), data = rda_df2))
-  
-  
-  rda_df2$locality <- factor(rda_df2$locality)
-  summary(gam(prs_best_scaled_resids ~ s(tmax_sum_lgm)+s(tmax_lgm)+s(tmin_lgm)+s(tave_lgm)+s(tmin_winter_lgm)+s(cwd_lgm)+s(bioclim_04_lgm)+s(bioclim_15_lgm)+s(bioclim_18_lgm)+s(bioclim_19_lgm), data = rda_df2))
-  
-  
-  library(randomForest)
-  
-  test = randomForest(prs_best_scaled ~ tmax_sum_lgm+tmax_lgm+tmin_lgm+tave_lgm+tmin_winter_lgm+cwd_lgm+bioclim_04_lgm+bioclim_15_lgm+bioclim_18_lgm+bioclim_19_lgm,
-                      ntree = 1000,
-                      data = rda_df2)
-  
-  test = randomForest(prs_best_scaled ~PCNM1+PCNM2+PCNM3+PCNM4+PCNM5+PCNM6+PCNM7+PCNM8+PCNM9+PCNM10,
-                      ntree = 1000,
-                      mtry = 3,
-                      data = rda_df2)
-  
-  test
-  importance(test)
-  
-  plot(importance(test))
-  
-  
-  
-  
-  ### Testing out pls regression
-  library(pls)
-  
-  
-  test <- plsr(prs_best_scaled ~ tmax_sum_lgm+tmin_lgm+tave_lgm+tmin_winter_lgm+cwd_lgm+bioclim_04_lgm+bioclim_15_lgm+bioclim_18_lgm+bioclim_19_lgm,
-               data = rda_df2,
-               validation = "LOO")
-  
-  summary(test)
-  
-  # Cross validation
-  plot(RMSEP(test), legendpos = "topright")
-  
-  plot(test, ncomp = 2, asp = 1, line = TRUE)
-  plot(test, plottype = "scores", comps = 1:3)
-  
-  loadings(test)
-  plot(test, "loadings", comps = 1:2, legendpos = "topleft",
-           labels = "names", xlab = "nm", las = 2,pretty.xlabels = F)
-
-  corrplot(test, labels = "names")
-   
-  
-  plot(test, plottype = "coef", ncomp=8, legendpos = "bottomleft",
-            labels = "names", xlab = "nm", pretty.xlabels = F, las = 2)
-  
-  coefplot(test, ncomp = 8, labels = "names", type = "b", xlim = c(0, 10), 
-           pretty.xlabels = F, las = 2)
-  
-  
-  ## Extraction coefficients
-  coef(test)
-  
-  visreg(test)
-  
-  R2(test)
-   
+    
 
    # # Average allele frequency by locality
    # library(multidplyr)
@@ -1642,7 +1895,7 @@
    library(colorfulVennPlot)
 
    ## Function to calculate variance partitioning
-    calc_varpart <- function(genetic_data, label){
+    calc_varpart <- function(genetic_data, label, permtest = FALSE){
 
       # With all data
       rda_out_full <- rda(as.formula(paste("genetic_data ~ ",
@@ -1651,6 +1904,12 @@
                                                    climate_vars_rda_lgm), collapse = "+"))),
                           data = rda_all_covariates_scaled,
                           scale = FALSE)
+      
+      if(permtest == TRUE){
+        cat("RDA out full : ")
+       print(anova(rda_out_full, permutations = 99))
+       "_____________________________ \n"
+      }
 
       # Partial out spatial component
       rda_out_part_spat <- rda(as.formula(paste("genetic_data ~ ",
@@ -1660,6 +1919,12 @@
                                            paste(spatial_vars_rda, collapse = "+"),")")),
                           data = rda_all_covariates_scaled,
                           scale = FALSE)
+      
+      if(permtest == TRUE){
+        cat("rda_out_part_spat : ")
+        print(anova(rda_out_part_spat, permutations = 99))
+        "_____________________________ \n"
+      }
 
       # Partial out current climate component
       rda_out_part_clim_current <- rda(as.formula(paste("genetic_data ~ ",
@@ -1669,6 +1934,12 @@
                                         paste(climate_vars_rda_current, collapse = "+"),")")),
                                        data = rda_all_covariates_scaled,
                                        scale = FALSE)
+      
+      if(permtest == TRUE){
+        cat("rda_out_part_clim_current : ")
+        print(anova(rda_out_part_clim_current, permutations = 99))
+        "_____________________________ \n"
+      }
 
       # Partial out lgm climate component
       rda_out_part_clim_lgm <- rda(as.formula(paste("genetic_data ~ ",
@@ -1678,6 +1949,12 @@
                                         paste(climate_vars_rda_lgm, collapse = "+"),")")),
                                    data = rda_all_covariates_scaled,
                                    scale = FALSE)
+      
+      if(permtest == TRUE){
+        cat("rda_out_part_clim_lgm : ")
+        print(anova(rda_out_part_clim_lgm, permutations = 99))
+        "_____________________________ \n"
+      }
 
       # Pure Spatial - partial out climate
       rda_out_pure_spat <- rda(as.formula(paste("genetic_data ~ ",
@@ -1687,6 +1964,13 @@
                                         collapse = "+"),")")),
                                data = rda_all_covariates_scaled,
                                scale = FALSE)
+      
+      if(permtest == TRUE){
+        cat(" rda_out_pure_spat : ")
+        print(anova( rda_out_pure_spat , permutations = 99))
+        "_____________________________ \n"
+      }
+      
       # Pure current climate
       rda_out_pure_clim_current <-  rda_out_pure_spat <- rda(as.formula(paste("genetic_data ~ ",
                                       paste(climate_vars_rda_current, collapse = "+"),
@@ -1695,6 +1979,12 @@
                                             collapse = "+"),")")),
                                                              data = rda_all_covariates_scaled,
                                                              scale = FALSE)
+      
+      if(permtest == TRUE){
+        cat(" rda_out_pure_clim_current: ")
+        print(anova( rda_out_pure_clim_current, permutations = 99))
+        "_____________________________ \n"
+      }
 
       # Pure lgm climate
       rda_out_pure_clim_lgm <-  rda_out_pure_spat <- rda(as.formula(paste("genetic_data ~ ",
@@ -1704,6 +1994,12 @@
                                             collapse = "+"),")")),
                                                          data = rda_all_covariates_scaled,
                                                          scale = FALSE)
+      
+      if(permtest == TRUE){
+        cat(" rda_out_pure_clim_lgm : ")
+        print(anova( rda_out_pure_clim_lgm, permutations = 99))
+        "_____________________________ \n"
+      }
 
       # Based on total variance (included unexplained variance)
    #  overall_iner <- summary(rda_out_full)$tot.chi
@@ -1766,10 +2062,22 @@
     
   
   # For all Snps
-    calc_varpart(genetic_data = rda_all_scaled, label = "All SNPs")
-    # dev.copy(pdf, paste0("./figs_tables/fig3/Figure 3 - venn diagram ", Sys.Date(), ".pdf"),
+     calc_varpart(genetic_data = rda_all_scaled, label = "All SNPs", permtest = TRUE)
+    # dev.copy(pdf, paste0("./figs_tables/Figure S3 - venn diagram ", Sys.Date(), ".pdf"),
     #          width = 3, height = 3, useDingbats = FALSE)
     # dev.off()
+     
+     # TO get overall r2
+     rda_out_full <- rda(as.formula(paste("rda_all_scaled ~ ",
+                                          paste(c(spatial_vars_rda,
+                                                  climate_vars_rda_current,
+                                                  climate_vars_rda_lgm), collapse = "+"))),
+                         data = rda_all_covariates_scaled,
+                         scale = FALSE)
+     
+     rda_out_full
+     
+     
 
   #  RDA on LGM climate
     rda_all_mod <- rda(as.formula(paste("rda_all_scaled ~ ",
@@ -1780,7 +2088,12 @@
                        data = rda_all_covariates_scaled,
                        scale = FALSE)
     
-    rda_all_mod
+    rda_out_full <- rda(as.formula(paste("genetic_data ~ ",
+                                         paste(c(spatial_vars_rda,
+                                                 climate_vars_rda_current,
+                                                 climate_vars_rda_lgm), collapse = "+"))),
+                        data = rda_all_covariates_scaled,
+                        scale = FALSE)rda_all_mod
     
     # anova(rda_all_mod, permutations = 99)
     # anova(rda_all_mod, permutations = 99, by = "axis")
@@ -2028,7 +2341,7 @@
 
   # Growth predictions by GBS mom
   ## Scale number of top and bottom snps - careful about running this twice!!
-  dat_snp_count_mom_unscaled <- dat_snp_count_mom
+  dat_snp_prs_mom_unscaled <- dat_snp_prs_mom
   
   
   # Set up gradient forest
@@ -2576,7 +2889,7 @@
      
     # Function to downscale and project raster 
      process_raster <- function(rast){
-       rast <- aggregate(rast, fact = 5) # Make smaller by averaging across cells
+       rast <- aggregate(rast, fact = 10) # Make smaller by averaging across cells
        rast_latlon <- projectRaster(rast, crs = CRS("+proj=longlat +datum=WGS84"))
        plot(rast_latlon)
        return(rast_latlon)
@@ -2681,7 +2994,7 @@
                            "tmin_winter", 
                             "cwd",
                       #     "aet",
-                           "bioclim_04",
+                        #   "bioclim_04",
                            "bioclim_15",
                            "bioclim_18",
                           # "bioclim_19", # R = 0.79 with aet; R = 0.84 with bioclim_18
@@ -2692,250 +3005,175 @@
      
      # Check variance inflation factor
      car::vif(lm(snp_chr8_30946730 ~ . , 
-                 data = gen_dat_top[, c("snp_chr8_30946730", climate_vars_gam_dist)]))
+                 data = gen_dat_clim[, c("snp_chr8_30946730", climate_vars_gam_dist)]))
      
-     pairs.panels(gen_dat_top[, climate_vars_gam_dist])
+     pairs.panels(gen_dat_clim[, climate_vars_gam_dist])
      
      
    ## Calculate PCA on climate and spatial variables
      
-     ## Scale climate variables based on GBS moms
-     x = 1 # used in loop
+    #  ## Scale climate variables based on GBS moms
+    #  x = 1 # used in loop
+    #  
+    #  scaled_var_means_gam_dist <- NA
+    #  scaled_var_sds_gam_dist <- NA
+    #  
+    #  gen_dat_top_scaled <- gen_dat_top
+    # 
+    #  for(var in climate_vars_gam_dist){
+    #    
+    #    # For all seedlings  
+    #    scaled_var_means_gam_dist[x] <- mean(gen_dat_top[[var]], na.rm = TRUE)
+    #    scaled_var_sds_gam_dist[x] <- sd(gen_dat_top[[var]], na.rm = TRUE)
+    #    gen_dat_top_scaled[var] <- (gen_dat_top_scaled[var] - scaled_var_means_gam_dist[x]) / scaled_var_sds_gam_dist[x]
+    # 
+    #    x = x + 1
+    #  }
+    #  
+    #  # Assign names  
+    #  names(scaled_var_means_gam_dist) <- climate_vars_gam_dist
+    #  names(scaled_var_sds_gam_dist) <-  climate_vars_gam_dist
+    # 
+    #  summary(gen_dat_top_scaled[ , climate_vars_gam_dist]) # make sure they are centered and scaled
+    #  
+    #  ## Look at interaction in latlong
+    #  gen_dat_top_scaled$latlong <- gen_dat_top_scaled$latitude * gen_dat_top_scaled$longitude
+    #  
+    #  
+    #  ## PCA on climate variables
+    #  pca_clim = prcomp(gen_dat_top_scaled[ , climate_vars_gam_dist], center = FALSE, scale = FALSE) 
+    #  
+    #  biplot(pca_clim)
+    #  summary(pca_clim)
+    #  screeplot(pca_clim, bstick = TRUE)
+    #  
+    #  ## Visualize PCA results
+    #    fviz_contrib(pca_clim, choice = "var", axes = 1)
+    #    fviz_contrib(pca_clim, choice = "var", axes = 2)
+    #    fviz_contrib(pca_clim, choice = "var", axes = 3)
+    #    fviz_contrib(pca_clim, choice = "var", axes = 4)
+    #    
+    #   
+    #    fviz_pca_var(pca_clim, axes = c(1, 2), col.var="contrib")
+    #    fviz_pca_var(pca_clim, axes = c(1, 4), col.var="contrib")
+    #    
+    #    
+    #    ## Save plot of contributions
+    #    
+    #    fviz_pca_var(pca_clim, axes = c(1, 2), col.var="contrib")
+    #    ggsave(filename = paste0("./figs_tables/Figure S5 - climate PCA 1 ", 
+    #                             Sys.Date(), ".png"),
+    #           units = "cm",
+    #           width = 20, height = 15)
+    #    
+    #    fviz_pca_var(pca_clim, axes = c(1, 3), col.var="contrib")
+    #    
+    #    ggsave(filename = paste0("./figs_tables/Figure S5 - climate PCA 2 ",
+    #                             Sys.Date(), ".png"),
+    #           units = "cm",
+    #           width = 20, height = 15)
+    #    
+    #    
+    #    
+    #    
+    #      ## PC1 - cwd, long, lat, bioclim_18
+    #    ## PC2 - bioclim4, bioclim15, tmin winter
+    #    ## PC3 - latlong, elevation, tmax_sum,
+    #    ## PC4 - latlong, tmax_sum, elevation
+    #    
+    #    sort(pca_clim$rotation[, 1])
+    #    sort(pca_clim$rotation[, 2])
+    #    sort(pca_clim$rotation[, 3])
+    #    sort(pca_clim$rotation[, 4])
+    #    
+    #    
+    #  pcs <- as.data.frame(pca_clim$x[, 1:7])
+    #    
+    #  # Add PCs as columns to dataframes
+    #  gen_dat_top <- bind_cols(gen_dat_top, pcs)
+    #  gen_dat_bottom <- bind_cols(gen_dat_bottom, pcs)
+    #  gen_dat_mid <- bind_cols(gen_dat_mid, pcs)
+    #    
+    #    
+    # # Convert raster df to PC space
+    #    
+    #    ## Forward scale variables first
+    #    for(var in climate_vars_gam_dist){
+    #      
+    #      # For all seedlings  
+    #      gam_dist_rast_df_nona[var] <- forward_transform(gam_dist_rast_df_nona[var],
+    #                                                 var = var, 
+    #                                                 means = scaled_var_means_gam_dist,
+    #                                                 sds = scaled_var_sds_gam_dist)
+    #    }
+    #    
+    #   summary(gam_dist_rast_df_nona)
+    #   
+    #   ## Make lat long interaction
+    #   gam_dist_rast_df_nona$latlong <- gam_dist_rast_df_nona$latitude * gam_dist_rast_df_nona$longitude
+    #    
+    #   # Generate predictions
+    #   gam_dist_rast_df_nona = bind_cols(gam_dist_rast_df_nona,
+    #                               data.frame(predict(pca_clim, gam_dist_rast_df_nona[ , -1])))
+    #   
+    #   head(gam_dist_rast_df_nona)
+    #   
+    #   summary(gam_dist_rast_df_nona)
+    #   
+    #  
+    #   climate_vars_gam_dist <- c("PC1","PC2","PC3")
+    #  
+    #  
      
-     scaled_var_means_gam_dist <- NA
-     scaled_var_sds_gam_dist <- NA
      
-     gen_dat_top_scaled <- gen_dat_top
+     # Count % of missing data for full gbs dataset
+     missing_all <- data.frame(gen_dat_clim_all[ "id"],
+                               missing = apply(dplyr::select(gen_dat_clim_all, snp_col_names),
+                                               MARGIN = 1, function(x) sum(is.na(x)))/length(snp_col_names))
+     
+     # Get list of samples to exclude because of missing data
+     exclude_based_on_missing <- missing_all$id[which(missing_all$missing > .20)]
+     
+     
+     
+     
+     rda_df <-  gen_dat_clim %>%
+       dplyr::left_join(., dplyr::select(sample_key, gbs_name, locality),
+                        by = c("id" = "gbs_name")) %>%
+       dplyr::filter(!(id %in% exclude_based_on_missing))
+     
+     
+     rda_df2 <- left_join(rda_df, dplyr::select(gen_dat_moms, accession, prs_best_scaled) %>% 
+                            distinct(accession, .keep_all = T) %>% 
+                            mutate(accession = as.numeric(as.character(accession)))) %>%
+     #  filter(!is.na(accession)) %>%
+       filter(!is.na(prs_best_scaled))
+     
+  
+     rda_df2$locality <- factor(rda_df2$locality)
 
-     for(var in climate_vars_gam_dist){
-       
-       # For all seedlings  
-       scaled_var_means_gam_dist[x] <- mean(gen_dat_top[[var]], na.rm = TRUE)
-       scaled_var_sds_gam_dist[x] <- sd(gen_dat_top[[var]], na.rm = TRUE)
-       gen_dat_top_scaled[var] <- (gen_dat_top_scaled[var] - scaled_var_means_gam_dist[x]) / scaled_var_sds_gam_dist[x]
-    
-       x = x + 1
-     }
-     
-     # Assign names  
-     names(scaled_var_means_gam_dist) <- climate_vars_gam_dist
-     names(scaled_var_sds_gam_dist) <-  climate_vars_gam_dist
-
-     summary(gen_dat_top_scaled[ , climate_vars_gam_dist]) # make sure they are centered and scaled
-     
-     ## Look at interaction in latlong
-     gen_dat_top_scaled$latlong <- gen_dat_top_scaled$latitude * gen_dat_top_scaled$longitude
-     
-     
-     ## PCA on climate variables
-     pca_clim = prcomp(gen_dat_top_scaled[ , climate_vars_gam_dist], center = FALSE, scale = FALSE) 
-     
-     biplot(pca_clim)
-     summary(pca_clim)
-     screeplot(pca_clim, bstick = TRUE)
-     
-     ## Visualize PCA results
-       fviz_contrib(pca_clim, choice = "var", axes = 1)
-       fviz_contrib(pca_clim, choice = "var", axes = 2)
-       fviz_contrib(pca_clim, choice = "var", axes = 3)
-       fviz_contrib(pca_clim, choice = "var", axes = 4)
-       
-      
-       fviz_pca_var(pca_clim, axes = c(1, 2), col.var="contrib")
-       fviz_pca_var(pca_clim, axes = c(1, 4), col.var="contrib")
-       
-       
-       ## Save plot of contributions
-       
-       fviz_pca_var(pca_clim, axes = c(1, 2), col.var="contrib")
-       ggsave(filename = paste0("./figs_tables/Figure S5 - climate PCA 1 ", 
-                                Sys.Date(), ".png"),
-              units = "cm",
-              width = 20, height = 15)
-       
-       fviz_pca_var(pca_clim, axes = c(1, 3), col.var="contrib")
-       
-       ggsave(filename = paste0("./figs_tables/Figure S5 - climate PCA 2 ",
-                                Sys.Date(), ".png"),
-              units = "cm",
-              width = 20, height = 15)
-       
-       
-       
-       
-         ## PC1 - cwd, long, lat, bioclim_18
-       ## PC2 - bioclim4, bioclim15, tmin winter
-       ## PC3 - latlong, elevation, tmax_sum,
-       ## PC4 - latlong, tmax_sum, elevation
-       
-       sort(pca_clim$rotation[, 1])
-       sort(pca_clim$rotation[, 2])
-       sort(pca_clim$rotation[, 3])
-       sort(pca_clim$rotation[, 4])
-       
-       
-     pcs <- as.data.frame(pca_clim$x[, 1:7])
-       
-     # Add PCs as columns to dataframes
-     gen_dat_top <- bind_cols(gen_dat_top, pcs)
-     gen_dat_bottom <- bind_cols(gen_dat_bottom, pcs)
-     gen_dat_mid <- bind_cols(gen_dat_mid, pcs)
-       
-       
-    # Convert raster df to PC space
-       
-       ## Forward scale variables first
-       for(var in climate_vars_gam_dist){
-         
-         # For all seedlings  
-         gam_dist_rast_df_nona[var] <- forward_transform(gam_dist_rast_df_nona[var],
-                                                    var = var, 
-                                                    means = scaled_var_means_gam_dist,
-                                                    sds = scaled_var_sds_gam_dist)
-       }
-       
-      summary(gam_dist_rast_df_nona)
-      
-      ## Make lat long interaction
-      gam_dist_rast_df_nona$latlong <- gam_dist_rast_df_nona$latitude * gam_dist_rast_df_nona$longitude
-       
-      # Generate predictions
-      gam_dist_rast_df_nona = bind_cols(gam_dist_rast_df_nona,
-                                  data.frame(predict(pca_clim, gam_dist_rast_df_nona[ , -1])))
-      
-      head(gam_dist_rast_df_nona)
-      
-      summary(gam_dist_rast_df_nona)
-      
-     
-      climate_vars_gam_dist <- c("PC1","PC2","PC3")
-     
-     
-     
-# Initialize variables
-   stack_top <- stack() # For Top SNPs
-   stack_bottom <- stack() # For Top SNPs
-   stack_random_snps <- stack() # For Random SNPs
-   stack_random_env <- stack() # For randomizing environmental variables
-
-   start_flag = FALSE
-   pp_df <- NULL # Initialize
-   
-   reps = 1
-
-## Begin loop over outlier SNPs to predict distribution         
-  for(mode in c("top_snps", "bottom_snps")){ # , random_env,  "random_snps"
-    
-    # Start rep loop
-    for(rep in 1:reps){  
-    
-    # Choose SNPS to loop over  - same SNPs for either top snps or random_env
-      if(mode == "top_snps" | mode == "random_env") {
-        snps <- top_snps_long$snp
-      }
-      
-      if(mode == "bottom_snps" | mode == "random_env") {
-        snps <- bottom_snps_long$snp
-      }
-
-      if(mode == "random_snps") {
-        snps <- mid_snps_long$snp
-      }
-
-      # Loop over SNPs
-       for(snp in 1:length(snps)){
-         
-         snp_name <- snps[snp]
-         
-         cat("Working on mode:", mode, "rep: ", rep, " snp:", snp, "  ", snp_name, "...\n")
-         
-         # Get climate and snp data
-         if(mode == "top_snps"){
-           X = gen_dat_top[, climate_vars_gam_dist] # Save climate variables
-           y = pull(gen_dat_top, snp_name) # Pull out snp values
-         }
-         
-         if(mode == "bottom_snps"){
-           X = gen_dat_bottom[, climate_vars_gam_dist] # Save climate variables
-           y = pull(gen_dat_bottom, snp_name) # Pull out snp values
-         }
-         
-         if(mode == "random_snps"){
-           X = gen_dat_mid[, climate_vars_gam_dist] # Save climate variables
-           y = pull(gen_dat_mid, snp_name) # Pull out snp values
-         }
-        
-         # Error check 
-          if(any(y == 2, na.rm = TRUE)){
-            stop("Why is there a 2 in the genotype?")
-          }
-         
-        # Set up dataframe for model
-         dat_gam_dist <- cbind(y = y[!is.na(y)], X[!is.na(y), ])
-
-         ## Scale y?
-         # dat_gam_dist$y <- scale(dat_gam_dist$y)[, 1]
-         
-         gam_dist <- gam(y ~ s(PC1, bs = "cr", k = 3) +
-                             s(PC2, bs = "cr", k = 3) +
-                             s(PC3, bs = "cr", k = 3),
-                     # method = "fREML",
+         gam_dist <- gam(prs_best_scaled ~ s(tmax_sum, bs = "cr") +
+                             s(tmin_winter, bs = "cr") +
+                             s(cwd, bs = "cr") + 
+                        #     s(bioclim_04, bs = "cr") + 
+                             s(bioclim_15, bs = "cr") + 
+                             s(bioclim_18, bs = "cr") +  
+                             s(elevation, bs = "cr") + 
+                             s(latitude, bs = "cr") + 
+                             s(longitude, bs = "cr"), 
+                       #      s(latitude, by = longitude, bs = "cr"),
+                           #  s(locality, bs = "re"),
+                    #  method = "fREML",
                      # discrete = TRUE,
                    #  select = TRUE,
-                    family = "binomial",
-                     data = dat_gam_dist)
-      
-         # Save and print summary
-           gam_dist_sum <- summary(gam_dist)
-          
-           print(table(y))
-           print(gam_dist_sum)
+                     data = rda_df2)
          
+         summary(gam_dist)
          
-         # Save deviance and rsquared from model
-           if(start_flag == FALSE){
-             dev_df <- data.frame(mode = mode,
-                                  rep = rep,
-                                  snp = snp_name,
-                                  deviance = gam_dist_sum$dev.expl,
-                                  rsq_adj = gam_dist_sum$r.sq
-                                  )
-  
-           } else {
-            dev_df <- rbind(dev_df, data.frame(mode = mode,
-                                 rep = rep,
-                                 snp = snp_name,
-                                 deviance = gam_dist_sum$dev.expl,
-                                 rsq_adj = gam_dist_sum$r.sq))
-            
-           } # End else for start flag
-  
+       #  visreg(gam_dist)
          
-         # Plot partial plots
-          for(climate_var in climate_vars_gam_dist){
-
-            pp_out <- visreg(gam_dist, xvar = climate_var, plot = FALSE)$fit
-            
-            pp_df_temp <- data.frame(snp = snp_name,
-                                     mode = mode,
-                                     rep = rep,
-                                     var = climate_var,
-                                     prob = pp_out$visregFit,
-                                     prob_centered = pp_out$visregFit - 
-                                       mean(pp_out$visregFit),
-                                     prob_scaled = scale(pp_out$visregFit),
-                                     x_val = pp_out[, climate_var],
-                                     stringsAsFactors = FALSE)
-            
-             if(!exists("pp_df")){ # If pp_df doesn't exist yet
-               pp_df = pp_df_temp
-             } else {
-               pp_df <- bind_rows(pp_df, pp_df_temp)
-             }
-
-          } # End climate vars loop
-
-         
+         gam_dist_rast_df_nona$locality <- "FHL"
+    
          ## Predict across a raster and add to stack
            gam_dist_rast_df_nona$pred = predict(gam_dist,
                                                 gam_dist_rast_df_nona, 
@@ -2948,21 +3186,13 @@
              values(rast) <- gam_dist_rast_df_temp$pred
              names(rast) <- snp_name # Name the raster
              
-          # Add to stack
-          if(mode == "top_snps") stack_top <- stack(stack_top, rast)
-          if(mode == "bottom_snps") stack_bottom <- stack(stack_bottom, rast)
-          if(mode == "random_snps")   stack_random_snps <- stack(stack_random_snps, rast)
-          if(mode == "random_env")   stack_random_env <- stack(stack_random_env, rast)
-
-           start_flag <- TRUE # Flip flag to true
-  
-       } # End loop over SNPs
-    
-     } # End rep
-    
-  } # End mode loop ####################
-     
-
+             
+             rast2 <- mask(rast, lobata_range_extended)
+             plot(rast2)
+             
+             hist(rast2, breaks = 50)
+             
+            
      
   ## Look at deviance explained
      dev_df %>%
