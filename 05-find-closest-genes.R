@@ -110,8 +110,8 @@
   
  
 # Read back in as dataframes  
-  col_names <- c("chrom_a", "pos1_a", "pos2_a", "chrom_b", "pos1_b", "pos2_b",
-                 "qlob_gene_name",
+  col_names <- c("chrom_a", "pos1_a", "pos2_a", "phenotype",
+                 "chrom_b", "pos1_b", "pos2_b", "qlob_gene_name",
                  "unk2", "unk3", "species", "gene_type", "unk4", "qlob_info", "distance")
  
   # Top genes

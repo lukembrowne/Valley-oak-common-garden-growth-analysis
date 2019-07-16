@@ -94,7 +94,10 @@ back_transform <- function(x, var, means, sds){
 
 # Convert factors
   dat_all_scaled$section <- factor(dat_all_scaled$section)
-  dat_all_scaled$section_block <- factor(dat_all_scaled$section_block) 
+  dat_all_scaled$section_block <- factor(dat_all_scaled$section_block, levels = c("IFG_1", "IFG_2", "IFG_3",
+                                                                                  "IFG_4", "IFG_5",
+                                                                                  "Block1_1", "North annex_2",
+                                                                                  "North_3", "North_4", "North_5")) 
   # dat_all_scaled$section_row <- factor(dat_all_scaled$section_row) 
   # dat_all_scaled$section_line <- factor(dat_all_scaled$section_line) 
   dat_all_scaled$accession <- factor(dat_all_scaled$accession)
@@ -244,7 +247,7 @@ back_transform <- function(x, var, means, sds){
                                 y = visregFit), lwd = 1,
                                 col = "forestgreen") +
     scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
-    scale_y_continuous(breaks = seq(.55, .85, .1), limits = c(.55, .85)) +
+  #  scale_y_continuous(breaks = seq(.55, .85, .1), limits = c(.55, .85)) +
     ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
   #  ylab("5 yr height (cm)") +
     xlab("Tmax transfer distance (°C) ") +
@@ -267,11 +270,162 @@ back_transform <- function(x, var, means, sds){
   # ggsave(filename = paste0("./figs_tables/Figure S1 - transfer function IFG", Sys.Date(), ".pdf"),
   #        gg,
   #        units = "cm", width = 11, height = 8)
+  
+  
+  
+## Plotting site and block effects
+  
+  
+  visreg(gam_all, xvar = "section_block", partial = F, scale = "response", rug = FALSE, 
+         ylab = expression(Relative~growth~rate~(cm~cm^-1~yr^-1)), main = "Block effects")
+  
+  
+  
+  ## Height
+    vis_height <- visreg(gam_all, xvar = "height_2014", partial = F, scale = "response")
+  
+    vis_height$fit$height_2014 <- back_transform(x =  vis_height$fit$height_2014, 
+                                                 var = "height_2014",
+                                                 means = scaled_var_means_all,
+                                                 sds = scaled_var_sds_all)
+  
+    gg_height <- ggplot(vis_height$fit, aes(x = height_2014, y = rgr)) +
+      
+      geom_ribbon(data = vis_height$fit, aes(ymin = visregLwr, ymax = visregUpr), 
+                  fill = "black", alpha = 0.25) +
+      geom_line(data = vis_height$fit, aes(x = height_2014, 
+                                  y = visregFit), lwd = 1,
+                col = "black") +
+      ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
+      xlab("Initial height (cm)") +
+      ggtitle("(a) Height effect") + 
+      theme_bw(10) + 
+      theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
+          #  plot.margin = (margin(1.5, 1.5, 1.5, 1.5, "cm")) 
+            ) +
+      NULL
+    
+    gg_height
+  
+  
+  
+  ## Blocks
+  vis_block <- visreg(gam_all, xvar = "section_block", partial = F, scale = "response")
+  
+  gg_block <- ggplot(vis_block$fit, aes(x = section_block, y = rgr)) +
+    geom_errorbar(data = vis_block$fit, 
+                  aes(ymin = visregLwr, ymax = visregUpr), 
+                  col = "black", width = .2) +
+    geom_point(data = vis_block$fit, aes(x = section_block, 
+                                         y = visregFit),
+               cex = 2.5,
+               col = "black") +
+    ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
+    geom_vline(xintercept = 5.5, lty = 2) +
+    xlab("Block") +
+    ggtitle("(b) Block effect") + 
+    theme_bw(10) + 
+    annotate("text", x = 3, y = .8, label = "Placerville, CA") + 
+    annotate("text", x = 8, y = .8, label = "Chico, CA") + 
+    theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
+         # plot.margin = (margin(1.5, 1.5, 1.5, 1.5, "cm")),
+          axis.text.x = element_text(angle = 45, hjust = 1)) +
+    NULL
+  
+  gg_block
+  
+  
+  ## Locality
+    vis_locality <- visreg(gam_all, xvar = "locality", partial = F, scale = "response")
+    
+    gg_locality <- ggplot(vis_locality$fit, aes(x = locality, y = rgr)) +
+      geom_errorbar(data = vis_locality$fit, 
+                    aes(ymin = visregLwr, ymax = visregUpr), 
+                    col = "black") +
+      geom_point(data = vis_locality$fit, aes(x = locality, 
+                                           y = visregFit),
+                 cex = 2.5,
+                 col = "black") +
+      ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
+      xlab("Locality") +
+      ggtitle("(c) Locality effect") + 
+      theme_bw(10) + 
+      theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
+           # plot.margin = (margin(1.5, 1.5, 1.5, 1.5, "cm")),
+            axis.text.x = element_text(angle = 90, hjust = 1, size =  6)) +
+      NULL
+    
+    gg_locality
+    
+    
+    ## Accession
+    # vis_accession <- visreg(gam_all, xvar = "accession", partial = F, scale = "response")
+    # 
+    # gg_accession <- ggplot(vis_accession$fit, aes(x = accession, y = rgr)) +
+    #   geom_errorbar(data = vis_accession$fit, 
+    #                 aes(ymin = visregLwr, ymax = visregUpr), 
+    #                 col = "black") +
+    #   geom_point(data = vis_accession$fit, aes(x = accession, 
+    #                                           y = visregFit),
+    #              cex = 2.5,
+    #              col = "black") +
+    #   ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
+    #   xlab("accession") +
+    #   ggtitle("accession effect") + 
+    #   theme_bw(10) + 
+    #   theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+    #         panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
+    #         plot.margin = (margin(1.5, 1.5, 1.5, 1.5, "cm")),
+    #         axis.text.x = element_text(angle = 90, hjust = 1)) +
+    #   NULL
+    # 
+    # gg_accession
+    
+    library(patchwork)
+    gg <- gg_height + gg_block + gg_locality + plot_layout(ncol = 1)
+    
+    ggsave(filename = paste0("./figs_tables/Figure S3 - rgr plots", Sys.Date(), ".pdf"),
+           gg,
+           units = "cm", width = 17.5, height = 20)
+    
+    
+    
 
+# Estimating heritability of RGR ------------------------------------------
+
+    
+    formula(paste0("rgr ~ section_block + s(height_2014, bs =\"cr\") + s(locality, bs = \"re\") + s(accession, bs = \"re\")"))
+    
+    
+    
+    # With all 5,000+ seedlings
+    gam_heritability <- bam(formula =  formula(paste0("rgr ~ section_block + s(height_2014, bs =\"cr\")")),
+                   data = dat_all_scaled,
+                   discrete = TRUE, 
+                   nthreads = 8,
+                   method = "fREML", 
+                   # family = "gaussian",
+                   family = "tw",
+                   control = list(trace = FALSE))
+    
+    hist(residuals(gam_heritability))
+    
+   lmer_out <-  lmer(residuals(gam_heritability) ~ (1 | accession), 
+         data = dat_all_scaled)
+   
+   var_df <- as.data.frame(VarCorr(lmer_out))
+   
+   var_va <- var_df$vcov[var_df$grp == "accession"] * (1/(2 * 0.125))
+   
+   h2 <- var_va / var(residuals(gam_heritability))
+   
+   h2
   
   
-  
-# Predicting changes in height based on degree increase -------------------
+   # Predicting changes in height based on degree increase -------------------
   
   # Set degree increases to compare for no change - medium & high emissions & minimum transfer distance
   degrees <- c(0, future_26_mean, future_85_mean, -4.3)
@@ -370,6 +524,128 @@ back_transform <- function(x, var, means, sds){
               n_years = 1)
   
   
+  
+  
+  
+
+# Modeling with Linear models and polynomial terms ------------------------
+
+  # Set formula for gam
+  form <- formula(paste0("rgr ~ section_block + s(height_2014, bs =\"cr\") + s(", var, " , bs = \"cr\") + s(PC1_clim, bs =\"cr\") + s(PC2_clim, bs =\"cr\") + s(tmax_sum_dif, by = PC1_clim, bs =\"cr\") + s(tmax_sum_dif, by = PC2_clim, bs =\"cr\") + s(locality, bs = \"re\") + s(accession, bs = \"re\")"))
+  
+  # With all 5,000+ seedlings
+  gam_all <- bam(formula = form,
+                 data = dat_all_scaled,
+                 discrete = TRUE, 
+                 nthreads = 8,
+                 method = "fREML", 
+                 # family = "gaussian",
+                 family = "tw",
+                 control = list(trace = FALSE))
+  
+  summary(gam_all)
+  
+  library(lme4)
+  library(lmerTest)
+  library(MuMIn)
+  
+  
+# Single term  
+ lm <-  lmer(rgr ~ section_block + height_2014 + PC1_clim + PC2_clim +
+         tmax_sum_dif + (1 | locality) + (1 | accession),
+       data = dat_all_scaled)
+ 
+ summary(lm)
+  
+ visreg(lm, partial = FALSE)
+ 
+ 
+ # Polynomial term
+ lm <-  lmer(rgr ~ section_block + height_2014 + PC1_clim + PC2_clim +
+               tmax_sum_dif  + I(tmax_sum_dif^2) + tmax_sum_dif:PC1_clim + tmax_sum_dif:PC2_clim +  (1 | locality) + (1 | accession),
+             data = dat_all_scaled)
+ 
+ summary(lm)
+ 
+ visreg(lm, partial = FALSE, xvar = "tmax_sum_dif", ylab = "RGR")
+ 
+ 
+ # Main plot
+ dev.copy(png, paste0("./figs_tables/Figure XX - growth response with polynomial model ", Sys.Date(), ".png"),
+          res = 300, units = "cm", width = 25, height = 16)
+ dev.off()
+ 
+ 
+ 
+ 
+ # Residuals approach
+ form <- formula(paste0("rgr ~ section_block + s(height_2014, bs =\"cr\") +  s(PC1_clim, bs =\"cr\") + s(PC2_clim, bs =\"cr\") + s(locality, bs = \"re\") + s(accession, bs = \"re\")"))
+ 
+ # With all 5,000+ seedlings
+ gam_resids <- bam(formula = form,
+                data = dat_all_scaled,
+                discrete = TRUE, 
+                nthreads = 8,
+                method = "fREML", 
+                # family = "gaussian",
+                family = "tw",
+                control = list(trace = FALSE))
+ 
+ resids <- residuals(gam_resids)
+ 
+ lm_resids <- lm(resids ~ tmax_sum_dif + I(tmax_sum_dif^2), 
+                 data = dat_all_scaled)
+ summary(lm_resids)
+ 
+ visreg(lm_resids, partial = FALSE, ylab = "RGR")
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+# Testing group -----------------------------------------------------------
+
+dat_all_scaled %>%
+   filter(accession %in% as.character(1:10)) %>%
+   ggplot(., aes(tmax_sum_dif, y = rgr, col = accession)) + 
+            geom_point() + 
+            geom_smooth() + 
+   facet_wrap(~accession)
+ 
+ 
+  # Interaction model approach
+ 
+ lm_int <- lmer(rgr ~ section_block + height_2014 + I(height_2014^2) + PC1_clim + PC2_clim +
+                 tmax_sum_dif  + I(tmax_sum_dif^2) + (tmax_sum_dif | accession) + (I(tmax_sum_dif^2) | accession),
+               data = dat_all_scaled)
+ 
+ summary(lm_int)
+ 
+ ranef(lm_int)
+ 
+ # Test for singificance of random effects and variance explained
+ ranova(lm_int)
+ r.squaredGLMM(lm_int)
+ 
+ summary(ranef(lm_int)$accession[, 2])
+ 
+ visreg(lm_int, partial = FALSE, xvar = "tmax_sum_dif", ylab = "RGR")
+ 
+ 
+ # Main plot
+ png(paste0("./figs_tables/Figure XX - blups ", Sys.Date(), ".png"),
+          res = 300, units = "cm", width = 50, height = 50)
+ visreg(lm_int, partial = FALSE, xvar = "tmax_sum_dif", ylab = "RGR", by = "accession")
+ dev.off()
+ 
+ 
+ 
+ 
+ 
   
   
 

@@ -6,6 +6,8 @@
 # Read in cluster run output ----------------------------------------------
 
   # Path to results
+  # Used in first submission to PNAS - "run_475547_tmax_sum_dif_training_set_resids_7030_2019_02_26"
+
   path <- "run_475547_tmax_sum_dif_training_set_resids_7030_2019_02_26"
   
   path_to_summaries <- paste0("./output/", path, "/model_summaries/")
@@ -174,6 +176,9 @@
 
   fdr_fvals = fdrtool(c(sum_df$f_val_gen_int),
                  statistic = "normal", plot = FALSE)
+  
+  fdr_fvals = fdrtool(c(sum_df$p_val_gen_int),
+                      statistic = "pvalue", plot = TRUE)
   
   # P values
   summary(fdr_fvals$pval)
