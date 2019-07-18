@@ -14,7 +14,7 @@
   # library(patchwork) # Installed on home directory
 
 # Load data
-  load("../gam_cluster_sim_2019-07-16.Rdata")
+  load("../gam_cluster_sim_2sites_2019-07-17.Rdata")
  
 ## Read in snps to skip
  # skip_these_SNPs <- read_csv("../skip_these_SNPs_2018_12_22.csv")

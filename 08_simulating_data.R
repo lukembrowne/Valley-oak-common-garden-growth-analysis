@@ -1,39 +1,36 @@
-## Simulate data
+
+
+# Simulate data -------------------------------------------------------
+set.seed(129)
+
+# Load libraries
 library(tidyverse)
 library(rrBLUP)
 library(gamm4)
 library(visreg)
+library(psych)
 
-## See if we have more power to detect patterns if we do it based on accession or based on genotype
-## Simulate data based on genotype and tmax transfer distance
-## Then compare to only have 2 samples (one in each garden) and looking for associations that way
-
-## See if the way we are calculating Breeding value correlates with observed breeding values
-
-## What is the false positive rate?
-
-
-## Simulate QTL and rescale the phenotype to be the 'optimum' temp, which is the mean in the normal distribution
-
-# Set parameters
-
-set.seed(129)
-
-
+# Experiment parameters
 n_accession <- 300
-n_seedlings_per_accession <- 10
 n_sites <- 2
-n_blocks <- 10
+n_blocks <- 5 # This equals the number of seedlings / accession per site
 
 
-sim_dat <- expand.grid(
+# QTL parameters
+r.snp <- 0.99   # Proportion of variance in trait explained by SNPs.
+d <- 0.00001    # Proportion of additive genetic variance due to QTLs.
+n <- n_accession    # Number of samples.
+p <- 5000        # Number of markers (SNPs).
+i <- seq(from = 1, to = p, length.out = 10)  # Indices of the QTLs ("causal variants").
+
+# Tmax optimum function parameters
+tmax_opt_sd <- 4
+
+
+# Set up main dataframe
+sim_dat <- expand.grid(site = as.character(1:n_sites),
             accession = as.character(1:n_accession),
-            block = as.character(1:(n_blocks/2)))
-dim(sim_dat)
-
-
-sim_dat <- rbind(cbind(site = "1", sim_dat),
-                 cbind(site = "2", sim_dat))
+            block = as.character(1:(n_blocks)))
 dim(sim_dat)
 
 sim_dat$section_block <- paste0(sim_dat$site, "_", sim_dat$block)
@@ -41,37 +38,33 @@ sim_dat$section_block <- factor(sim_dat$section_block)
 
 sim_dat$ID <- as.character(1:nrow(sim_dat))
 
+table(sim_dat$accession, sim_dat$section_block)
+table(sim_dat$accession, sim_dat$site)
+table(sim_dat$site)
+
 
 
 
 # Generate effect sizes for ...
-
-# Block
-  block_effect <- rnorm(n = levels(sim_dat$section_block), sd = .25)
-  names(block_effect) <- levels(sim_dat$section_block)
-  block_effect
-
-# Site
-#  site_effect <- rnorm(n = n_sites, sd = .25)
-  site_effect <- c(.5, -.5)
-  names(site_effect) <- levels(sim_dat$site_effect)
-  site_effect
-
-# accession
-  accession_effect <- rnorm(n = n_accession, sd = .25)
-  names(accession_effect) <- levels(sim_dat$accession)
-  accession_effect
+  
+  # Block
+    block_effect <- rnorm(n = levels(sim_dat$section_block), sd = .25)
+    names(block_effect) <- levels(sim_dat$section_block)
+    block_effect
+  
+  # Site
+    site_effect <- rnorm(n = n_sites, sd = .25)
+    names(site_effect) <- levels(sim_dat$site_effect)
+    site_effect
+  
+  # accession
+    accession_effect <- rnorm(n = n_accession, sd = .25)
+    names(accession_effect) <- levels(sim_dat$accession)
+    accession_effect
   
   
 # Simulate QTL - which is the optimum temperature for each genotype, determined by many loci
-  
-  # SCRIPT PARAMETERS
-  r.snp <- 0.9   # Proportion of variance in trait explained by SNPs.
-  d <- 0.0001    # Proportion of additive genetic variance due to QTLs.
-  n <- n_accession    # Number of samples.
-  p <- 2000        # Number of markers (SNPs).
-  i <- seq(from = 1, to = p, length.out = 10)  # Indices of the QTLs ("causal variants").
-  
+
   # GENERATE DATA SET
   # Generate the minor allele frequencies. They are uniformly
   # distributed on [0.05,0.5].
@@ -101,15 +94,6 @@ sim_dat$ID <- as.character(1:nrow(sim_dat))
   # additive genetic variance that is due to QTL effects (d) and the
   # total proportion of variance explained (r). That is, we adjust beta
   # and u so that
-  #
-  #   r = a/(a+1)
-  #   d = b/a,
-  #
-  # where I've defined
-  #
-  #   a = (u + beta)'*cov(X)*(u + beta),
-  #   b = beta'*cov(X)*beta.
-  #
   # Note: this code only works if d or r are not exactly 0 or exactly 1.
   # Snps
   st.snp   <- c(r.snp/(1-r.snp) * d/var(X.snp %*% beta.snp))
@@ -127,51 +111,12 @@ sim_dat$ID <- as.character(1:nrow(sim_dat))
   cat("Proportion of variance in Y explained by genotypes =  ",var.snp,"\n")
   
 
-  ## Output in GEMMA format
-  ### Output SNP information in BIMBAM format
-  snp.sim <- as.data.frame(X.snp.unscaled) %>%
-    `colnames<-`(paste0("snp_",
-                        str_pad(as.character(1:ncol(X.snp.unscaled)),
-                                4, pad = "0"))) %>%
-    mutate(ID = paste0("ind_",
-                       str_pad(as.character(1:nrow(X.snp.unscaled)), 4, pad = "0"))) %>%
-    gather(key = "site", value = "value", -ID) %>%
-    spread(key = ID, value = value) %>%
-    mutate(allele_type1 = "C", allele_type2 = "T") %>%
-    select(site, allele_type1, allele_type2, everything())
-  
-  head(snp.sim[, 1:20])
-  
-  dim(snp.sim)
-  
-  # Write to file
-  # write_tsv(snp.sim,
-  #           "./data_simulation/snp.sim.txt",
-  #           col_names = FALSE)
-  
-  ## Make SNP annotation file
-  snp.sim.annotation <- data.frame(snp.name = snp.sim$site,
-                                   snp.position = str_split(snp.sim$site,
-                                                            "_", simplify = T)[,2],
-                                   snp.chrom = "1")
-  
-  head(snp.sim.annotation)
-  
-  # write_tsv(x = snp.sim.annotation,
-  #           path = "./data_simulation/snp.sim.annotation.txt",
-  #           col_names = FALSE)
-  
-  
-  # Use simulated phenotype as 'optimum' temps for growth response
-  tmax_opt <- scales::rescale(y.total, to = c(-7.5, 2.5))
-  names(tmax_opt) <- levels(sim_dat$accession)
-  
   
 # Generate tmax differences
-  site_temp <- c(35, 25) # Set temperatures of sites
-  names(site_temp) <- c("1", "2")
+  site_temp <- seq(22.5, 37.5, length.out = n_sites)
   
-  accession_temp <- rnorm(n = n_accession, mean = 30, sd = 2.5)
+  # Set temp of home site for accession - assuming here no correlation between level of adaptation and home temperature
+  accession_temp <- rnorm(n = n_accession, mean = 30, sd = 3)
   names(accession_temp) <- levels(sim_dat$accession)
   hist(accession_temp)
   summary(accession_temp)
@@ -183,58 +128,99 @@ sim_dat$ID <- as.character(1:nrow(sim_dat))
   
   hist(sim_dat$tmax_dif)
   
-  # Save effect sizes of tmax dif
   
-  ## No accession variation based on QTL
-  # sim_dat$tmax_dif_effect <- dnorm(sim_dat$tmax_dif,
-  #                          mean = -5, sd = 4)
-  # # Rescale
-  # sim_dat$tmax_dif_effect <- scales::rescale( sim_dat$tmax_dif_effect,
-  #                                             to = c(-.25, .25))
-  # 
-  # plot(sim_dat$tmax_dif, sim_dat$tmax_dif_effect)
-
+# Use simulated phenotype as 'optimum' tmax_difs for growth response
+  # Where growth rates of their progeny should peak
+  tmax_opt <- scales::rescale(y.total,
+                              to = c(-7.5, 2.5)) # This sets maximum and min of how far off optimum genotypes are
+  names(tmax_opt) <- levels(sim_dat$accession)
+  
+  
+  
+# Save effect sizes of tmax dif
   
   ## accession variation based on QTL
+  # Simulate where progeny are on transfer function for each accession, assuming transfer function comes from a normal distribution
   for(i in 1:nrow(sim_dat)){
     sim_dat$tmax_dif_effect[i] <- dnorm(sim_dat$tmax_dif[i], 
-                                        mean = tmax_opt[sim_dat$accession[i]],
-                                        sd = 4)
+                                  mean = tmax_opt[sim_dat$accession[i]],
+                                  sd = tmax_opt_sd)
     }
   
-  # Rescale
-  sim_dat$tmax_dif_effect <- scales::rescale(sim_dat$tmax_dif_effect,
-                                              to = c(-.25, .25))
+  # Rescale effect sizes
+  tmax_dif_effect_mean <- mean(sim_dat$tmax_dif_effect)
+  tmax_dif_effect_sd <- sd(sim_dat$tmax_dif_effect)
+  sim_dat$tmax_dif_effect_scaled <- ((sim_dat$tmax_dif_effect - tmax_dif_effect_mean) / 
+                                      tmax_dif_effect_sd )
   
-  plot(sim_dat$tmax_dif, sim_dat$tmax_dif_effect)
-  
-  
-  sim_dat %>%
-    filter(accession %in% as.character(1:10)) %>%
-  ggplot(. ,aes(x = tmax_dif, y = tmax_dif_effect, col = accession)) + 
-    geom_point(show.legend = F) + geom_line()
+  # Divide by XXX to reduce effect size
+  sim_dat$tmax_dif_effect_scaled <- sim_dat$tmax_dif_effect_scaled / 5
+  summary(sim_dat$tmax_dif_effect_scaled)
   
   
+  
+  
+  
+# Plot transfer function for each accession and calculate true breeding values
+  tmax_seq <- seq(min(sim_dat$tmax_dif), max(sim_dat$tmax_dif), by = .1)
+  
+  # Make dataframe to save 'true' GEBV
+  acc_prs <- data.frame(accession = NA, 
+                        prs_true = NA) 
+  
+  plot_n <- sample(names(tmax_opt), size = 5)
+  already_plotted = FALSE
+  x = 1
+  for(acc in names(tmax_opt)){
+    
+    acc_preds <-  dnorm(tmax_seq, 
+                        mean = tmax_opt[acc],
+                        sd = tmax_opt_sd)
+  
+    acc_prs[x, "accession"] <- acc
+    acc_prs[x, "prs_true"] <- mean(acc_preds[tmax_seq > 0])
+
+    rand_color <- sample(colors(), 1)
+    
+    ## Plot lines
+    if(acc %in% plot_n && !already_plotted){
+      plot(tmax_seq, acc_preds, type = "l", col = rand_color, 
+           las = 1, xlab = "tmax_dif", ylab = "Marginal effect on RGR")
+      already_plotted = TRUE
+    } else if (acc %in% plot_n && already_plotted) {
+      lines(tmax_seq, acc_preds, type = "l", col = rand_color)
+    }
+    
+    # Plot points where progeny lie
+    if(acc %in% plot_n){
+      sub_progeny <- sim_dat[sim_dat$accession == acc, ]
+      points(sub_progeny$tmax_dif, sub_progeny$tmax_dif_effect, pch = 19, col = rand_color)
+    }
+    
+    x = x + 1
+  }
+
+  summary(acc_prs$prs_true)
+
+
 # Simulate growth rates
-  
-for(i in 1:nrow(sim_dat)){
-  
-  sim_dat$rgr[i] <- 1 +
-                   block_effect[sim_dat$section_block[i]] + 
-                   site_effect[sim_dat$site[i]] + 
-                  accession_effect[sim_dat$accession[i]] + 
-                  sim_dat$tmax_dif_effect[i] + 
-                  rnorm(n = 1, mean = 0, sd = .25)
-  
-}  
+  for(i in 1:nrow(sim_dat)){
+    
+    sim_dat$rgr[i] <- 1 +
+                     block_effect[sim_dat$section_block[i]] + 
+                     site_effect[sim_dat$site[i]] + 
+                     accession_effect[sim_dat$accession[i]] + 
+                     sim_dat$tmax_dif_effect_scaled[i] + 
+                     rnorm(n = 1, mean = 0, sd = .25)
+    
+  }  
   
   
   hist(sim_dat$rgr)
   
-  
-  
- #  
- #  ## Gam version
+
+ 
+## Gam version
   gam <- bam(rgr ~ section_block + s(accession, bs = "re") +  s(tmax_dif, bs = "cr"),
              data = sim_dat,
              discrete = TRUE,
@@ -246,10 +232,13 @@ for(i in 1:nrow(sim_dat)){
 
   summary(gam)
 
-  visreg(gam, partial = F)
-   
+ # visreg(gam, partial = F)
+  
+  visreg(gam, partial = F, xvar = "tmax_dif", ylab = "RGR")
+  abline(v = 0, lwd = 1.5)
   
 
+  
 # Choose training and testing sets ----------------------------------------
 
   # 70/30 sampling
@@ -282,9 +271,6 @@ for(i in 1:nrow(sim_dat)){
   
   
   
-  
-  
-  
 
 # Set up model for cluster ------------------------------------------------
 
@@ -299,8 +285,7 @@ for(i in 1:nrow(sim_dat)){
   }
   
   
-  
-  # Getting genetic data
+# Getting genetic data
   colnames(X.snp.unscaled) <- paste0("snp_", 1:ncol(X.snp.unscaled))
   snp_col_names <- colnames(X.snp.unscaled)
 
@@ -463,18 +448,15 @@ for(i in 1:nrow(sim_dat)){
                        PC1_gen = 0, PC2_gen = 0)
   
   pred <- left_join(pred, expand.grid(accession = "1",
-                              tmax_dif_unscaled = c(seq(min(sim_dat$tmax_dif),
-                                               max(sim_dat$tmax_dif),
-                                               length.out = 150), 0)))
+                              tmax_dif = c(seq(-10, 10, length.out = 150), 0)))
   
-  pred$tmax_dif <- scale(pred$tmax_dif_unscaled)
+  pred$tmax_dif_unscaled <- pred$tmax_dif
   
   head(pred)
   
   pred
   
   folds <- NA
-  
   
   ### Run full model and save out residuals for cluster analysis
   fixed_effects <- paste0(paste0("rgr ~ section_block  + s(tmax_dif, bs=\"cr\") + s(accession, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\")  + s(tmax_dif, by = PC1_gen, bs=\"cr\") + s(tmax_dif, by = PC2_gen, bs=\"cr\")"))
@@ -515,32 +497,26 @@ for(i in 1:nrow(sim_dat)){
        accession_effect,
        beta.snp, u.snp, block_effect, site_effect, tmax_opt,
        X.snp, X.snp.unscaled,
-    #   scaled_var_means_gbs_all, scaled_var_sds_gbs_all,
-     #  scaled_var_means_gbs_testing, scaled_var_sds_gbs_testing,
-     #  scaled_var_means_gbs_training, scaled_var_sds_gbs_training,
+       gen_dat, training_moms, testing_moms,
        scaled_snps_means_all, scaled_snps_sds_all,
        scaled_snps_means_training, scaled_snps_sds_training,
        scaled_snps_means_testing, scaled_snps_sds_testing,
        folds,
-    file = paste0("./data_simulation//gam_cluster_sim_", Sys.Date(), ".Rdata"))
+    file = paste0("./data_simulation//gam_cluster_sim_", n_sites, "sites_",
+                  Sys.Date(), ".Rdata"))
   
   
-  
-  
-  
-  
-
 # Analyzing cluster output ------------------------------------------------
 
   # Path to results
-  path <- "run_381428_tmax_sum_dif_sim_test2"
+  path <- "run_396531_tmax_sum_dif_sim_2sites"
   
   path_to_summaries <- paste0("./data_simulation/", path, "/model_summaries/")
   path_to_predictions <- paste0("./data_simulation/", path, "/model_predictions/")
   
   # Load data
   load(file = paste0("./data_simulation/", path,
-                     "/gam_cluster_sim_2019-07-15.Rdata" ))
+                     "/gam_cluster_sim_20sites_2019-07-17.Rdata" ))
   
   
   # Read in files
@@ -662,34 +638,12 @@ for(i in 1:nrow(sim_dat)){
   
   pred_df_long =  pred_df_sub %>%
     dplyr::group_by(snp, genotype) %>%
-    do(data.frame(height_change_warmer = mean((.$pred[.$tmax_dif_unscaled > 0]  -
-                                                 .$pred[.$tmax_dif_unscaled == 0] ) /
-                                                abs(.$pred[.$tmax_dif_unscaled == 0]) ) * 100,
-                  height_change_warmer_base0 = mean((.$pred[.$tmax_dif_unscaled > 0]
-                                                     - base0 ) /  abs(base0)) * 100,
-                  height_change_warmer_absolute = mean(.$pred[.$tmax_dif_unscaled > 0])))
+    do(data.frame(height_change_warmer_absolute = mean(.$pred[.$tmax_dif_unscaled > 0])))
   
   head(pred_df_long)
   dim(pred_df_long)
   
-  summary(pred_df_long$height_change_warmer)
-  summary(pred_df_long$height_change_warmer_base0)
-  
-  
-  # plot(pred_df_long$height_change_warmer,
-  #      pred_df_long$height_change_warmer_base0, pch = "." )
-  # abline(a = 0, b = 1)
-  # cor.test(pred_df_long$height_change_warmer,pred_df_long$height_change_warmer_base0)
-  # 
-  # plot(pred_df_long$height_change_warmer_absolute,
-  #      pred_df_long$height_change_warmer_base0, pch = "." )
-  # abline(a = 0, b = 1)
-  # cor.test(pred_df_long$height_change_warmer_absolute,
-  #          pred_df_long$height_change_warmer_base0 )
-  # 
-  # head(pred_df_long)
-  # dim(pred_df_long)
-  
+  summary(pred_df_long$height_change_warmer_absolute)
   
   # Join prediction dataframe to summary dataframe
   sum_df_long_w_preds <- left_join(sum_df_long,
@@ -703,8 +657,11 @@ for(i in 1:nrow(sim_dat)){
   # F values of interaction term
   hist(sum_df$f_val_gen_int, breaks = 50)
   
-  fdr_fvals = fdrtool(c(sum_df$f_val_gen_int),
-                      statistic = "normal", plot = FALSE)
+  # fdr_fvals = fdrtool(c(sum_df$f_val_gen_int),
+  #                     statistic = "normal", plot = FALSE)
+  
+  fdr_fvals = fdrtool(c(sum_df$p_val_gen_int),
+                      statistic = "pvalue", plot = FALSE)
   
   # P values
   summary(fdr_fvals$pval)
@@ -738,10 +695,10 @@ for(i in 1:nrow(sim_dat)){
   sort(fdr_fvals$qval, decreasing = T)
   
   # Plot figure
-  ## Need to hand-edit the axis labesl for q values to say Q instead of P
-  # dev.copy(pdf, paste0("./figs_tables/Figure S6 - histogram and qqplots of p values ", Sys.Date(), ".pdf"),
-  #          width = 7, height = 7, useDingbats = FALSE)
-  # dev.off()
+  # Need to hand-edit the axis labesl for q values to say Q instead of P
+  dev.copy(pdf, paste0("./data_simulation/figures/Qqplots of p values ", n_sites, "sites_", Sys.Date(), ".pdf"),
+           width = 7, height = 7, useDingbats = FALSE)
+  dev.off()
   
   par(mfrow = c(1,1))
   
@@ -759,39 +716,9 @@ for(i in 1:nrow(sim_dat)){
   summary(sum_df_long_w_preds$q_val)
   
   
+
   
-  #    ## Plot interactions at particular genotype
-  #    # pred_snp = dplyr::left_join(dplyr::select(man_df, SNP), pred_df_raw, by = c("SNP" = "snp"))
-  #    # pred_snp <- pred_snp %>%
-  #    #   rename(snp = SNP)
-  #    # table(pred_snp$snp)
-  #    # 
-  #    # snp_filter = "snp_chr8_7837444" # For example of strong interaction
-  #    # snp_filter = "snp_chr2_10328592"
-  #    # pred_snp %>%
-  #    #   dplyr::filter(snp == snp_filter)  %>%
-  #    # ggplot(., aes(x = tmax_sum_dif_unscaled, y = pred, col = factor(genotype))) + 
-  #    #   geom_vline(aes(xintercept = 0), lty = 2, size = .25) +
-  #    #   geom_vline(xintercept = 4.8, size = .25) +
-  #    #   geom_ribbon(aes(ymin = pred - 1.96*se, ymax = pred + 1.96 * se, fill = factor(genotype)), alpha = .15, color = NA,
-  #    #               show.legend = F) +
-  #    #   geom_line(alpha = 1,
-  #    #             show.legend = T, size = 1) + 
-  #    #   ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
-  #    #   xlab("Tmax transfer distance") +
-  #    #   theme_bw(15) + 
-  #    #   scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) + 
-  #    #   theme(panel.border = element_blank(), panel.grid.major = element_blank(),
-  #    #         panel.grid.minor = element_blank(), 
-  #    #         axis.line = element_line(colour = "black"))   + 
-  #    #   labs(color = "Genotype")
-  #    # 
-  #    # sum_df_long_w_preds[sum_df_long_w_preds$snp == snp_filter,]
-  #    # table(dat_snp[, snp_filter])
-  #    
-  
-  
-  # Figure 2 - Manhattan plot of Q values ---------------------------------------------------------
+  # Figure 2 - Manhattan plot of Q values -----------------------
   ## Using iterative filtering
   snp_pos <-data.frame(chrom = "1", pos = 1:ncol(X.snp))
   snp_pos
@@ -873,20 +800,21 @@ for(i in 1:nrow(sim_dat)){
     NULL
   
   # # Save as file - PNG
-  # ggsave(paste0("./figs_tables/fig2/Figure 2 - manhattan plot interaction term wo labels_",
-  #                      Sys.Date(), ".png"),
-  #          width = 19, height = 4, units = "cm", dpi = 600)
+  ggsave(paste0("./data_simulation/figures/manhattan plot interaction term wo labels_", n_sites, "sites_",
+                       Sys.Date(), ".png"),
+           width = 19, height = 4, units = "cm", dpi = 600)
   
   
+  
+
+# Calculate PRS -----------------------------------------------------------
 
   # Calculate polygenic risk score for each maternal genotype
   gen_dat_moms <- dplyr::select(gen_dat, accession, snp_col_names)
   dim(gen_dat_moms)
   
   # Choose SNPs
-  n_snps_values <- c(1000, seq(2000, 11000, by = 2000))
-  
-  gene_copy_thresholds <- c(1, 25, 50, 100, 250)
+  n_snps_values <- c(seq(1000, 5000, 1000), nrow(sum_df))
   
   # Initialize dataframe for output
   prs_df_summary <- tibble(n_snps = n_snps_values,
@@ -912,9 +840,6 @@ for(i in 1:nrow(sim_dat)){
     
     preds_sub <- dplyr::filter(sum_df_long_w_preds, snp == snp_name) %>%
       dplyr::select(genotype, height_change_warmer_absolute, n_gen, q_val)
-    
-    ## Filter out genotypes below a count value
-    #  preds_sub <- dplyr::filter(preds_sub, n_gen > gene_copy_thresh)
     
     counted <- preds_sub$genotype
     
@@ -1004,7 +929,6 @@ for(i in 1:nrow(sim_dat)){
     
     x = x + 1 # Move onto next SNP
     
-    
   } # End snp loop
   
   
@@ -1021,7 +945,7 @@ for(i in 1:nrow(sim_dat)){
     #ylab("R2 adjusted in testing set") +
     ylab(bquote('R'^2[adj]~'training test')) +
     scale_x_continuous(breaks = prs_df_summary$n_snps) +
-    scale_y_continuous(breaks = seq(0, 0.02, by = 0.0025), limits = c(-0.0015, 0.015)) + 
+   # scale_y_continuous(breaks = seq(0, 0.02, by = 0.0025), limits = c(-0.0015, 0.015)) + 
     theme_bw(7) + 
     geom_hline(yintercept = 0, lty = 2) + 
     theme(panel.border = element_blank(), panel.grid.major = element_blank(),
@@ -1032,16 +956,18 @@ for(i in 1:nrow(sim_dat)){
   
   
   # # Save as file
-  # ggsave(paste0("./figs_tables/Figure S3 - testing variance explained by number of snps",
-  #                      Sys.Date(), ".png"),
-  #          width = 10, height = 4, units = "cm", dpi = 300)
-  #useDingbats=FALSE)
+  ggsave(paste0("./data_simulation/figures/Testing variance explained by number of snps_", n_sites, "_sites_",
+                       Sys.Date(), ".png"),
+           width = 10, height = 4, units = "cm", dpi = 300)
   
   
   
+  top_r2_index <- which(prs_df_summary$r2 == max(prs_df_summary$r2,
+                                                 na.rm = T))
   
   # Set top PRS
-  gen_dat_moms$prs_best <- gen_dat_moms$prs_10000
+  gen_dat_moms$prs_best <- gen_dat_moms[, paste0("prs_",
+                                   prs_df_summary$n_snps[top_r2_index])]
   
   
   prs_best_mean <- mean(gen_dat_moms$prs_best)
@@ -1052,52 +978,11 @@ for(i in 1:nrow(sim_dat)){
   
   summary(gen_dat_moms$prs_best_scaled); hist(gen_dat_moms$prs_best_scaled, breaks = 50)
   
-  
-  
-  
-  
-  
-# Compare estimated to ‘true’ breeding value ------------------------------
 
-  tmax_seq <- seq(-10, 10, by = .1)
   
   
-  acc_prs <- data.frame(accession = NA, 
-                        prs_true = NA)
-  x = 1
-  
-  for(acc in names(tmax_opt)){
-    
-   acc_preds <-  dnorm(tmax_seq, 
-          mean = tmax_opt[acc],
-          sd = 4)
-   
-   
-   acc_prs[x, "accession"] <- acc
-   acc_prs[x, "prs_true"] <- mean(acc_preds[tmax_seq > 0])
-   
-   x = x + 1
-   
-   ## Plot lines
-   if(x == 1){
-     plot(tmax_seq, acc_preds, type = "l", col = sample(colors(), 1), las = 1)
-   } else {
-     lines(tmax_seq, acc_preds, type = "l", col = sample(colors(), 1))
-   }
-   
-  }
-  
-  acc_prs
-  
-  summary(acc_prs$prs_true)
-  hist(acc_prs$prs, breaks = 50)
   
   
-  plot(scale(acc_prs$prs_true), gen_dat_moms$prs_best_scaled, pch = 19)
-  abline(a = 0, b = 1, lwd = 2)
-  cor.test(acc_prs$prs_true, gen_dat_moms$prs_best)
-  
-
   
 
 # Plot predictions of PRS -------------------------------------------------
@@ -1138,12 +1023,12 @@ for(i in 1:nrow(sim_dat)){
   
   ## Save output
   
-  # Save gam summary to file
-  #  sink(file = paste0("./figs_tables/Table S2 - prs_all_gam_model_summary_",
-  #                     Sys.Date(), ".txt"))
-  #  summary(gam_prs_all)
-  # # anova(gam_prs_all)
-  #  sink()
+#  Save gam summary to file
+   sink(file = paste0("./data_simulation/figures/prs_all_gam_model_summary_",n_sites, "_sites_",
+                      Sys.Date(), ".txt"))
+   summary(gam_prs_all)
+   anova(gam_prs_all)
+   sink()
   
   
   
@@ -1176,32 +1061,32 @@ for(i in 1:nrow(sim_dat)){
   #   # anova(gam_prs_training)
   #    sink()
   #   
-  # #### Testing   
-  #    dat_snp_testing2 <- dat_snp_testing %>%
-  #      dplyr::mutate(accession = as.numeric(as.character(accession))) %>%
-  #      dplyr::left_join(.,  dplyr::select(gen_dat_moms, accession, prs_best, prs_best_scaled))
-  #    
-  #    dim(dat_snp_testing2)
-  #    
-  #    # Gam with interaction effect
-  #    gam_prs_testing = bam(formula = formula(fixed_effects),
-  #                           data = dat_snp_testing2,
-  #                           discrete = TRUE, 
-  #                           nthreads = 8,
-  #                           method = "fREML",
-  #                           #   family = "tw",
-  #                           control = list(trace = FALSE))
-  #    
-  #    summary(gam_prs_testing)
-  #    
-  #    ## Save output
-  #    
-  #    # Save gam summary to file
-  #    sink(file = paste0("./figs_tables/Table S2 - prs_testing_gam_model_summary_",
-  #                       Sys.Date(), ".txt"))
-  #    summary(gam_prs_testing)
-  #    # anova(gam_prs_testing)
-  #    sink()   
+  #### Testing
+     dat_snp_testing2 <- dat_snp_testing %>%
+    #  dplyr::mutate(accession = as.numeric(as.character(accession))) %>%
+       dplyr::left_join(.,  dplyr::select(gen_dat_moms, accession, prs_best, prs_best_scaled))
+
+     dim(dat_snp_testing2)
+
+     # Gam with interaction effect
+     gam_prs_testing = bam(formula = formula(fixed_effects),
+                            data = dat_snp_testing2,
+                            discrete = TRUE,
+                            nthreads = 8,
+                            method = "fREML",
+                            #   family = "tw",
+                            control = list(trace = FALSE))
+
+     summary(gam_prs_testing)
+
+     ## Save output
+
+     # Save gam summary to file
+     sink(file = paste0("./data_simulation/figures/prs_testing_gam_model_summary_",n_sites, "_sites_",
+                        Sys.Date(), ".txt"))
+     summary(gam_prs_testing)
+      anova(gam_prs_testing)
+     sink()
   
   
   ## Plot predictions
@@ -1210,7 +1095,7 @@ for(i in 1:nrow(sim_dat)){
   newdata <-  expand.grid(section_block = "1_1",
                           locality = "FHL",
                           height_2014 = 0,
-                          accession = "6",
+                          accession = "1",
                           tmax_dif = c(seq(min(dat_snp_all_unscaled$tmax_dif),
                                                max(dat_snp_all_unscaled$tmax_dif),
                                                length.out = 150), 
@@ -1254,8 +1139,8 @@ for(i in 1:nrow(sim_dat)){
     geom_ribbon(aes(ymin = pred - 1.96*se, ymax = pred + 1.96 * se, 
                     fill = factor(prs_best_scaled)), alpha = .35) +
     geom_line(aes(col = factor(prs_best_scaled))) + 
-    scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
-    scale_y_continuous(breaks = seq(0, 1.75, by = 0.25)) + 
+ #   scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) +
+ #   scale_y_continuous(breaks = seq(0, 1.75, by = 0.25)) + 
     ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
     xlab("Tmax transfer distance (°C)") +
     scale_color_manual(values = c("#af8dc3", "#227eb8", "#7fbf7b")) +
@@ -1272,191 +1157,309 @@ for(i in 1:nrow(sim_dat)){
   
   
   # Save plot output
-  # ggsave(filename = paste0("./figs_tables/fig2/Figure 2 - prs growth ", Sys.Date(), ".pdf"),
-  #        units = "cm", width = 8, height = 6)
-  # 
-  
-  
-  
-  
-  ## Calculating differences in growth rates
-  growth_dif =  newdata %>%
-    dplyr::mutate(tmax_sum_dif_unscaled = back_transform(tmax_sum_dif, var = "tmax_sum_dif",
-                                                         means = scaled_var_means_gbs_all,
-                                                         sds = scaled_var_sds_gbs_all))
-  
-  # Comparing high to mid
-  (growth_dif$pred[growth_dif$prs_best_scaled == 1 & growth_dif$tmax_sum_dif_unscaled == 4.8] -
-      growth_dif$pred[growth_dif$prs_best_scaled == 0 & growth_dif$tmax_sum_dif_unscaled == 4.8]) /
-    abs(growth_dif$pred[growth_dif$prs_best_scaled == 0 & growth_dif$tmax_sum_dif_unscaled == 4.8]) * 100
-  
-  # Compare high to low
-  (growth_dif$pred[growth_dif$prs_best_scaled == 1 & growth_dif$tmax_sum_dif_unscaled == 4.8] -
-      growth_dif$pred[growth_dif$prs_best_scaled == -1 & growth_dif$tmax_sum_dif_unscaled == 4.8]) /
-    abs(growth_dif$pred[growth_dif$prs_best_scaled == -1 & growth_dif$tmax_sum_dif_unscaled == 4.8]) * 100
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  #  Simulate selection based on PRS score like in Hayden & SOD -------------
-  
-  
-  # ### Run full model and save out residuals for cluster analysis
-  # fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\")  + s(accession, bs = \"re\") + s(locality, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\") + s(PC1_clim, bs=\"cr\") + s(PC2_clim, bs=\"cr\")"))
-  # 
-  # # Gam with interaction effect
-  # gam_snp_all2 = bam(formula = formula(fixed_effects),
-  #                    data = dat_snp_all,
-  #                    discrete = TRUE, 
-  #                    nthreads = 8,
-  #                    method = "fREML",
-  #                    family = "tw",
-  #                    control = list(trace = FALSE))
-  # 
-  # summary(gam_snp_all2)
-  # 
-  # dat_snp_all2 <- dat_snp_all
-  # 
-  # dat_snp_all2$rgr_resids <- resid(gam_snp_all2)
-  # hist(dat_snp_all2$rgr_resids, breaks = 50)
-  # 
-  # ## Mean center the residuals
-  # dat_snp_all2$rgr_resids <-  dat_snp_all2$rgr_resids - mean(dat_snp_all2$rgr_resids)
-  # summary(dat_snp_all2$rgr_resids)
-  # 
-  # 
-  # dat_snp_prs2 <- dat_snp_all2 %>%
-  #   dplyr::mutate(accession = as.numeric(as.character(accession))) %>%
-  #   dplyr::select(accession, site, locality, tmax_sum, tmax_sum_dif, 
-  #                 rgr, rgr_resids, 
-  #                 section_block, PC1_gen, PC2_gen, PC1_clim, PC2_clim, height_2014) %>%
-  #   dplyr::left_join(., dplyr::select(gen_dat_moms, accession, prs_best, prs_best_scaled)) %>%
-  #   dplyr::mutate(accession = factor(accession)) %>%
-  #   dplyr::mutate(tmax_sum_dif_unscaled = back_transform(tmax_sum_dif, var = "tmax_sum_dif",
-  #                                                        means = scaled_var_means_gbs_all,
-  #                                                        sds = scaled_var_sds_gbs_all))
-  # 
-  # # Set parameters
-  # set.seed(1)
-  # sample_size = 50
-  # n_reps <- 10000
-  # 
-  # # Indices for top and bottom quartiles
-  # upper_ind <- which(dat_snp_prs2$prs_best_scaled >= 1 & 
-  #                      dat_snp_prs2$tmax_sum_dif_unscaled > 0)
-  # length(upper_ind)
-  # 
-  # lower_ind <- which(dat_snp_prs2$prs_best_scaled <= 
-  #                      quantile(dat_snp_prs2$prs_best_scaled, .25) 
-  #                    & dat_snp_prs2$tmax_sum_dif_unscaled > 0)
-  # length(lower_ind)
-  # 
-  # random_ind <- which(dat_snp_prs2$tmax_sum_dif_unscaled > 0)
-  # length(random_ind)
-  # 
-  # climate_match <- dat_snp_prs2  %>%
-  #   dplyr::filter(tmax_sum_dif_unscaled <= .5 & tmax_sum_dif_unscaled >= -.5)  
-  # dim(climate_match)
-  # 
-  # climate_colder <- dat_snp_prs2  %>%
-  #   dplyr::filter(tmax_sum_dif_unscaled <= -2)  
-  # dim(climate_colder)
-  # 
-  # # Initialize output
-  # output_df <- tibble(rep = 1:n_reps,
-  #                     `Upper quartile GEBV` = NA,
-  #                     `Lower quartile GEBV` = NA,
-  #                     `None` = NA,
-  #                     `Climate Match` = NA,
-  #                     `Climate Colder` = NA)
-  # 
-  # 
-  # for(x in 1:n_reps){
-  #   
-  #   if(x %% 500 == 0){
-  #     cat("Working on x: ", x, " .... \n")
-  #   }
-  #   
-  #   upper_sample <- sample(upper_ind, size = sample_size)
-  #   lower_sample <- sample(lower_ind, size = sample_size)
-  #   avg_sample <- sample(random_ind, size = sample_size)
-  #   climate_match_sample <- sample(1:nrow(climate_match), size = sample_size)
-  #   climate_colder_sample <- sample(1:nrow(climate_colder), size = sample_size)
-  #   
-  #   
-  #   output_df$`Upper quartile GEBV`[x] <-     mean(dat_snp_prs2$rgr_resids[upper_sample])
-  #   output_df$`Lower quartile GEBV`[x] <-     mean(dat_snp_prs2$rgr_resids[lower_sample])
-  #   output_df$None[x] <-                      mean(dat_snp_prs2$rgr_resids[avg_sample])
-  #   output_df$`Climate Match`[x] <-            mean(climate_match$rgr_resids[climate_match_sample])
-  #   output_df$`Climate Colder`[x] <-          mean(climate_colder$rgr_resids[climate_colder_sample])
-  #   
-  # }
-  # 
-  # 
-  # # Plot results 
-  # output_df %>%
-  #   gather(key = type, value = rgr_resid, -rep) %>%
-  #   mutate(type = factor(type, levels = c("None", "Climate Match", "Climate Colder",
-  #                                         "Upper quartile GEBV", "Lower quartile GEBV"))) %>%
-  #   dplyr::filter(type != "Lower quartile GEBV") %>%
-  #   ggplot(., aes(x = type, y = rgr_resid, fill = type)) + 
-  #   geom_hline(yintercept = 0, lty = 2)+
-  #   # geom_violin(draw_quantiles = c(.5)) +
-  #   geom_boxplot(outlier.shape = NA) + 
-  #   xlab("Choice criteria") +
-  #   ylab("Adjusted Relative Growth Rate") + 
-  #   scale_fill_manual(values =  c("#227eb8", "#fdc086", "#ffff99", "#7fbf7b")) + # "#af8dc3")) +
-  #   scale_x_discrete(labels = c("Random", "Climate match \n -0.5° to 0.5°\nTmax transfer", 
-  #                               "Climate match \n <= -2°\nTmax transfer",
-  #                               "GEBV \n >= 1 SD")) +
-  #   #"GEBV \n Lower quartile")) + 
-  #   scale_y_continuous(breaks = seq(-.25, .25, by = 0.05),
-  #                      limits = c(-.1, .15)) +
-  #   theme_bw(8) + 
-  #   theme(panel.border = element_blank(), 
-  #         panel.grid.major = element_blank(),
-  #         panel.grid.minor = element_blank(), 
-  #         axis.line = element_line(colour = "black"),
-  #         axis.text.x = element_text(size = 8),
-  #         axis.title.x = element_text(size = 10),
-  #         axis.title.y = element_text(size = 10),
-  #         legend.position = "none") +
-  #   NULL
-  # 
-  # # Save output
-  # # ggsave(filename = paste0("./figs_tables/fig2/Figure 2 - rgr predictions by choice ",
-  # #                          Sys.Date(), ".pdf"),
-  # #        units = "cm",
-  # #        width = 9, height = 8)
-  # 
-  # 
-  # 
-  # ## Comparing different scenarios 
-  # growth_by_scenario <-  output_df %>%
-  #   gather(key = type, value = rgr_resid, -rep) %>%
-  #   mutate(type = factor(type, levels = c("None", "Climate Match", "Climate Colder",
-  #                                         "Upper quartile GEBV", "Lower quartile GEBV"))) %>%
-  #   dplyr::filter(type != "Lower quartile GEBV") %>%
-  #   group_by(type) %>%
-  #   summarise_all(mean)
-  # 
-  # growth_by_scenario
-  # 
-  # growth_by_scenario$rgr_resid[growth_by_scenario$type == "Upper quartile GEBV"] - growth_by_scenario$rgr_resid[growth_by_scenario$type == "Climate Match"]
-  # 
-  # growth_by_scenario$rgr_resid[growth_by_scenario$type == "Upper quartile GEBV"] - growth_by_scenario$rgr_resid[growth_by_scenario$type == "Climate Colder"]
-  # 
-  # growth_by_scenario$rgr_resid[growth_by_scenario$type == "Upper quartile GEBV"] - growth_by_scenario$rgr_resid[growth_by_scenario$type == "None"]
-  # 
-  # 
-  # 
-  
+  ggsave(filename = paste0("./data_simulation/figures/prs growth ",n_sites, "_sites_", Sys.Date(), ".pdf"),
+         units = "cm", width = 8, height = 6)
 
   
   
+  
+  
+# Compare estimated to ‘true’ values ------------------------------
+  
+  
+  ## Block effects - missing tmax effect
+  block_pred <- visreg(gam_snp_all, xvar = "section_block",
+                       cond=list(tmax_dif=0))$fit
+  
+  for(i in 1:nrow(block_pred)){
+    site_effect_temp <- ifelse(grepl(pattern = "^1", 
+                                 block_pred$section_block[i]),
+                               yes = site_effect[1],
+                               no = site_effect[2])
+    
+    block_pred$truth[i] <-1 +  block_effect[block_pred$section_block[i]] +
+                        site_effect_temp + 
+                           accession_effect[block_pred$accession[i]]
+  }
+  
+  ggplot(block_pred, aes(section_block, visregFit)) + 
+    geom_point() + 
+    geom_errorbar(aes(ymin = visregLwr, ymax = visregUpr), width = .1) + 
+    geom_point(aes(section_block, truth), col = "red", size = 2) + 
+    ylab("RGR") + 
+    theme_bw(15)
+  
+  
+  # Accession predictions
+  accession_pred <- visreg(gam_snp_all, xvar = "accession",
+                       cond=list(tmax_dif=0))$fit
+  
+  for(i in 1:nrow(accession_pred)){
+    site_effect_temp <- ifelse(grepl(pattern = "^1", 
+                                     accession_pred$section_block[i]),
+                               yes = site_effect[1],
+                               no = site_effect[2])
+    
+    accession_pred$truth[i] <- 1 + 
+      block_effect[accession_pred$section_block[i]] +
+      site_effect_temp + 
+      accession_effect[accession_pred$accession[i]]
+  }
+  
+  ggplot(accession_pred, aes(accession, visregFit)) + 
+    geom_point() + 
+    geom_errorbar(aes(ymin = visregLwr, ymax = visregUpr), width = .1) + 
+    geom_point(aes(accession, truth), col = "red", size = 2) + 
+    ylab("RGR") + 
+    theme_bw(15)
+  
+  
+  
+# Plot true vs estimated breeding values  
+  summary(acc_prs$prs_true)
+  hist(acc_prs$prs, breaks = 50)
+  
+  # Set colors for training and testing set
+  col <- ifelse(acc_prs$accession %in% training_moms, "steelblue", "coral")
+  
+  plot(scale(acc_prs$prs_true), gen_dat_moms$prs_best_scaled, pch = 19,
+       xlab = "GEBV True", ylab = "GEBV Estimated", col = col)
+  abline(a = 0, b = 1, lwd = 2)
+  
+  cor_training <- cor(acc_prs$prs_true[acc_prs$accession %in% training_moms], 
+                           gen_dat_moms$prs_best_scaled[gen_dat_moms$accession %in% training_moms])
+  cor_testing <- cor(acc_prs$prs_true[!acc_prs$accession %in% training_moms], 
+                     gen_dat_moms$prs_best_scaled[!gen_dat_moms$accession %in% training_moms])
+  
+  
+  legend("bottomright", legend = c(paste0("R = ", round(cor_training, 3)),
+                                   paste0("R = ", round(cor_testing, 3))),
+         col = c("steelblue", "coral"), pch = 19)
+  
+  dev.copy(pdf, paste0("./data_simulation/figures/GAM correlation with true GEBV ", 
+                       n_sites, "_sites.pdf"))
+  dev.off()         
+ 
+  
+  
+   
+  ## Only training moms
+  plot(scale(acc_prs$prs_true[acc_prs$accession %in% training_moms]),
+       gen_dat_moms$prs_best_scaled[gen_dat_moms$accession %in% training_moms], pch = 19,
+       xlab = "GEBV True", ylab = "GEBV Estimated")
+  abline(a = 0, b = 1, lwd = 2)
+  cor.test(acc_prs$prs_true[acc_prs$accession %in% training_moms], 
+           gen_dat_moms$prs_best_scaled[gen_dat_moms$accession %in% training_moms])
+  
+  ## Only testing moms
+  plot(scale(acc_prs$prs_true[!acc_prs$accession %in% training_moms]),
+       gen_dat_moms$prs_best_scaled[!gen_dat_moms$accession %in% training_moms], pch = 19,
+       xlab = "GEBV True", ylab = "GEBV Estimated")
+  abline(a = 0, b = 1, lwd = 2)
+  cor.test(acc_prs$prs_true[!acc_prs$accession %in% training_moms], 
+           gen_dat_moms$prs_best_scaled[!gen_dat_moms$accession %in% training_moms])
+  
+  
+# Correlate p value with estimated effect size
+  snp_effect_df <- data.frame(snp = snp_col_names, 
+                              snp_effect = u.snp + beta.snp)
+  
+  sum_df_wtruth <- left_join(sum_df, snp_effect_df)
+  
+  sum_df_wtruth <- sum_df_wtruth %>%
+    mutate(snp_effect  = abs(snp_effect))
+  
+  pairs.panels(select(sum_df_wtruth, snp_effect, dev_explained, rsq_adj,
+                      p_val_gen_int, f_val_gen_int, p_val_gen_main,
+                      f_val_gen_main, q_val))
+  
+  
+
+
+# Testing out conventional approaches -------------------------------------
+  
+  ## Testing out different transfer functions per accession
+   gam_acc <- bam(rgr ~ section_block + s(accession, bs = "re") +  s(tmax_dif, by = accession),
+              data = sim_dat[sim_dat$accession %in% training_moms, ],
+              discrete = TRUE,
+              nthreads = 8,
+              method = "fREML",
+              # accession = "gaussian",
+              #   accession = "tw",
+              control = list(trace = FALSE))
+
+# summary(gam_acc)
+
+  ## Calculate RGR at tmax > 0 based on individual accession curves
+   # Make dataframe to save 'true' GEBV
+   acc_rgr_absolute <- data.frame(accession = NA, 
+                                  height_change_warmer = NA) 
+   
+   plot = FALSE
+   x = 1
+   for(acc in names(tmax_opt)){
+     
+     cat("Working on accession:", acc, "... \n")
+     
+     if(acc %in% testing_moms){
+       acc_rgr_absolute[x, "accession"] <- acc
+       acc_rgr_absolute[x, "height_change_warmer"] <- NA
+       acc_rgr_absolute[x, "tmax_opt"] <- NA
+       x = x + 1
+       next
+     }
+     
+     # Build prediction dataframe
+     pred_acc <-  expand.grid(height_2014 = 0,
+                          accession = acc,
+                          section_block = "1_1",
+                          locality = "FHL",
+                          PC1_clim =0, PC2_clim = 0,
+                          PC1_gen = 0, PC2_gen = 0)
+     
+     pred_acc <- left_join(pred_acc, expand.grid(accession = acc,
+                       # tmax_dif= c(seq(min(sim_dat$tmax_dif),
+                       #                max(sim_dat$tmax_dif),
+                       #                length.out = 150))))
+     
+     tmax_dif= c(seq(-10,
+                     10,
+                     length.out = 150))))
+     
+     pred_acc$preds <- predict(gam_acc, newdata = pred_acc)
+     
+     ## Scaled plot
+     if(acc %in% names(tmax_opt) && plot){
+       plot(pred_acc$tmax_dif, 
+            scales::rescale(pred_acc$preds, c(0, 1)), 
+            type  = "l", lwd = 1.5, las = 1,
+            ylab = "Scaled RGR effect", xlab = "Tmax dif",
+            main = paste0("Accession: ", acc))
+       abline(vline = 0, lty = 2)
+       
+       # Calculate 'true' transfer function
+       truth <-  dnorm(pred_acc$tmax_dif,
+                       mean = tmax_opt[acc],
+                       sd = tmax_opt_sd)
+       lines(pred_acc$tmax_dif, scales::rescale(truth, c(0, 1)), 
+             lwd = 1.5, col = "blue")
+       
+       sub_progeny <- sim_dat[sim_dat$accession == acc, ]
+       points(sub_progeny$tmax_dif, 
+              scales::rescale(sub_progeny$tmax_dif_effect, c(0, 1)), 
+              pch = 19, col = "blue")
+     }
+     
+     acc_rgr_absolute[x, "accession"] <- acc
+     acc_rgr_absolute[x, "height_change_warmer"] <- mean(pred_acc$preds[pred_acc$tmax_dif > 0])
+     acc_rgr_absolute[x, "tmax_opt"] <- pred_acc$tmax_dif[which(pred_acc$preds == 
+                                                                max(pred_acc$preds))]
+     x = x + 1
+   }
+   
+  
+   acc_rgr_absolute
+   
+   ## Compare estimated and 'true' values of tmax_opt
+   # plot(tmax_opt, acc_rgr_absolute$tmax_opt, pch = 19)
+   # cor.test(tmax_opt, acc_rgr_absolute$tmax_opt)
+   # abline(a = 0, b = 1 , lwd = 2)
+   
+   # Comapre with true values of gebv
+   plot(acc_prs$prs_true, acc_rgr_absolute$height_change_warmer, pch = 19)
+   cor.test(acc_prs$prs_true, acc_rgr_absolute$height_change_warmer)
+   abline(a = 0, b = 1 , lwd = 2)
+   
+   
+   plot(acc_rgr_absolute$tmax_opt, acc_rgr_absolute$height_change_warmer, pch = 19)
+   cor.test(acc_rgr_absolute$tmax_opt,
+            acc_rgr_absolute$height_change_warmer)
+   abline(a = 0, b = 1 , lwd = 2)
+   
+   
+   
+
+   
+ ### Calculate BLUPs based
+   library(BGLR)
+   
+   ind.names <- paste0("ind_", 1:length(y.total))
+   
+   # Computing the genomic relationship matrix for SNPs
+   A.snp.temp <- scale(X.snp.unscaled,center=TRUE,scale=TRUE)
+   A.snp <- tcrossprod(A.snp.temp)/ncol(A.snp.temp)
+   
+  
+   # Fitting the model
+   
+   # Parameters    
+   nIter <- 10000
+   burnIn <- 2500
+   verbose <- F
+   
+   y = acc_rgr_absolute$height_change_warmer
+   summary(y)
+ #  y = acc_rgr_absolute$tmax_opt
+   
+   ## Model with SNP and methylation data
+   mod.snp <-BGLR( y = y,
+                   ETA = list(list(K = A.snp, model = 'RKHS')),
+                   nIter = nIter, burnIn = burnIn,
+                   saveAt='./data_simulation/bglr/', 
+                   verbose = verbose)
+
+   str(mod.snp)
+   
+   # Variance explained
+   1 - mod.snp$varE/var(y)
+
+   
+   ## Compare estimated breeding values
+   bglr_gebv <- mod.snp$ETA[[1]]$u
+   
+   plot(scale(acc_prs$prs_true),  bglr_gebv, pch = 19,
+        xlab = "GEBV True", ylab = "GEBV Estimated (BLUP)", las = 1)
+ #  abline(a = 0, b = 1, lwd = 2)
+   cor.test(acc_prs$prs_true, bglr_gebv)
+   cor.test(acc_prs$prs_true, bglr_gebv, method = "spearman")
+  
+   
+   
+   
+   # Set colors for training and testing set
+   col <- ifelse(acc_prs$accession %in% training_moms, "steelblue", "coral")
+   
+   plot(scale(acc_prs$prs_true), scale(bglr_gebv), pch = 19,
+        xlab = "GEBV True", ylab = "GEBV Estimated (BLUP)", col = col)
+   abline(a = 0, b = 1, lwd = 2)
+   
+   cor_overall <- cor(acc_prs$prs_true, bglr_gebv)
+   cor_training <- cor(acc_prs$prs_true[acc_prs$accession %in% training_moms], 
+                       bglr_gebv[gen_dat_moms$accession %in% training_moms])
+   cor_testing <- cor(acc_prs$prs_true[!acc_prs$accession %in% training_moms], 
+                      bglr_gebv[!gen_dat_moms$accession %in% training_moms])
+   
+   
+   legend("bottomright", legend = c(paste0("R = ", round(cor_overall, 3)),
+                                    paste0("R = ", round(cor_training, 3)),
+                                    paste0("R = ", round(cor_testing, 3))),
+          col = c("black", "steelblue", "coral"), pch = 19)
+   
+   dev.copy(pdf, paste0("./data_simulation/figures/BLUP correlation with true GEBV ", 
+                        n_sites, "_sites.pdf"))
+   dev.off()         
+   
+   
+   
+   
+   
+   ## Compare BLUP approach to GAM approach
+   
+   pairs.panels(data.frame(gebv_true = acc_prs$prs_true, 
+                           gebv_blup = bglr_gebv, 
+                           gebv_gam = gen_dat_moms$prs_best_scaled),
+                ellipses = F)
+   
+   
+   
 
