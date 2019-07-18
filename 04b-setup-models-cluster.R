@@ -313,7 +313,13 @@
   
   
   ### Run full model and save out residuals for cluster analysis
+  
+  ## Original used in PNAS submission
   fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(accession, bs = \"re\") + s(locality, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\")  + s(tmax_sum_dif, by = PC1_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC2_gen, bs=\"cr\") + s(PC1_clim, bs=\"cr\") + s(PC2_clim, bs=\"cr\")  + s(tmax_sum_dif, by = PC1_clim, bs=\"cr\") + s(tmax_sum_dif, by = PC2_clim, bs=\"cr\")"))
+  
+  
+  # Testing out removing family effects
+  fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\")"))
   
   
   # Gam with interaction effect
@@ -341,19 +347,19 @@
   
 
 # Save data to file that will be uploaded to cluster  
-  # save(dat_snp_all, dat_snp_all_unscaled,
-  #      dat_snp_training, dat_snp_training_unscaled,
-  #      dat_snp_testing, dat_snp_testing_unscaled,
-  #      snp_col_names,
-  #      pred,
-  #      scaled_var_means_gbs_all, scaled_var_sds_gbs_all,
-  #      scaled_var_means_gbs_testing, scaled_var_sds_gbs_testing,
-  #      scaled_var_means_gbs_training, scaled_var_sds_gbs_training,
-  #      scaled_snps_means_all, scaled_snps_sds_all,
-  #      scaled_snps_means_training, scaled_snps_sds_training,
-  #      scaled_snps_means_testing, scaled_snps_sds_testing,
-  #      folds,
-  #   file = paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
+  save(dat_snp_all, dat_snp_all_unscaled,
+       dat_snp_training, dat_snp_training_unscaled,
+       dat_snp_testing, dat_snp_testing_unscaled,
+       snp_col_names,
+       pred,
+       scaled_var_means_gbs_all, scaled_var_sds_gbs_all,
+       scaled_var_means_gbs_testing, scaled_var_sds_gbs_testing,
+       scaled_var_means_gbs_training, scaled_var_sds_gbs_training,
+       scaled_snps_means_all, scaled_snps_sds_all,
+       scaled_snps_means_training, scaled_snps_sds_training,
+       scaled_snps_means_testing, scaled_snps_sds_testing,
+       folds,
+    file = paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
 
 
  

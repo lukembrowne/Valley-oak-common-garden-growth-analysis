@@ -7,8 +7,10 @@
 
   # Path to results
   # Used in first submission to PNAS - "run_475547_tmax_sum_dif_training_set_resids_7030_2019_02_26"
+#  path <- "run_475547_tmax_sum_dif_training_set_resids_7030_2019_02_26"
 
-  path <- "run_475547_tmax_sum_dif_training_set_resids_7030_2019_02_26"
+  # With siblings in both training and testing sets July 16 2019
+   path <- "run_389456_tmax_sum_dif_rgr_family_acrossCV_reduced_model"
   
   path_to_summaries <- paste0("./output/", path, "/model_summaries/")
   path_to_predictions <- paste0("./output/", path, "/model_predictions/")
@@ -143,6 +145,7 @@
     head(pred_df_long)
     dim(pred_df_long)
     
+    summary(pred_df_long$height_change_warmer_absolute)
     summary(pred_df_long$height_change_warmer)
     summary(pred_df_long$height_change_warmer_base0)
     
@@ -177,24 +180,14 @@
   fdr_fvals = fdrtool(c(sum_df$f_val_gen_int),
                  statistic = "normal", plot = FALSE)
   
-  fdr_fvals = fdrtool(c(sum_df$p_val_gen_int),
-                      statistic = "pvalue", plot = TRUE)
-  
+  # fdr_fvals = fdrtool(c(sum_df$p_val_gen_int),
+  #                     statistic = "pvalue", plot = TRUE)
+  # 
   # P values
   summary(fdr_fvals$pval)
   hist(fdr_fvals$pval, breaks = 40)
   sum(fdr_fvals$pval < 0.05)
   sort(fdr_fvals$pval)[1:50]
-
-  
-  # Calculate genomic control?
-  # library(gap)
-  # 
-  # test = gcontrol2(fdr_fvals$pval)
-  # test$lambda
-  # 
-
-
     
   # Q values
   hist(fdr_fvals$qval, breaks = 40) # Each q-value is the expected proportion of false positives among all SNP effects that are at least as extreme as that observed for the current SNP.
@@ -227,12 +220,7 @@
       # dev.off()
 
   par(mfrow = c(1,1))
-  
-  # Local false discovery rate
-  hist(fdr_fvals$lfdr, breaks = 40)
-  sum(fdr_fvals$lfdr < 0.05)
-  summary(fdr_fvals$lfdr)
-  
+
 
   # Join back to main dataframe
   sum_df$q_val <- fdr_fvals$qval
@@ -651,6 +639,7 @@
     summary(dat_snp_prs$prs_best_scaled)
    
     dat_snp_prs_unscaled <- dat_snp_prs
+    
     
     # Set formula
      fixed_effects <- paste0(paste0("rgr_resids ~ s(prs_best_scaled, bs=\"cr\") + 

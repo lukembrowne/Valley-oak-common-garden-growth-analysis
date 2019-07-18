@@ -562,94 +562,9 @@
 # Select a subset of adults for taining and testing, CV Validation
       
       
-      # For  path <- "run_448582_tmax_sum_dif_training_set_8020_2019_02_21" 2/21/2019
-      # or
-      # path <- "run_470998_tmax_sum_dif_training_set_resids_8020_2019_02_25"
-      # set.seed(129)
-      # training_moms <- sample(na.omit(climate_gbs_mom$accession),
-      #                         size = length(na.omit(climate_gbs_mom$accession))*0.80)
-      # 
-      # testing_moms <- na.omit(climate_gbs_mom$accession)[!na.omit(climate_gbs_mom$accession)
-      #                                                    %in% training_moms]
-      # 
-      # any(training_moms %in% testing_moms) # Should both be false
-      # any(testing_moms %in% training_moms)
-      # 
-      # 
-      # ## Save two datasets for training and testing
-      # dat_gbs_training_clim <- dat_gbs_all_clim %>%
-      #   dplyr::filter(accession %in% training_moms)
-      # dat_gbs_testing_clim <- dat_gbs_all_clim %>%
-      #   dplyr::filter(accession %in% testing_moms)
-      # 
-      # dim(dat_gbs_training_clim)
-      # dim(dat_gbs_testing_clim)
-      # 
-      # table(dat_gbs_testing_clim$section_block)
-      # table(dat_gbs_testing_clim$locality)
-
-      
-    
-      # For - path <- "run_452409_tmax_sum_dif_training_set_5050family_2019_02_22"
-          # ## Create folds for validation balanced across accessions for - 
-          # set.seed(129)
-          # 
-          # folds <- caret::createFolds(factor(dat_gbs_all_clim$accession), k = 2)
-          # 
-          # table(dat_gbs_all_clim$accession[folds[[1]]])
-          # table(dat_gbs_all_clim$accession[folds[[2]]])
-          # 
-          # ## Save two datasets for training and testing    
-          # dat_gbs_training_clim <- dat_gbs_all_clim[folds[[1]], ]
-          # dat_gbs_testing_clim <- dat_gbs_all_clim[folds[[2]], ]
-          # 
-          # dim(dat_gbs_training_clim)
-          # dim(dat_gbs_testing_clim)
-          # 
-          # table(dat_gbs_testing_clim$section_block)
-          # table(dat_gbs_testing_clim$locality)
-          # table(dat_gbs_testing_clim$accession)
-          # 
-          # table(dat_gbs_training_clim$section_block)
-          # table(dat_gbs_training_clim$locality)
-          # table(dat_gbs_training_clim$accession)
-          # 
-      
-      
-      # 60/40 sampling
-      # For  path <- "run_454506_tmax_sum_dif_training_set_6040_2019_02_22
-      # set.seed(1)
-      # training_moms <- sample(na.omit(climate_gbs_mom$accession),
-      #                         size = length(na.omit(climate_gbs_mom$accession))*0.60)
-      # 
-      # testing_moms <- na.omit(climate_gbs_mom$accession)[!na.omit(climate_gbs_mom$accession)
-      #                                                    %in% training_moms]
-      # 
-      # any(training_moms %in% testing_moms) # Should both be false
-      # any(testing_moms %in% training_moms)
-      # 
-      # 
-      # ## Save two datasets for training and testing
-      # dat_gbs_training_clim <- dat_gbs_all_clim %>%
-      #   dplyr::filter(accession %in% training_moms)
-      # dat_gbs_testing_clim <- dat_gbs_all_clim %>%
-      #   dplyr::filter(accession %in% testing_moms)
-      # 
-      # dim(dat_gbs_training_clim)
-      # dim(dat_gbs_testing_clim)
-      # 
-      # table(dat_gbs_testing_clim$section_block)
-      # table(dat_gbs_testing_clim$locality)
-      # table(dat_gbs_testing_clim$accession)
-      # 
-      # table(dat_gbs_training_clim$section_block)
-      # table(dat_gbs_training_clim$locality)
-      # table(dat_gbs_training_clim$accession)
-      # 
-      # 
-      
       # 70/30 sampling
       # For path "run_475547_tmax_sum_dif_training_set_resids_7030_2019_02_26"
+      # Used in initial submission to PNAS
       set.seed(129)
       training_moms <- sample(na.omit(climate_gbs_mom$accession),
                               size = length(na.omit(climate_gbs_mom$accession))*0.70)
@@ -669,6 +584,35 @@
       
       dim(dat_gbs_training_clim)
       dim(dat_gbs_testing_clim)
+      
+      table(dat_gbs_testing_clim$section_block)
+      table(dat_gbs_testing_clim$locality)
+      table(dat_gbs_testing_clim$accession)
+      
+      table(dat_gbs_training_clim$section_block)
+      table(dat_gbs_training_clim$locality)
+      table(dat_gbs_training_clim$accession)
+      
+      
+      
+      # 70/30 sampling with family in both training and testing
+      set.seed(129)
+      
+     training_seedlings <-  caret::createDataPartition(
+                              factor(dat_gbs_all_clim$accession),
+                                 p = .70)$Resample1
+      
+      
+      ## Save two datasets for training and testing
+      dat_gbs_training_clim <- dat_gbs_all_clim[training_seedlings, ]
+      dat_gbs_testing_clim <- dat_gbs_all_clim[-training_seedlings, ]
+      
+      dim(dat_gbs_training_clim)
+      dim(dat_gbs_testing_clim)
+      
+      # Percentages of total
+      nrow(dat_gbs_training_clim)/nrow(dat_gbs_all_clim)
+      nrow(dat_gbs_testing_clim)/nrow(dat_gbs_all_clim)
       
       table(dat_gbs_testing_clim$section_block)
       table(dat_gbs_testing_clim$locality)
