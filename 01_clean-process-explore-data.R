@@ -17,7 +17,7 @@
 
     ## If token is stale: gs_auth(new_user = TRUE)
      #dat_17_raw <- gs_read(gs_key("1CvaUjE7qBvKbbc8QaG_B4vxFZlCNe79z_q9JwYhMhhw"), ws = 2)
-    dat_17_raw <- read_csv("./data/cleaned_data/Qlobata census measurements 2017 - Measurement data 2017.csv")
+    dat_17_raw <- read_csv("./data/cleaned_data/Qlobata census measurements 2017 - Measurement data 2017.csv", guess_max = 50000)
     colnames(dat_17_raw) <- paste0(colnames(dat_17_raw), "_2017")
     
     ## Remove if we don't know the accession / progeny
@@ -28,7 +28,7 @@
     
   ## Load in garden data from 2015 - "Qlobata census measurements 2015"
    #dat_15_raw <- gs_read(gs_key("1ljUeS4j3tte1qaXQFNJGmeOL7wTIlBRC8N5vJ1HlN8k"), ws = 2)
-    dat_15_raw <- read_csv("./data/cleaned_data/Qlobata census measurements 2015 - Measurement Data 2015.csv")
+    dat_15_raw <- read_csv("./data/cleaned_data/Qlobata census measurements 2015 - Measurement Data 2015.csv", guess_max = 50000)
     colnames(dat_15_raw) <- paste0(colnames(dat_15_raw), "_2015")
     
     ## Remove if we don't know the accession / progeny
@@ -40,7 +40,7 @@
     
   ## Load in 2014 data which has heights before planted into garden
    # dat_14_raw <- gs_read(gs_key("10Yss2ciOo0cazkT9Udu55QUr37T7zXeQbnGuLpTnAMM"), ws = 2)
-    dat_14_raw <- read_csv("./data/cleaned_data/Qlobata census measurements 2014 - Measurement data 2014.csv")
+    dat_14_raw <- read_csv("./data/cleaned_data/Qlobata census measurements 2014 - Measurement data 2014.csv", guess_max = 50000)
     colnames(dat_14_raw) <- paste0(colnames(dat_14_raw), "_2014")
     dat_14_raw$Progeny_2014 <- as.character(dat_14_raw$Progeny_2014)
     

@@ -177,11 +177,11 @@
   # F values of interaction term
   hist(sum_df$f_val_gen_int, breaks = 50)
 
-  fdr_fvals = fdrtool(c(sum_df$f_val_gen_int),
-                 statistic = "normal", plot = FALSE)
+  # fdr_fvals = fdrtool(c(sum_df$f_val_gen_int),
+  #                statistic = "normal", plot = FALSE)
   
-  # fdr_fvals = fdrtool(c(sum_df$p_val_gen_int),
-  #                     statistic = "pvalue", plot = TRUE)
+  fdr_fvals = fdrtool(c(sum_df$p_val_gen_int),
+                      statistic = "pvalue", plot = TRUE)
   # 
   # P values
   summary(fdr_fvals$pval)
