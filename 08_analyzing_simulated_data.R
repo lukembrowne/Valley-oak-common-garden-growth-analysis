@@ -7,6 +7,7 @@ library(fdrtool)
 library(qqman)
 library(tidyverse)
 library(readr)
+library(lme4)
 library(mgcv, lib.loc = "/u/home/l/lukembro/R/x86_64-pc-linux-gnu-library/3.5") # Make sure to load latest version of mgcv
 
 
@@ -45,11 +46,9 @@ load(file = paste0("./", data_file))
 
 
 # Read in files
-sum_df_raw <- plyr::ldply(list.files(path_to_summaries, full = TRUE), read_csv)
+sum_df_raw <- suppressMessages(plyr::ldply(list.files(path_to_summaries, full = TRUE), read_csv))
 
 dim(sum_df_raw)
-sum_df_raw
-
 summary(sum_df_raw)
 
 
@@ -95,8 +94,8 @@ table(sum_df_raw$acc_pred)
 
 
 ## Read in model predictions
-pred_df_raw <- plyr::ldply(list.files(path_to_predictions, full = TRUE), 
-                           read_csv)
+pred_df_raw <- suppressMessages(plyr::ldply(list.files(path_to_predictions, full = TRUE), 
+                           read_csv))
 pred_df_raw$genotype <- as.character(pred_df_raw$genotype)
 
 str(pred_df_raw)
@@ -221,9 +220,9 @@ qq(fdr_fvals$pval, main = "Uncorrected p-values", las = 1)
 # Q values
 hist(fdr_fvals$qval, breaks = 40, col = "steelblue2",
      xlab = "q-value", main = "q-values", las = 1)
-qq(fdr_fvals$qval, main = "q-values", las = 1)
-sort(fdr_fvals$qval, decreasing = T)
-
+if(!all(fdr_fvals$qval == 1)){ # Only plot if all q values are not 1
+  qq(fdr_fvals$qval, main = "q-values", las = 1)
+}
 
 dev.off()
 
@@ -238,7 +237,7 @@ summary(fdr_fvals$lfdr)
 # Join back to main dataframe
 sum_df$q_val <- fdr_fvals$qval
 sum_df_long_w_preds <- dplyr::left_join(sum_df_long_w_preds,
-                                        dplyr::select(sum_df, snp, q_val),
+                                        dplyr::select(sum_df, snp, q_val, p_val_gen_int),
                                         by = "snp")
 summary(sum_df_long_w_preds$q_val)
 
@@ -286,7 +285,7 @@ man_df$color <- "steelblue2"
 
 # Start plot
 ggplot(man_df, aes(x = index, 
-                   y = -log10(q_val),
+                   y = -log10(p_val_gen_int),
                    label = SNP)) +
   
   # Vertical lines
@@ -314,8 +313,8 @@ ggplot(man_df, aes(x = index,
 scale_x_continuous(expand = c(0.00, 0.00), 
                    breaks = x_axis_breaks$index,
                    labels = x_axis_breaks$chrom) + 
-  scale_y_continuous(breaks = seq(0, 18, 2), limits = c(0, 17)) + 
-  ylab("-log10(q-value)") + 
+ # scale_y_continuous(breaks = seq(0, 18, 2), limits = c(0, 17)) + 
+  ylab("-log10(p-value)") + 
   xlab("Chromosome") + 
   theme_bw(8) + 
   theme(panel.border = element_blank(), panel.grid.major = element_blank(),
@@ -340,7 +339,7 @@ gen_dat_moms <- dplyr::select(gen_dat, accession, snp_col_names)
 dim(gen_dat_moms)
 
 # Choose SNPs
-n_snps_values <- round(c(seq(100, nrow(sum_df), length.out = 8)))
+n_snps_values <- round(c(seq(100, nrow(sum_df), length.out = 20)))
 
 # Initialize dataframe for output
 prs_df_summary <- tibble(n_snps = n_snps_values,
@@ -442,7 +441,7 @@ for(snp_name in snp_list_ordered){
               dplyr::select(gen_dat_moms, accession, prs_training_by_count), by = "accession")
     
     # Scale prs
-    test2$prs_training_scaled <- (test2$prs_training_by_count - mean(test2$prs_training_by_count)) / sd(test2$prs_by_count)
+    test2$prs_training_scaled <- (test2$prs_training_by_count - mean(test2$prs_training_by_count)) / sd(test2$prs_training_by_count)
     
 
     # Set up model terms
@@ -512,15 +511,23 @@ top_r2_index <- which(prs_df_summary$r2_training == max(prs_df_summary$r2_traini
 # Set top PRS
 gen_dat_moms$prs_best <- gen_dat_moms[, paste0("prs_",
                                                prs_df_summary$n_snps[top_r2_index])]
+gen_dat_moms$prs_training_best <- gen_dat_moms[, paste0("prs_training_",
+                                               prs_df_summary$n_snps[top_r2_index])]
 
-
+# Scale PRS scores
 prs_best_mean <- mean(gen_dat_moms$prs_best)
 prs_best_sd <- sd(gen_dat_moms$prs_best)
 gen_dat_moms$prs_best_unscaled <- gen_dat_moms$prs_best
 gen_dat_moms$prs_best_scaled <- (gen_dat_moms$prs_best - prs_best_mean) / prs_best_sd
 
-
 summary(gen_dat_moms$prs_best_scaled); hist(gen_dat_moms$prs_best_scaled, breaks = 50)
+
+prs_training_best_mean <- mean(gen_dat_moms$prs_training_best)
+prs_training_best_sd <- sd(gen_dat_moms$prs_training_best)
+gen_dat_moms$prs_training_best_unscaled <- gen_dat_moms$prs_training_best
+gen_dat_moms$prs_training_best_scaled <- (gen_dat_moms$prs_training_best - prs_training_best_mean) / prs_training_best_sd
+
+summary(gen_dat_moms$prs_training_best_scaled); hist(gen_dat_moms$prs_training_best_scaled, breaks = 50)
 
 
 
@@ -608,9 +615,14 @@ sink()
 #### Testing
 dat_snp_testing2 <- dat_snp_testing %>%
   #  dplyr::mutate(accession = as.numeric(as.character(accession))) %>%
-  dplyr::left_join(.,  dplyr::select(gen_dat_moms, accession, prs_best, prs_best_scaled))
+  dplyr::left_join(.,  dplyr::select(gen_dat_moms, accession, prs_best, prs_training_best_scaled))
 
 dim(dat_snp_testing2)
+
+# Set formula
+fixed_effects <- paste0(paste0("rgr_resids ~ s(prs_training_best_scaled, bs=\"cr\") + 
+                               s(tmax_dif, by = prs_training_best_scaled, bs=\"cr\")"))
+
 
 # Gam with interaction effect
 gam_prs_testing = bam(formula = formula(fixed_effects),
@@ -712,50 +724,50 @@ ggsave(filename = paste0("./figures/prs growth ",n_sites, "_sites_", Sys.Date(),
 
 
 ## Block effects - missing tmax effect
-block_pred <- visreg(gam_snp_all, xvar = "section_block",
-                     cond=list(tmax_dif=0))$fit
-
-for(i in 1:nrow(block_pred)){
-  site_effect_temp <- ifelse(grepl(pattern = "^1", 
-                                   block_pred$section_block[i]),
-                             yes = site_effect[1],
-                             no = site_effect[2])
-  
-  block_pred$truth[i] <-1 +  block_effect[block_pred$section_block[i]] +
-    site_effect_temp + 
-    accession_effect[block_pred$accession[i]]
-}
-
-ggplot(block_pred, aes(section_block, visregFit)) + 
-  geom_point() + 
-  geom_errorbar(aes(ymin = visregLwr, ymax = visregUpr), width = .1) + 
-  geom_point(aes(section_block, truth), col = "red", size = 2) + 
-  ylab("RGR") + 
-  theme_bw(15)
-
-
-# Accession predictions
-accession_pred <- visreg(gam_snp_all, xvar = "accession",
-                         cond=list(tmax_dif=0))$fit
-
-for(i in 1:nrow(accession_pred)){
-  site_effect_temp <- ifelse(grepl(pattern = "^1", 
-                                   accession_pred$section_block[i]),
-                             yes = site_effect[1],
-                             no = site_effect[2])
-  
-  accession_pred$truth[i] <- 1 + 
-    block_effect[accession_pred$section_block[i]] +
-    site_effect_temp + 
-    accession_effect[accession_pred$accession[i]]
-}
-
-ggplot(accession_pred, aes(accession, visregFit)) + 
-  geom_point() + 
-  geom_errorbar(aes(ymin = visregLwr, ymax = visregUpr), width = .1) + 
-  geom_point(aes(accession, truth), col = "red", size = 2) + 
-  ylab("RGR") + 
-  theme_bw(15)
+#block_pred <- visreg(gam_snp_all, xvar = "section_block",
+#                     cond=list(tmax_dif=0))$fit
+#
+#for(i in 1:nrow(block_pred)){
+#  site_effect_temp <- ifelse(grepl(pattern = "^1", 
+#                                   block_pred$section_block[i]),
+#                             yes = site_effect[1],
+#                             no = site_effect[2])
+#  
+#  block_pred$truth[i] <-1 +  block_effect[block_pred$section_block[i]] +
+#    site_effect_temp + 
+#    accession_effect[block_pred$accession[i]]
+#}
+#
+#ggplot(block_pred, aes(section_block, visregFit)) + 
+#  geom_point() + 
+#  geom_errorbar(aes(ymin = visregLwr, ymax = visregUpr), width = .1) + 
+#  geom_point(aes(section_block, truth), col = "red", size = 2) + 
+#  ylab("RGR") + 
+#  theme_bw(15)
+#
+#
+## Accession predictions
+#accession_pred <- visreg(gam_snp_all, xvar = "accession",
+#                         cond=list(tmax_dif=0))$fit
+#
+#for(i in 1:nrow(accession_pred)){
+#  site_effect_temp <- ifelse(grepl(pattern = "^1", 
+#                                   accession_pred$section_block[i]),
+#                             yes = site_effect[1],
+#                             no = site_effect[2])
+#  
+#  accession_pred$truth[i] <- 1 + 
+#    block_effect[accession_pred$section_block[i]] +
+#    site_effect_temp + 
+#    accession_effect[accession_pred$accession[i]]
+#}
+#
+#ggplot(accession_pred, aes(accession, visregFit)) + 
+#  geom_point() + 
+#  geom_errorbar(aes(ymin = visregLwr, ymax = visregUpr), width = .1) + 
+#  geom_point(aes(accession, truth), col = "red", size = 2) + 
+#  ylab("RGR") + 
+#  theme_bw(15)
 
 
 
@@ -768,43 +780,43 @@ col <- ifelse(acc_prs$accession %in% training_moms, "steelblue", "coral")
 
 
 png(paste0("./figures/GAM correlation with true GEBV ", 
-                     n_sites, "_sites.png"), width = 8, height = 5, units = "in", res = 300)
-plot(scale(acc_prs$prs_true), gen_dat_moms$prs_best_scaled, pch = 19,
-     xlab = "GEBV True", ylab = "GEBV Estimated", col = col)
-abline(a = 0, b = 1, lwd = 2)
+                     n_sites, "_sites.png"), width = 16, height = 5, units = "in", res = 300)
 
-cor_overall <- cor(acc_prs$prs_true, gen_dat_moms$prs_best_scaled)
-cor_training <- cor(acc_prs$prs_true[acc_prs$accession %in% training_moms], 
-                    gen_dat_moms$prs_best_scaled[gen_dat_moms$accession %in% training_moms])
-cor_testing <- cor(acc_prs$prs_true[!acc_prs$accession %in% training_moms], 
-                   gen_dat_moms$prs_best_scaled[!gen_dat_moms$accession %in% training_moms])
+par(mfrow = c(1,2))
+
+# First plot is overall with full model (no training and testing)
+  plot(scale(acc_prs$prs_true), gen_dat_moms$prs_best_scaled, pch = 19,
+       xlab = "GEBV True", ylab = "GEBV Estimated", col = "black")
+  abline(a = 0, b = 1, lwd = 2)
+
+  cor_overall <- cor(acc_prs$prs_true, gen_dat_moms$prs_best_scaled)
+
+  legend("bottomright", legend = c(paste0("R = ", round(cor_overall, 3))),
+          col = c("black"), pch = 19)
 
 
-legend("bottomright", legend = c(paste0("R = ", round(cor_overall, 3)),
-                                  paste0("R = ", round(cor_training, 3)),
-                                  paste0("R = ", round(cor_testing, 3))),
-        col = c("black", "steelblue", "coral"), pch = 19)
+## Second plot is focusing on training vs. testing
+  plot(scale(acc_prs$prs_true), gen_dat_moms$prs_training_best_scaled, pch = 19,
+       xlab = "GEBV True", ylab = "GEBV Estimated in Training model", col = col)
+  abline(a = 0, b = 1, lwd = 2)
 
-        
+  cor_overall <- cor(acc_prs$prs_true, gen_dat_moms$prs_training_best_scaled)
+  cor_training <- cor(acc_prs$prs_true[acc_prs$accession %in% training_moms], 
+                      gen_dat_moms$prs_training_best_scaled[gen_dat_moms$accession %in% training_moms])
+  cor_testing <- cor(acc_prs$prs_true[!acc_prs$accession %in% training_moms], 
+                     gen_dat_moms$prs_training_best_scaled[!gen_dat_moms$accession %in% training_moms])
+
+
+  legend("bottomright", legend = c(paste0("R = ", round(cor_overall, 3)),
+                                    paste0("R = ", round(cor_training, 3)),
+                                    paste0("R = ", round(cor_testing, 3))),
+          col = c("black", "steelblue", "coral"), pch = 19)
+
+
+par(mfrow = c(1,1))
+      
 dev.off() 
 
-
-
-## Only training moms
-plot(scale(acc_prs$prs_true[acc_prs$accession %in% training_moms]),
-     gen_dat_moms$prs_best_scaled[gen_dat_moms$accession %in% training_moms], pch = 19,
-     xlab = "GEBV True", ylab = "GEBV Estimated")
-abline(a = 0, b = 1, lwd = 2)
-cor.test(acc_prs$prs_true[acc_prs$accession %in% training_moms], 
-         gen_dat_moms$prs_best_scaled[gen_dat_moms$accession %in% training_moms])
-
-## Only testing moms
-plot(scale(acc_prs$prs_true[!acc_prs$accession %in% training_moms]),
-     gen_dat_moms$prs_best_scaled[!gen_dat_moms$accession %in% training_moms], pch = 19,
-     xlab = "GEBV True", ylab = "GEBV Estimated")
-abline(a = 0, b = 1, lwd = 2)
-cor.test(acc_prs$prs_true[!acc_prs$accession %in% training_moms], 
-         gen_dat_moms$prs_best_scaled[!gen_dat_moms$accession %in% training_moms])
 
 
 # Correlate p value with estimated effect size
@@ -837,13 +849,25 @@ gam_acc <- bam(rgr ~ section_block + s(tmax_dif, bs = "cr") + s(accession, bs = 
 
 # summary(gam_acc)
 
+## Doing the same with a quadratic function
+gam_acc_quad <- lmer(rgr ~ section_block + tmax_dif + I(tmax_dif^2) + 
+                       + (tmax_dif | accession),
+                     data = sim_dat)
+
+summary(gam_acc_quad)
+
+visreg(gam_acc_quad, partial = F)
+
+
 ## Calculate RGR at tmax > 0 based on individual accession curves
 # Make dataframe to save 'true' GEBV
 acc_rgr_absolute <- data.frame(accession = NA, 
-                               height_change_warmer = NA) 
+                               height_change_warmer = NA,
+                               height_change_warmer_quad = NA) 
 
-plot = FALSE
+plot = F
 x = 1
+
 for(acc in names(tmax_opt)){
   
   cat("Working on accession:", acc, "... \n")
@@ -865,24 +889,32 @@ for(acc in names(tmax_opt)){
                            PC1_gen = 0, PC2_gen = 0)
   
   pred_acc <- left_join(pred_acc, expand.grid(accession = acc,
-                                              # tmax_dif= c(seq(min(sim_dat$tmax_dif),
-                                              #                max(sim_dat$tmax_dif),
-                                              #                length.out = 150))))
-                                              
-                                              tmax_dif= c(seq(-10,
-                                                              10,
-                                                              length.out = 150))))
+                                              tmax_dif= c(seq(min(sim_dat$tmax_dif),
+                                                              max(sim_dat$tmax_dif),
+                                                              by = 0.1))))
+  
+  pred_acc$tmax_dif_scaled <- ( pred_acc$tmax_dif - mean(sim_dat$tmax_dif)) / sd(sim_dat$tmax_dif)
+  
+  
   
   pred_acc$preds <- predict(gam_acc, newdata = pred_acc)
+  pred_acc$preds_quad <- predict(gam_acc_quad, newdata = pred_acc)
   
   ## Scaled plot
   if(acc %in% names(tmax_opt) && plot){
+    
+    # Plot GAM curve
     plot(pred_acc$tmax_dif, 
          scales::rescale(pred_acc$preds, c(0, 1)), 
          type  = "l", lwd = 1.5, las = 1,
          ylab = "Scaled RGR effect", xlab = "Tmax dif",
          main = paste0("Accession: ", acc))
-    abline(vline = 0, lty = 2)
+    abline(v = 0, lty = 2)
+    
+    # Plot Quad curve
+    lines(pred_acc$tmax_dif,
+          scales::rescale(pred_acc$preds_quad, c(0, 1)),
+          lty = 2, col = "red")
     
     # Calculate 'true' transfer function
     truth <-  dnorm(pred_acc$tmax_dif,
@@ -899,6 +931,7 @@ for(acc in names(tmax_opt)){
   
   acc_rgr_absolute[x, "accession"] <- acc
   acc_rgr_absolute[x, "height_change_warmer"] <- mean(pred_acc$preds[pred_acc$tmax_dif > 0])
+  acc_rgr_absolute[x, "height_change_warmer_quad"] <- mean(pred_acc$preds_quad[pred_acc$tmax_dif > 0])
   acc_rgr_absolute[x, "tmax_opt"] <- pred_acc$tmax_dif[which(pred_acc$preds == 
                                                                max(pred_acc$preds))]
   x = x + 1
@@ -907,22 +940,19 @@ for(acc in names(tmax_opt)){
 
 acc_rgr_absolute
 
-## Compare estimated and 'true' values of tmax_opt
-# plot(tmax_opt, acc_rgr_absolute$tmax_opt, pch = 19)
-# cor.test(tmax_opt, acc_rgr_absolute$tmax_opt)
-# abline(a = 0, b = 1 , lwd = 2)
-
 # Comapre with true values of gebv
 plot(acc_prs$prs_true, acc_rgr_absolute$height_change_warmer, pch = 19)
 cor.test(acc_prs$prs_true, acc_rgr_absolute$height_change_warmer)
 abline(a = 0, b = 1 , lwd = 2)
 
+plot(acc_prs$prs_true, acc_rgr_absolute$height_change_warmer_quad, pch = 19)
+cor.test(acc_prs$prs_true, acc_rgr_absolute$height_change_warmer_quad)
 
-plot(acc_rgr_absolute$tmax_opt, acc_rgr_absolute$height_change_warmer, pch = 19)
-cor.test(acc_rgr_absolute$tmax_opt,
-         acc_rgr_absolute$height_change_warmer)
-abline(a = 0, b = 1 , lwd = 2)
-
+# Compare GAM and quadtratic approaches
+plot( acc_rgr_absolute$height_change_warmer, 
+      acc_rgr_absolute$height_change_warmer_quad, pch = 19)
+cor.test(acc_rgr_absolute$height_change_warmer,
+         acc_rgr_absolute$height_change_warmer_quad)
 
 
 ### Calculate BLUPs based on BGLR
@@ -943,8 +973,17 @@ abline(a = 0, b = 1 , lwd = 2)
  verbose <- F
  
  y = acc_rgr_absolute$height_change_warmer
+ y.quad = acc_rgr_absolute$height_change_warmer_quad
  summary(y)
- #  y = acc_rgr_absolute$tmax_opt
+ 
+ # Make training set
+ y.training <- y
+ y.training[!acc_rgr_absolute$accession %in% training_moms] <- NA # Set as NA those in the testing set
+ summary(y.training)
+ 
+ y.quad.training <- y
+ y.quad.training[!acc_rgr_absolute$accession %in% training_moms] <- NA # Set as NA those in the testing set
+ summary(y.quad.training)
  
  ## Model with SNP and methylation data
  mod.snp <-BGLR( y = y,
@@ -952,49 +991,117 @@ abline(a = 0, b = 1 , lwd = 2)
                  nIter = nIter, burnIn = burnIn,
                  saveAt='./bglr/', 
                  verbose = verbose)
+
+  mod.snp.training <-BGLR( y = y.training,
+                 ETA = list(list(K = A.snp, model = 'RKHS')),
+                 nIter = nIter, burnIn = burnIn,
+                 saveAt='./bglr/', 
+                 verbose = verbose)
+  
+  mod.snp.quad <-BGLR( y = y.quad,
+                  ETA = list(list(K = A.snp, model = 'RKHS')),
+                  nIter = nIter, burnIn = burnIn,
+                  saveAt='./bglr/', 
+                  verbose = verbose)
+  
+  mod.snp.quad.training <-BGLR( y = y.quad.training,
+                           ETA = list(list(K = A.snp, model = 'RKHS')),
+                           nIter = nIter, burnIn = burnIn,
+                           saveAt='./bglr/', 
+                           verbose = verbose)
  
- str(mod.snp)
- 
- # Variance explained
- 1 - mod.snp$varE/var(y)
- 
- 
- ## Compare estimated breeding values
+ ## Compare estimated breeding values to true breeding values
  bglr_gebv <- mod.snp$ETA[[1]]$u
+ bglr_gebv_training <- mod.snp.training$ETA[[1]]$u
  
- plot(scale(acc_prs$prs_true),  bglr_gebv, pch = 19,
-      xlab = "GEBV True", ylab = "GEBV Estimated (BLUP)", las = 1)
- #  abline(a = 0, b = 1, lwd = 2)
- cor.test(acc_prs$prs_true, bglr_gebv)
- cor.test(acc_prs$prs_true, bglr_gebv, method = "spearman")
- 
- 
+ bglr_gebv_quad <- mod.snp.quad$ETA[[1]]$u
+ bglr_gebv_quad_training <- mod.snp.quad.training$ETA[[1]]$u
  
  
  # Set colors for training and testing set
  col <- ifelse(acc_prs$accession %in% training_moms, "steelblue", "coral")
  
  
- png(paste0("./figures/BLUP correlation with true GEBV ", 
-                      n_sites, "_sites.png"), width = 8, height = 5, units = "in", res = 300)
  
- plot(scale(acc_prs$prs_true), scale(bglr_gebv), pch = 19,
-      xlab = "GEBV True", ylab = "GEBV Estimated (BLUP)", col = col)
+ ## For GAM BLUP approach
+ png(paste0("./figures/BLUP GAM correlation with true GEBV ", 
+                      n_sites, "_sites.png"), width = 16, height = 5, units = "in", res = 300)
+ 
+  par(mfrow = c(1,2))
+
+# First plot is overall with full model (no training and testing)
+  plot(scale(acc_prs$prs_true), scale(bglr_gebv), pch = 19,
+       xlab = "GEBV True", ylab = "GEBV Estimated (BLUP)", col = "black")
+  abline(a = 0, b = 1, lwd = 2)
+
+  cor_overall <- cor(acc_prs$prs_true, bglr_gebv)
+
+  legend("bottomright", legend = c(paste0("R = ", round(cor_overall, 3))),
+          col = c("black"), pch = 19)
+
+
+## Second plot is focusing on training vs. testing
+  plot(scale(acc_prs$prs_true), scale(bglr_gebv_training), pch = 19,
+       xlab = "GEBV True", ylab = "GEBV Estimated (BLUP) in Training model", col = col)
+  abline(a = 0, b = 1, lwd = 2)
+
+  cor_overall <- cor(acc_prs$prs_true, scale(bglr_gebv_training))
+  cor_training <- cor(acc_prs$prs_true[acc_prs$accession %in% training_moms], 
+                      scale(bglr_gebv_training)[gen_dat_moms$accession %in% training_moms])
+  cor_testing <- cor(acc_prs$prs_true[!acc_prs$accession %in% training_moms], 
+                     scale(bglr_gebv_training)[!gen_dat_moms$accession %in% training_moms])
+
+
+  legend("bottomright", legend = c(paste0("R = ", round(cor_overall, 3)),
+                                    paste0("R = ", round(cor_training, 3)),
+                                    paste0("R = ", round(cor_testing, 3))),
+          col = c("black", "steelblue", "coral"), pch = 19)
+
+
+  par(mfrow = c(1,1))
+
+ dev.off()     
+ 
+ 
+ 
+ ## For Quadratic BLUP approach
+ png(paste0("./figures/BLUP Quadratic correlation with true GEBV ", 
+            n_sites, "_sites.png"), width = 16, height = 5, units = "in", res = 300)
+ 
+ par(mfrow = c(1,2))
+ 
+ # First plot is overall with full model (no training and testing)
+ plot(scale(acc_prs$prs_true), scale(bglr_gebv_quad), pch = 19,
+      xlab = "GEBV True", ylab = "GEBV Estimated (BLUP Quad)", col = "black")
  abline(a = 0, b = 1, lwd = 2)
  
- cor_overall <- cor(acc_prs$prs_true, bglr_gebv)
+ cor_overall <- cor(acc_prs$prs_true, bglr_gebv_quad)
+ 
+ legend("bottomright", legend = c(paste0("R = ", round(cor_overall, 3))),
+        col = c("black"), pch = 19)
+ 
+ 
+ ## Second plot is focusing on training vs. testing
+ plot(scale(acc_prs$prs_true), scale(bglr_gebv_quad_training), pch = 19,
+      xlab = "GEBV True", ylab = "GEBV Estimated (BLUP) in Training model", col = col)
+ abline(a = 0, b = 1, lwd = 2)
+ 
+ cor_overall <- cor(acc_prs$prs_true, scale(bglr_gebv_quad_training))
  cor_training <- cor(acc_prs$prs_true[acc_prs$accession %in% training_moms], 
-                     bglr_gebv[gen_dat_moms$accession %in% training_moms])
+                     scale(bglr_gebv_quad_training)[gen_dat_moms$accession %in% training_moms])
  cor_testing <- cor(acc_prs$prs_true[!acc_prs$accession %in% training_moms], 
-                    bglr_gebv[!gen_dat_moms$accession %in% training_moms])
+                    scale(bglr_gebv_quad_training)[!gen_dat_moms$accession %in% training_moms])
  
  
  legend("bottomright", legend = c(paste0("R = ", round(cor_overall, 3)),
                                   paste0("R = ", round(cor_training, 3)),
                                   paste0("R = ", round(cor_testing, 3))),
         col = c("black", "steelblue", "coral"), pch = 19)
-
- dev.off()     
+ 
+ 
+ par(mfrow = c(1,1))
+ 
+ dev.off()   
  
  
  
@@ -1107,7 +1214,8 @@ abline(a = 0, b = 1 , lwd = 2)
  png(paste0("./figures/GAM and BLUP correlation with true GEBV ", 
                      n_sites, "_sites.png"), width = 10, height = 10, units = "in", res = 300)
  pairs.panels(data.frame(gebv_true = acc_prs$prs_true, 
-                         gebv_blup_BGLR = bglr_gebv, 
+                         gebv_blup_GAM = bglr_gebv, 
+                         gebv_blup_QUAD = bglr_gebv_quad, 
                        #  gev_blup_GAPIT = gapit_out$BLUP,
                          gebv_gam = gen_dat_moms$prs_best_scaled),
               ellipses = F)

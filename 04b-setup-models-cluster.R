@@ -317,11 +317,7 @@
   ## Original used in PNAS submission
   fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(accession, bs = \"re\") + s(locality, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\")  + s(tmax_sum_dif, by = PC1_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC2_gen, bs=\"cr\") + s(PC1_clim, bs=\"cr\") + s(PC2_clim, bs=\"cr\")  + s(tmax_sum_dif, by = PC1_clim, bs=\"cr\") + s(tmax_sum_dif, by = PC2_clim, bs=\"cr\")"))
   
-  
-  # Testing out removing family effects
-  fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\")"))
-  
-  
+
   # Gam with interaction effect
   gam_snp_all = bam(formula = formula(fixed_effects),
                     data = dat_snp_all,

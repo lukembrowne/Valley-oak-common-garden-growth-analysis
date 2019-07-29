@@ -595,32 +595,32 @@
       
       
       
-      # 70/30 sampling with family in both training and testing
-      set.seed(129)
-      
-     training_seedlings <-  caret::createDataPartition(
-                              factor(dat_gbs_all_clim$accession),
-                                 p = .70)$Resample1
-      
-      
-      ## Save two datasets for training and testing
-      dat_gbs_training_clim <- dat_gbs_all_clim[training_seedlings, ]
-      dat_gbs_testing_clim <- dat_gbs_all_clim[-training_seedlings, ]
-      
-      dim(dat_gbs_training_clim)
-      dim(dat_gbs_testing_clim)
-      
-      # Percentages of total
-      nrow(dat_gbs_training_clim)/nrow(dat_gbs_all_clim)
-      nrow(dat_gbs_testing_clim)/nrow(dat_gbs_all_clim)
-      
-      table(dat_gbs_testing_clim$section_block)
-      table(dat_gbs_testing_clim$locality)
-      table(dat_gbs_testing_clim$accession)
-      
-      table(dat_gbs_training_clim$section_block)
-      table(dat_gbs_training_clim$locality)
-      table(dat_gbs_training_clim$accession)
+     #  # 70/30 sampling with family in both training and testing
+     #  set.seed(129)
+     #  
+     # training_seedlings <-  caret::createDataPartition(
+     #                          factor(dat_gbs_all_clim$accession),
+     #                             p = .70)$Resample1
+     #  
+     #  
+     #  ## Save two datasets for training and testing
+     #  dat_gbs_training_clim <- dat_gbs_all_clim[training_seedlings, ]
+     #  dat_gbs_testing_clim <- dat_gbs_all_clim[-training_seedlings, ]
+     #  
+     #  dim(dat_gbs_training_clim)
+     #  dim(dat_gbs_testing_clim)
+     #  
+     #  # Percentages of total
+     #  nrow(dat_gbs_training_clim)/nrow(dat_gbs_all_clim)
+     #  nrow(dat_gbs_testing_clim)/nrow(dat_gbs_all_clim)
+     #  
+     #  table(dat_gbs_testing_clim$section_block)
+     #  table(dat_gbs_testing_clim$locality)
+     #  table(dat_gbs_testing_clim$accession)
+     #  
+     #  table(dat_gbs_training_clim$section_block)
+     #  table(dat_gbs_training_clim$locality)
+     #  table(dat_gbs_training_clim$accession)
       
       
 # Calculating difference in climate variables -----------------------------

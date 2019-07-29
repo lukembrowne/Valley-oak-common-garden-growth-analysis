@@ -474,8 +474,11 @@ back_transform <- function(x, var, means, sds){
   
   ## Calculate how much loss in height based on % decrease in RGR
   calc_height <- function(h0, mod, degree_increase, n_years){
-    h1 <- h0
-    cat("Height in year:", round(h1, 2), " : 0 with deg_increase: ", degree_increase, "... \n")
+   
+    
+     h1 <- h0
+    cat("Height in year zero:", round(h1, 2), " cm with a ", round(degree_increase, 2), 
+        " deg_increase: ... \n")
     
     for(year in 1:n_years){
       # Set prediction df
@@ -499,7 +502,7 @@ back_transform <- function(x, var, means, sds){
       
       rgr <- predict(gam_all, newdata = newdata2, type = "response")
       print(rgr)
-      h1 <- (exp(rgr * 3)) * h1
+      h1 <- exp(rgr + log(h1))
       
       cat("Height in year:", round(h1, 2), " : ", year, " with deg_increase: ", degree_increase, "... \n")
       
@@ -511,17 +514,18 @@ back_transform <- function(x, var, means, sds){
 
   h0 = 50
   
-  calc_height(h0 = h0, mod = gam_all, 
-              degree_increase = lgm_mean, 
-              n_years = 1)
+  # calc_height(h0 = h0, mod = gam_all, 
+  #             degree_increase = lgm_mean, 
+  #             n_years = 1)
   
+  # Compare these two outputs to determine how much height is lost due to ## % reduction in growth rates under warming climate scenario
   calc_height(h0 = h0, mod = gam_all, 
               degree_increase = 0, 
-              n_years = 1)
+              n_years = 3)
   
   calc_height(h0 = h0, mod = gam_all, 
               degree_increase = future_85_mean, 
-              n_years = 1)
+              n_years = 3)
   
   
   

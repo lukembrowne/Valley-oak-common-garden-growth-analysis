@@ -16,6 +16,7 @@ args<-commandArgs(trailingOnly=TRUE)
 print(args)
 
 n_sites <- as.numeric(args[1])
+qtl_ve <- as.numeric(args[2])
 
 # Experiment parameters
 n_accession <- 300
@@ -24,17 +25,15 @@ n_blocks <- 5 # This equals the number of seedlings / accession per site
 
 
 
-
 # QTL parameters
 r.snp <- 0.99   # Proportion of variance in trait explained by SNPs.
-d <- 0.99    # Proportion of additive genetic variance due to QTLs.
+d <- qtl_ve    # Proportion of additive genetic variance due to QTLs.
 n <- n_accession    # Number of samples.
-p <- 1000      # Number of markers (SNPs).
+p <- 12000      # Number of markers (SNPs).
 i <- seq(from = 1, to = p, length.out = 100)  # Indices of the QTLs ("causal variants").
 
 # Tmax optimum function parameters
 tmax_opt_sd <- 4
-
 
 # Set up main dataframe
 sim_dat <- expand.grid(site = as.character(1:n_sites),
@@ -74,6 +73,23 @@ table(sim_dat$site)
   
 # Simulate QTL - which is the optimum temperature for each genotype, determined by many loci
 
+    # Small script to simulated data that models the an idealized
+    # genome-wide association study, in which all single nucleotide
+    # polymorphisms (SNPs) have alternative alleles at high frequencies in
+    # the population (>5%), and all SNPs contribute some (small) amount of
+    # variation to the quantitative trait. The SNPs are divided into two
+    # sets: those that contribute a very small amount of variation, and
+    # those that contribute a larger amount of variable (these are the
+    # "QTLs"---quantitative trait loci).
+    #
+    # Adjust the five parameters below (r, d, n, p, i) to control how the
+    # data are enerated.
+    #
+    # Peter Carbonetto
+    # University of Chicago
+    # January 23, 2017
+    #
+    
   # GENERATE DATA SET
   # Generate the minor allele frequencies. They are uniformly
   # distributed on [0.05,0.5].
@@ -85,6 +101,7 @@ table(sim_dat$site)
     (runif(n*p) < maf)
   X.snp <- matrix(as.double(X.snp),n,p,byrow = TRUE)
   X.snp.unscaled <- X.snp
+  
   
   # Center the columns of X.
   rep.row <- function (x, n)
@@ -112,22 +129,37 @@ table(sim_dat$site)
                             c(var(X.snp %*% u.snp))))))^2
   u.snp    <- sqrt(sa.snp) * u.snp
 
-  u.snp <- 0 ## Only for major QTL
+  # Set polygenic effects to 0 if QTL variation explained is really high
+  if(qtl_ve == 0.99){
+    u.snp = rep(0,p)
+  }
   
+  if(qtl_ve == 0.01){
+    beta.snp = rep(0,p)
+  }
+
   # Generate the quantitative trait measurements.
   y.total <- c(X.snp %*% (u.snp + beta.snp) + rnorm(n))
   
   # Check that the data are simulated in the way we requested.
   var.snp <- c(var(X.snp %*% (u.snp + beta.snp))/var(y.total))
-  cat("Proportion of variance in Y explained by genotypes =  ",var.snp,"\n")
+  var.poly <- c(var(X.snp %*% (u.snp))/var(y.total))
+  var.qtl <- c(var(X.snp %*% (beta.snp))/var(y.total))
+  cat("Proportion of variance in Y explained by both polygenic and QTL effects =  ",var.snp,"\n")
+  cat("Proportion of variance in Y explained by polygenic effects =  ",var.poly,"\n")
+  cat("Proportion of variance in Y explained by QTL effects =  ",var.qtl,"\n")
+
+  # Print out summaries
+  summary(beta.snp)
+  summary(u.snp)
   
 
   
 # Generate tmax differences
-  site_temp <- seq(22.5, 37.5, length.out = n_sites)
+  site_temp <- seq(25, 35, length.out = n_sites)
   
   # Set temp of home site for accession - assuming here no correlation between level of adaptation and home temperature
-  accession_temp <- rnorm(n = n_accession, mean = 30, sd = 3)
+  accession_temp <- rnorm(n = n_accession, mean = 30, sd = 4)
   names(accession_temp) <- levels(sim_dat$accession)
   hist(accession_temp)
   summary(accession_temp)
@@ -137,7 +169,10 @@ table(sim_dat$site)
     sim_dat$tmax_dif[i] <- site_temp[sim_dat$site[i]] -  accession_temp[sim_dat$accession[i]] 
   }
   
-  hist(sim_dat$tmax_dif)
+  
+  # In supplementary section
+  hist(sim_dat$tmax_dif, breaks = 50, col = "steelblue2", xlab = "Tmax difference",
+       las = 1, main = "Histogram of simulated Tmax differences for 2 planting sites")
   
   
 # Use simulated phenotype as 'optimum' tmax_difs for growth response
@@ -164,7 +199,7 @@ table(sim_dat$site)
   sim_dat$tmax_dif_effect_scaled <- ((sim_dat$tmax_dif_effect - tmax_dif_effect_mean) / 
                                       tmax_dif_effect_sd )
   
-  # Divide by XXX to reduce effect size
+  # Divide by XXX to reduce overall effect size
   sim_dat$tmax_dif_effect_scaled <- sim_dat$tmax_dif_effect_scaled / 5
   summary(sim_dat$tmax_dif_effect_scaled)
   
@@ -179,7 +214,8 @@ table(sim_dat$site)
   acc_prs <- data.frame(accession = NA, 
                         prs_true = NA) 
   
-  plot_n <- sample(names(tmax_opt), size = 5)
+ # plot_n <- sample(names(tmax_opt), size = 5)
+  plot_n <- names(tmax_opt)
   already_plotted = FALSE
   x = 1
   for(acc in names(tmax_opt)){
@@ -195,23 +231,86 @@ table(sim_dat$site)
     
     ## Plot lines
     if(acc %in% plot_n && !already_plotted){
-      plot(tmax_seq, acc_preds, type = "l", col = rand_color, 
-           las = 1, xlab = "tmax_dif", ylab = "Marginal effect on RGR")
+      plot(tmax_seq, acc_preds, type = "l", col = rand_color, lwd =0.25,
+           las = 1, xlab = "Tmax difference", ylab = "Marginal effect on RGR")
       already_plotted = TRUE
     } else if (acc %in% plot_n && already_plotted) {
-      lines(tmax_seq, acc_preds, type = "l", col = rand_color)
+      lines(tmax_seq, acc_preds, type = "l", col = rand_color, lwd =0.25)
     }
     
     # Plot points where progeny lie
     if(acc %in% plot_n){
-      sub_progeny <- sim_dat[sim_dat$accession == acc, ]
-      points(sub_progeny$tmax_dif, sub_progeny$tmax_dif_effect, pch = 19, col = rand_color)
+      # sub_progeny <- sim_dat[sim_dat$accession == acc, ]
+      # points(sub_progeny$tmax_dif, sub_progeny$tmax_dif_effect, pch = 19, col = rand_color)
     }
     
     x = x + 1
   }
-
-  summary(acc_prs$prs_true)
+    
+    # Plot average species-wide response
+    lines(tmax_seq, dnorm(tmax_seq, 
+                          mean = mean(tmax_opt),
+                          sd = tmax_opt_sd), lwd = 3)
+    abline(v = 0, lwd = 2, lty = 2)
+    
+  
+    summary(acc_prs$prs_true)
+    
+  
+## Figure for supplement of how 'true' breeding value was calculated
+  fam1 <- dnorm(tmax_seq, 
+                mean = -5,
+                sd = tmax_opt_sd)
+  fam2 <- dnorm(tmax_seq, 
+                mean = 1,
+                sd = tmax_opt_sd)
+  plot(tmax_seq, fam1, type = "l", col = "blue", lty = 2,
+       las = 1, xlab = "Tmax difference", ylab = "Marginal effect on RGR")
+  # Bold lines used in calculation
+  lines(tmax_seq[tmax_seq > 0], fam1[tmax_seq > 0], col = "blue", lwd = 2)
+  # Add second family
+  lines(tmax_seq, fam2, type = "l", col = "red", lty = 2)
+  lines(tmax_seq[tmax_seq > 0], fam2[tmax_seq > 0], col = "red", lwd = 2)
+  abline(v = 0, lwd = 2, lty = 1)
+  
+  legend("topright", legend = c(paste0("BV = ", round(mean(fam1[tmax_seq > 0]), 3)),
+                                paste0("BV = ", round(mean(fam2[tmax_seq > 0]), 3))),
+                                lty = 1, 
+         col = c("blue", "red"), lwd = 2)
+  
+  
+  
+  ## Plot showing sampling design 
+  already_plotted = FALSE
+  x = 1
+  for(acc in sample(names(tmax_opt), 3)){
+    
+    acc_preds <-  dnorm(tmax_seq, 
+                        mean = tmax_opt[acc],
+                        sd = tmax_opt_sd)
+    rand_color <- c("black", "red", "blue")[x]
+    
+    ## Plot lines
+    if(!already_plotted){
+      plot(tmax_seq, acc_preds, type = "l", col = rand_color, lwd =0.25,
+           las = 1, xlab = "Tmax difference", ylab = "Marginal effect on RGR")
+      abline(v = 0, lty = 2)
+      already_plotted = TRUE
+    } else {
+      lines(tmax_seq, acc_preds, type = "l", col = rand_color, lwd =0.25)
+    }
+    
+    # Plot points where progeny lie
+      sub_progeny <- sim_dat[sim_dat$accession == acc, ]
+      points(sub_progeny$tmax_dif, sub_progeny$tmax_dif_effect, pch = 19, col = rand_color)
+      x = x+1
+  }
+  
+  
+  
+  
+  
+  
 
 
 # Simulate growth rates
@@ -223,7 +322,6 @@ table(sim_dat$site)
                      accession_effect[sim_dat$accession[i]] + 
                      sim_dat$tmax_dif_effect_scaled[i] + 
                      rnorm(n = 1, mean = 0, sd = .25)
-    
   }  
   
   
@@ -245,8 +343,22 @@ table(sim_dat$site)
 
  # visreg(gam, partial = F)
   
-  visreg(gam, partial = F, xvar = "tmax_dif", ylab = "RGR")
+
+  
+  
+# Compare model estimate to truth for supplementary material
+  par(mfrow = c(1, 2))
+  plot(tmax_seq,dnorm(tmax_seq, 
+                      mean = mean(tmax_opt),
+                      sd = tmax_opt_sd), type = "l", col = "black", lwd = 3,
+       las = 1, xlab = "Tmax difference", ylab = "Marginal effect on RGR",
+       main = "Simulated species-level response")
+  abline(v = 0, lwd = 2, lty = 2)
+  visreg(gam, partial = F, xvar = "tmax_dif", ylab = "Relative Growth Rate", rug = F,
+         xlab = "Tmax difference", main = "GAM estimated species-level response")
   abline(v = 0, lwd = 1.5)
+  
+  par(mfrow = c(1, 1))
   
 
   
@@ -470,7 +582,7 @@ table(sim_dat$site)
   folds <- NA
   
   ### Run full model and save out residuals for cluster analysis
-  fixed_effects <- paste0(paste0("rgr ~ section_block  + s(tmax_dif, bs=\"cr\") + s(accession, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\")  + s(tmax_dif, by = PC1_gen, bs=\"cr\") + s(tmax_dif, by = PC2_gen, bs=\"cr\")"))
+  fixed_effects <- paste0(paste0("rgr ~ section_block  + s(tmax_dif, bs=\"cr\") + s(accession, bs = \"re\")"))
   
   
   # Gam with interaction effect
