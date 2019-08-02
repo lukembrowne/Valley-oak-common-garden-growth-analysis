@@ -14,7 +14,7 @@
   # library(patchwork) # Installed on home directory
 
 # Load data
-  load("../gam_cluster_2019-02-26.Rdata")
+  load("../gam_cluster_2019-08-01.Rdata")
  
 ## Read in snps to skip
  # skip_these_SNPs <- read_csv("../skip_these_SNPs_2018_12_22.csv")
@@ -94,18 +94,30 @@
    
    ## Impute missing data to mean allele frequency - assumes genotypes are scaled
     dat_snp_training[is.na(dat_snp_training[, snp]), snp] <- 0
+    dat_snp_all[is.na(dat_snp_all[, snp]), snp] <- 0
      
   # Gam with interaction effect
     gam_snp_int = bam(
                  # formula = make_formula(fixed_effects_int, random_effects),
                    formula = formula(fixed_effects_resids),
-                  data = dat_snp_training,
-                  discrete = TRUE,
+                  data = dat_snp_all,
+               #   discrete = TRUE,
                   nthreads = 8,
                   method = "fREML")
                 #  family = "tw")
-1
+                
     print(summary(gam_snp_int))
+
+
+   # Gam with interaction effect on training data
+    gam_snp_int_training = bam(
+      formula = formula(fixed_effects_resids),
+      data = dat_snp_training,
+     # discrete = TRUE,
+      nthreads = 8,
+      method = "fREML")
+    
+    print(summary(gam_snp_int_training)) 
 
 
  ## Calculate decrease in deviance with SNP data  
@@ -126,6 +138,7 @@
    
   # Save deviance differences and Rsquared into model
     gam_snp_int_summary <- summary(gam_snp_int)
+    gam_snp_int_training_summary <- summary(gam_snp_int_training)
   #  gam_no_snp_summary  <- summary(gam_no_snp)
     
  #   gam_snp_int$dev_dif <- gam_snp_int_summary$dev - gam_no_snp_summary$dev
@@ -144,7 +157,16 @@
   # Make predictions
 
    # When SNPs are continuous, make own genotypes
-      gen_temp <- data.frame(accession = "1", 
+
+  gen_temp_all <- data.frame(accession = "1", 
+                   genotype = c(0, 1, 2),             
+                   genotype_scaled = c((0 - scaled_snps_means_all[snp]) /
+                                         scaled_snps_sds_all[snp],
+                                (1 - scaled_snps_means_all[snp]) / scaled_snps_sds_all[snp],
+                                (2 - scaled_snps_means_all[snp]) / scaled_snps_sds_all[snp]))
+
+
+      gen_temp_training <- data.frame(accession = "1", 
                  genotype = c(0, 1, 2),             
                	 genotype_scaled = c((0 - scaled_snps_means_training[snp]) /
                	                       scaled_snps_sds_training[snp],
@@ -152,7 +174,8 @@
                               (2 - scaled_snps_means_training[snp]) / scaled_snps_sds_training[snp]))
                  
       
-      pred_sub <- left_join(pred, gen_temp)
+      pred_sub <- left_join(pred, gen_temp_all)
+      pred_sub_training <- left_join(pred, gen_temp_training)
         
         
     # Make sure genotypes are represented and rename column      
@@ -168,6 +191,11 @@
       
   ## For SNPs as continuous
       pred_sub <-  pred_sub  %>%
+        dplyr::filter(genotype %in% pull(dat_snp_all_unscaled, snp)) %>%
+        dplyr::mutate(!!snp := genotype_scaled) %>% 
+        dplyr::mutate(genotype = as.character(genotype))
+
+      pred_sub_training <-  pred_sub_training  %>%
         dplyr::filter(genotype %in% pull(dat_snp_training_unscaled, snp)) %>%
         dplyr::mutate(!!snp := genotype_scaled) %>% 
         dplyr::mutate(genotype = as.character(genotype))
@@ -206,6 +234,24 @@
                             se = TRUE)
       pred_sub$pred <- gam_preds$fit
       pred_sub$se <- gam_preds$se.fit
+
+    # Training model  
+      gam_preds_training <-  predict(gam_snp_int_training, 
+                            newdata = pred_sub_training,
+                            type = "response",
+                            se = TRUE)
+      
+      
+      
+      pred_sub_training$pred_training <- gam_preds_training$fit
+      pred_sub_training$se_training <- gam_preds_training$se.fit
+      
+    # Join training data to full model predictions
+     pred_sub <-  dplyr::left_join(pred_sub,
+                                   dplyr::select(pred_sub_training, genotype,
+                                               tmax_sum_dif, pred_training,
+                                               se_training)) 
+      
 
      
 ### Training and testing validation
@@ -310,12 +356,14 @@
       
       # Deviance explained
       dev_explained = gam_snp_int_summary$dev.expl,
+      dev_explained_training = gam_snp_int_training_summary$dev.expl,
       
       # Difference in deviance
       dev_dif = gam_snp_int$dev_dif,
       
       # Rsquared adjusted
       rsq_adj = gam_snp_int_summary$r.sq,
+      rsq_adj_training = gam_snp_int_training_summary$r.sq,
       
       # Difference in r squared
       rsq_dif = gam_snp_int$rsq_dif,
@@ -323,7 +371,6 @@
       # # Use grep to look at the last number of the smooth summary table - 
       # # Should correspond to the genotype
        # # Returns NA if no match
-     
      p_val_gen_int = ifelse(length(gam_snp_int_summary$s.table[grep(pattern = ":snp_",                                            rownames(gam_snp_int_summary$s.table)), "p-value"]) == 0,
                               yes = NA,
                               no = gam_snp_int_summary$s.table[grep(pattern = ":snp_",
@@ -346,6 +393,30 @@
                             yes = NA,
                             no = gam_snp_int_summary$p.table[grep(pattern = "snp_",
                  rownames(gam_snp_int_summary$p.table)), "t value"]),
+     
+      ## Extract test statistics and p value for training model
+     p_val_gen_int_training = ifelse(length(gam_snp_int_training_summary$s.table[grep(pattern = ":snp_",                                            rownames(gam_snp_int_training_summary$s.table)), "p-value"]) == 0,
+                            yes = NA,
+                            no = gam_snp_int_training_summary$s.table[grep(pattern = ":snp_",
+                                                                  rownames(gam_snp_int_training_summary$s.table)), "p-value"]),
+     
+     ## F value for interaction term
+     f_val_gen_int_training = ifelse(length(gam_snp_int_training_summary$s.table[grep(pattern = ":snp_",                                            rownames(gam_snp_int_training_summary$s.table)), "F"]) == 0,
+                            yes = NA,
+                            no = gam_snp_int_training_summary$s.table[grep(pattern = ":snp_",
+                                                                  rownames(gam_snp_int_training_summary$s.table)), "F"]),
+     
+     # P and f value for main term
+     p_val_gen_main_training = ifelse(length(gam_snp_int_training_summary$p.table[grep(pattern = "snp_",                                            rownames(gam_snp_int_training_summary$p.table)), "Pr(>|t|)"]) == 0,
+                             yes = NA,
+                             no = gam_snp_int_training_summary$p.table[grep(pattern = "snp_",
+                                                                            rownames(gam_snp_int_training_summary$p.table)), "Pr(>|t|)"]),
+     
+     ## T value for main term
+     f_val_gen_main_training = ifelse(length(gam_snp_int_training_summary$p.table[grep(pattern = "snp_",                                            rownames(gam_snp_int_training_summary$p.table)), "t value"]) == 0,
+                             yes = NA,
+                             no = gam_snp_int_training_summary$p.table[grep(pattern = "snp_",
+                                                                   rownames(gam_snp_int_training_summary$p.table)), "t value"]),
      
      
      
@@ -374,7 +445,7 @@
    ## Write predictions to file
       pred_sub_out <- pred_sub %>%
         dplyr::mutate(snp = snp) %>%
-        dplyr::select(snp, tmax_sum_dif_unscaled, genotype, pred, se)
+        dplyr::select(snp, tmax_sum_dif_unscaled, genotype, pred, se, pred_training, se_training)
       
       write_csv(pred_sub_out, path = paste0("./model_predictions/gam_predictions_", task_id, ".csv"),
                append = append)

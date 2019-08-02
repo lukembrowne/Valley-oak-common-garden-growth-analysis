@@ -361,39 +361,39 @@
   ## Calculating MEMs / PCNM
     
   # Calculate distance matrix
-    library(geosphere)
-    
-    mom_lat_longs <- as.data.frame(dplyr::select(climate_gbs_mom, longitude, latitude))
-    dist_mat <- matrix(NA, ncol = nrow(climate_gbs_mom), nrow = nrow(climate_gbs_mom))
-    
-    for(i in 1:nrow(dist_mat)){
-      
-      if(i %% 50 == 0){
-        cat("Working on row:", i, " ... \n")
-      }
-      
-      for(j in 1:nrow(dist_mat)){
-        
-        dist_mat[i, j] <- distHaversine(mom_lat_longs[i, ], 
-                                        mom_lat_longs[j, ])/ 1000 # To convert to km
-        
-      }
-    }
-    
-    dist_mat[1:10, 1:10]
-    
-  mem = vegan::pcnm(dist_mat)  
-  
-  # Plot out MEMs
-  vegan::ordisurf(mom_lat_longs, mem$vectors[,1], bubble = 4, main = "PCNM 1")
-  vegan::ordisurf(mom_lat_longs, mem$vectors[,2], bubble = 4, main = "PCNM 2")
-    
-  mem$values # Eigenvalues
-  mem$vectors # Eigenvectors
-
-  ## Bind positive eigenvectors to climate dataset
-  climate_gbs_mom <- dplyr::bind_cols(climate_gbs_mom, as.data.frame(mem$vectors))
-  
+  #   library(geosphere)
+  #   
+  #   mom_lat_longs <- as.data.frame(dplyr::select(climate_gbs_mom, longitude, latitude))
+  #   dist_mat <- matrix(NA, ncol = nrow(climate_gbs_mom), nrow = nrow(climate_gbs_mom))
+  #   
+  #   for(i in 1:nrow(dist_mat)){
+  #     
+  #     if(i %% 50 == 0){
+  #       cat("Working on row:", i, " ... \n")
+  #     }
+  #     
+  #     for(j in 1:nrow(dist_mat)){
+  #       
+  #       dist_mat[i, j] <- distHaversine(mom_lat_longs[i, ], 
+  #                                       mom_lat_longs[j, ])/ 1000 # To convert to km
+  #       
+  #     }
+  #   }
+  #   
+  #   dist_mat[1:10, 1:10]
+  #   
+  # mem = vegan::pcnm(dist_mat)  
+  # 
+  # # Plot out MEMs
+  # vegan::ordisurf(mom_lat_longs, mem$vectors[,1], bubble = 4, main = "PCNM 1")
+  # vegan::ordisurf(mom_lat_longs, mem$vectors[,2], bubble = 4, main = "PCNM 2")
+  #   
+  # mem$values # Eigenvalues
+  # mem$vectors # Eigenvectors
+  # 
+  # ## Bind positive eigenvectors to climate dataset
+  # climate_gbs_mom <- dplyr::bind_cols(climate_gbs_mom, as.data.frame(mem$vectors))
+  # 
   
   ## Merge data to give climate of origin for each seedling
     dat_all_clim <- left_join(dat_all, climate_garden_mom, by = "accession")
@@ -559,6 +559,11 @@
       dim(dat_gbs_all_clim)
       
       
+      
+
+      
+      
+      
 # Select a subset of adults for taining and testing, CV Validation
       
       
@@ -593,35 +598,113 @@
       table(dat_gbs_training_clim$locality)
       table(dat_gbs_training_clim$accession)
       
+      unique(dat_gbs_testing_clim$accession) %in% unique(dat_gbs_training_clim$accession)
+      unique(dat_gbs_training_clim$accession) %in% unique(dat_gbs_testing_clim$accession)
+      sum(unique(dat_gbs_training_clim$accession) %in% unique(dat_gbs_testing_clim$accession))
       
       
-     #  # 70/30 sampling with family in both training and testing
-     #  set.seed(129)
-     #  
-     # training_seedlings <-  caret::createDataPartition(
-     #                          factor(dat_gbs_all_clim$accession),
-     #                             p = .70)$Resample1
-     #  
-     #  
-     #  ## Save two datasets for training and testing
-     #  dat_gbs_training_clim <- dat_gbs_all_clim[training_seedlings, ]
-     #  dat_gbs_testing_clim <- dat_gbs_all_clim[-training_seedlings, ]
-     #  
-     #  dim(dat_gbs_training_clim)
-     #  dim(dat_gbs_testing_clim)
-     #  
-     #  # Percentages of total
-     #  nrow(dat_gbs_training_clim)/nrow(dat_gbs_all_clim)
-     #  nrow(dat_gbs_testing_clim)/nrow(dat_gbs_all_clim)
-     #  
-     #  table(dat_gbs_testing_clim$section_block)
-     #  table(dat_gbs_testing_clim$locality)
-     #  table(dat_gbs_testing_clim$accession)
-     #  
-     #  table(dat_gbs_training_clim$section_block)
-     #  table(dat_gbs_training_clim$locality)
-     #  table(dat_gbs_training_clim$accession)
       
+      
+  # 70/30 sampling with family in both training and testing
+      set.seed(309)
+
+     training_seedlings <-  caret::createDataPartition(
+                              factor(dat_gbs_all_clim$accession),
+                                 p = .90)$Resample1
+
+
+      ## Save two datasets for training and testing
+      dat_gbs_training_clim <- dat_gbs_all_clim[training_seedlings, ]
+      dat_gbs_testing_clim <- dat_gbs_all_clim[-training_seedlings, ]
+
+      dim(dat_gbs_training_clim)
+      dim(dat_gbs_testing_clim)
+
+      # Percentages of total
+      nrow(dat_gbs_training_clim)/nrow(dat_gbs_all_clim)
+      nrow(dat_gbs_testing_clim)/nrow(dat_gbs_all_clim)
+
+      table(dat_gbs_testing_clim$section_block)
+      table(dat_gbs_testing_clim$locality)
+      table(dat_gbs_testing_clim$accession)
+
+      table(dat_gbs_training_clim$section_block)
+      table(dat_gbs_training_clim$locality)
+      table(dat_gbs_training_clim$accession)
+
+
+      unique(dat_gbs_testing_clim$accession) %in% unique(dat_gbs_training_clim$accession)
+      unique(dat_gbs_training_clim$accession) %in% unique(dat_gbs_testing_clim$accession)
+      
+      
+      
+ # 10 fold cross validation
+      set.seed(129)
+      
+      training_seedlings <-  caret::createFolds(factor(dat_gbs_all_clim$accession),
+                                                k = 2, returnTrain = T)[[1]]
+      
+      ## Save two datasets for training and testing
+      dat_gbs_training_clim <- dat_gbs_all_clim[training_seedlings, ]
+      dat_gbs_testing_clim <- dat_gbs_all_clim[-training_seedlings, ]
+      
+      dim(dat_gbs_training_clim)
+      dim(dat_gbs_testing_clim)
+      
+      # Percentages of total
+      nrow(dat_gbs_training_clim)/nrow(dat_gbs_all_clim)
+      nrow(dat_gbs_testing_clim)/nrow(dat_gbs_all_clim)
+
+      table(dat_gbs_training_clim$section_block)
+      table(dat_gbs_training_clim$locality)
+      table(dat_gbs_training_clim$accession)
+      
+      table(dat_gbs_testing_clim$section_block)
+      table(dat_gbs_testing_clim$locality)
+      table(dat_gbs_testing_clim$accession)
+      
+      unique(dat_gbs_testing_clim$accession) %in% unique(dat_gbs_training_clim$accession)
+      unique(dat_gbs_training_clim$accession) %in% unique(dat_gbs_testing_clim$accession)
+      
+      sum(unique(dat_gbs_testing_clim$accession) %in% unique(dat_gbs_training_clim$accession))
+      
+      
+      
+  # 10 fold cross validation - not across families
+      set.seed(129)
+      
+      training_moms_indices <-  caret::createFolds(na.omit(climate_gbs_mom$accession),
+                                                k = 10, returnTrain = T)[[1]]
+      
+      training_moms <- na.omit(climate_gbs_mom$accession)[training_moms_indices]
+      
+      ## Save two datasets for training and testing
+      dat_gbs_training_clim <- dat_gbs_all_clim[dat_gbs_all_clim$accession %in% training_moms, ]
+      dat_gbs_testing_clim <- dat_gbs_all_clim[!dat_gbs_all_clim$accession %in% training_moms, ]
+      
+      dim(dat_gbs_training_clim)
+      dim(dat_gbs_testing_clim)
+      
+      # Percentages of total
+      nrow(dat_gbs_training_clim)/nrow(dat_gbs_all_clim)
+      nrow(dat_gbs_testing_clim)/nrow(dat_gbs_all_clim)
+      
+      table(dat_gbs_training_clim$section_block)
+      table(dat_gbs_training_clim$locality)
+      table(dat_gbs_training_clim$accession)
+      
+      table(dat_gbs_testing_clim$section_block)
+      table(dat_gbs_testing_clim$locality)
+      table(dat_gbs_testing_clim$accession)
+      
+      unique(dat_gbs_testing_clim$accession) %in% unique(dat_gbs_training_clim$accession)
+      unique(dat_gbs_training_clim$accession) %in% unique(dat_gbs_testing_clim$accession)
+      
+      sum(unique(dat_gbs_testing_clim$accession) %in% unique(dat_gbs_training_clim$accession))    
+
+      
+      
+
       
 # Calculating difference in climate variables -----------------------------
 

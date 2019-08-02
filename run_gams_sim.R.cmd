@@ -18,7 +18,7 @@
 #  program output  = Specified by user program
 #  Threaded:     8-way threaded
 #  Resources requested
-#$ -l h_data=4096M,h_rt=01:00:00
+#$ -l h_data=4096M,h_rt=02:00:00
 # #
 #  Name of application for log
 #$ -v QQAPP=job
@@ -30,7 +30,7 @@
 #$ -r n
 #
 #  Job array indexes
-#$ -t 1-1000:25
+#$ -t 1-12000:100
 
 # Set variable that will be passed to R script
 # Interval needs to match what is set in Job array indexes
@@ -38,7 +38,7 @@
 #set run_label="XXX"
 #set data_file="XXX"
 
-set interval=25
+set interval=100
 set climate_var_dif='tmax_sum_dif'
 
 
