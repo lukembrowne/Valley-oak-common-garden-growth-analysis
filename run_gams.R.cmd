@@ -36,7 +36,7 @@
 # Set variable that will be passed to R script
 # Interval needs to match what is set in Job array indexes
 
-set run_label="rgr_fREML_discrete_v3_tw_genpc_cv_devdif_ld"
+set run_label="rgr_9010nofam"
 set interval=25
 set climate_var_dif='tmax_sum_dif'
 
@@ -81,7 +81,7 @@ set climate_var_dif='tmax_sum_dif'
 mkdir run_${JOB_ID}_${climate_var_dif}_{$run_label}
 cp ./run_gams.R ./run_${JOB_ID}_${climate_var_dif}_{$run_label}
 cp ./run_gams.R.cmd ./run_${JOB_ID}_${climate_var_dif}_{$run_label}
-cp ./gam_cluster_*.Rdata ./run_${JOB_ID}_${climate_var_dif}_{$run_label}
+cp ./gam_cluster_2*.Rdata ./run_${JOB_ID}_${climate_var_dif}_{$run_label}
 cd ./run_${JOB_ID}_${climate_var_dif}_{$run_label}
 mkdir R_output
 mkdir output

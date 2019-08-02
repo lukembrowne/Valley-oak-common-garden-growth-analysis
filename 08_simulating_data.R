@@ -1,7 +1,7 @@
 
 
 # Simulate data -------------------------------------------------------
-set.seed(129)
+
 
 # Load libraries
 library(mgcv, lib.loc = "/u/home/l/lukembro/R/x86_64-pc-linux-gnu-library/3.5") # Make sure to load latest version of mgcv
@@ -17,6 +17,9 @@ print(args)
 
 n_sites <- as.numeric(args[1])
 qtl_ve <- as.numeric(args[2])
+rep <- as.numeric(args[3])
+
+set.seed(rep) # Set seed based on rep
 
 # Experiment parameters
 n_accession <- 300
@@ -47,7 +50,7 @@ sim_dat$section_block <- factor(sim_dat$section_block)
 sim_dat$ID <- as.character(1:nrow(sim_dat))
 
 # table(sim_dat$accession, sim_dat$section_block)
-table(sim_dat$accession, sim_dat$site)
+# table(sim_dat$accession, sim_dat$site)
 table(sim_dat$site)
 
 
@@ -68,7 +71,7 @@ table(sim_dat$site)
   # accession
     accession_effect <- rnorm(n = n_accession, sd = .25)
     names(accession_effect) <- levels(sim_dat$accession)
-    accession_effect
+   # accession_effect
   
   
 # Simulate QTL - which is the optimum temperature for each genotype, determined by many loci
@@ -102,7 +105,6 @@ table(sim_dat$site)
   X.snp <- matrix(as.double(X.snp),n,p,byrow = TRUE)
   X.snp.unscaled <- X.snp
   
-  
   # Center the columns of X.
   rep.row <- function (x, n)
     matrix(x,n,length(x),byrow = TRUE)
@@ -131,9 +133,9 @@ table(sim_dat$site)
 
   # Set polygenic effects to 0 if QTL variation explained is really high
   if(qtl_ve == 0.99){
-    u.snp = rep(0,p)
+    u.snp = rep(0, p)
   }
-  
+
   if(qtl_ve == 0.01){
     beta.snp = rep(0,p)
   }
@@ -280,37 +282,6 @@ table(sim_dat$site)
   
   
   
-  ## Plot showing sampling design 
-  already_plotted = FALSE
-  x = 1
-  for(acc in sample(names(tmax_opt), 3)){
-    
-    acc_preds <-  dnorm(tmax_seq, 
-                        mean = tmax_opt[acc],
-                        sd = tmax_opt_sd)
-    rand_color <- c("black", "red", "blue")[x]
-    
-    ## Plot lines
-    if(!already_plotted){
-      plot(tmax_seq, acc_preds, type = "l", col = rand_color, lwd =0.25,
-           las = 1, xlab = "Tmax difference", ylab = "Marginal effect on RGR")
-      abline(v = 0, lty = 2)
-      already_plotted = TRUE
-    } else {
-      lines(tmax_seq, acc_preds, type = "l", col = rand_color, lwd =0.25)
-    }
-    
-    # Plot points where progeny lie
-      sub_progeny <- sim_dat[sim_dat$accession == acc, ]
-      points(sub_progeny$tmax_dif, sub_progeny$tmax_dif_effect, pch = 19, col = rand_color)
-      x = x+1
-  }
-  
-  
-  
-  
-  
-  
 
 
 # Simulate growth rates
@@ -427,7 +398,7 @@ table(sim_dat$site)
   pca_gen = prcomp(kin_mat, center = TRUE, scale = TRUE) ## PCA on kinship matrix
   
   # biplot(pca_gen)
-  summary(pca_gen)
+  # summary(pca_gen)
   #  screeplot(pca_gen, bstick = TRUE)
   
   ### Figure S3 - Plotting results of PCA for supplementary material
@@ -577,13 +548,11 @@ table(sim_dat$site)
   
   head(pred)
   
-  pred
-  
   folds <- NA
   
   ### Run full model and save out residuals for cluster analysis
   fixed_effects <- paste0(paste0("rgr ~ section_block  + s(tmax_dif, bs=\"cr\") + s(accession, bs = \"re\")"))
-  
+  # fixed_effects <- paste0(paste0("rgr ~ section_block + s(accession, bs = \"re\")"))
   
   # Gam with interaction effect
   gam_snp_all = bam(formula = formula(fixed_effects),

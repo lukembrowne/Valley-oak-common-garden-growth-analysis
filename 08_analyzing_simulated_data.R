@@ -218,11 +218,11 @@ hist(fdr_fvals$pval, breaks = 40, col = "steelblue2",
 qq(fdr_fvals$pval, main = "Uncorrected p-values", las = 1)
 
 # Q values
-hist(fdr_fvals$qval, breaks = 40, col = "steelblue2",
-     xlab = "q-value", main = "q-values", las = 1)
-if(!all(fdr_fvals$qval == 1)){ # Only plot if all q values are not 1
-  qq(fdr_fvals$qval, main = "q-values", las = 1)
-}
+#hist(fdr_fvals$qval, breaks = 40, col = "steelblue2",
+#     xlab = "q-value", main = "q-values", las = 1)
+#if(!all(fdr_fvals$qval == 1)){ # Only plot if all q values are not 1
+#  qq(fdr_fvals$qval, main = "q-values", las = 1)
+#}
 
 dev.off()
 
@@ -346,7 +346,7 @@ prs_df_summary <- tibble(n_snps = n_snps_values,
                          r2_training = NA)
 
 # Order snps based on lowest Q values
-snp_list_ordered <- sum_df$snp[order(sum_df$q_val)]
+snp_list_ordered <- sum_df$snp[order(sum_df$p_val_gen_int)]
 
 # Initialize
 gen_dat_moms$prs <- NULL
@@ -780,7 +780,7 @@ col <- ifelse(acc_prs$accession %in% training_moms, "steelblue", "coral")
 
 
 png(paste0("./figures/GAM correlation with true GEBV ", 
-                     n_sites, "_sites.png"), width = 16, height = 5, units = "in", res = 300)
+                     n_sites, "_sites.png"), width = 10, height = 4, units = "in", res = 300)
 
 par(mfrow = c(1,2))
 
@@ -1066,7 +1066,7 @@ cor.test(acc_rgr_absolute$height_change_warmer,
  
  ## For Quadratic BLUP approach
  png(paste0("./figures/BLUP Quadratic correlation with true GEBV ", 
-            n_sites, "_sites.png"), width = 16, height = 5, units = "in", res = 300)
+            n_sites, "_sites.png"), width = 10, height = 4, units = "in", res = 300)
  
  par(mfrow = c(1,2))
  
