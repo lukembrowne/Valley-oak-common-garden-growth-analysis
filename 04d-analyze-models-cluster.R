@@ -14,10 +14,13 @@
    
    path <- "run_493517_tmax_sum_dif_rgr_simplifiedresidmodel3"
    
-   path <- "run_500651_tmax_sum_dif_rgr_5050"
+   path <- "run_509026_tmax_sum_dif_rgr_10foldacrossfams"
   
   path_to_summaries <- paste0("./output/", path, "/model_summaries/")
   path_to_predictions <- paste0("./output/", path, "/model_predictions/")
+  
+  ## Load in data
+  load(paste0("./output/", path, "/gam_cluster_2019-08-03.Rdata"))
 
   
  # Read in files
@@ -26,7 +29,9 @@
     dim(sum_df_raw)
     sum_df_raw
     
+    head(sum_df_raw)
     summary(sum_df_raw)
+    str(sum_df_raw)
   
   
   ## Missing snps
@@ -40,25 +45,7 @@
     ## Write snps that were run to file to rerun missing snps on cluster
       # write_csv(data.frame(snp = snp_col_names[which(snp_col_names %in% sum_df_raw$snp)]),
       #           path = "./output/skip_these_SNPs_2018_12_28.csv")
-    
-  # Make sure columns are in right format
-    sum_df_raw <- sum_df_raw %>%
-      mutate(n_gen0 = as.numeric(n_gen0),
-             n_gen1 = as.numeric(n_gen1),
-             n_gen2 = as.numeric(n_gen2),
-             # height_change_gen_0 = as.numeric(height_change_gen_0),
-             # height_change_gen_1 = as.numeric(height_change_gen_1),
-             # height_change_gen_2 = as.numeric(height_change_gen_2),
-             # p_val_gen_0 = as.numeric(p_val_gen_0),
-             # p_val_gen_1 = as.numeric(p_val_gen_1),
-             # p_val_gen_2 = as.numeric(p_val_gen_2),
-             p_val_gen_int = as.numeric(p_val_gen_int),
-             cv_cor_gen_0 = as.numeric(cv_cor_gen_0),
-             cv_cor_gen_1 = as.numeric(cv_cor_gen_1),
-             cv_cor_gen_2 = as.numeric(cv_cor_gen_2))
-    
-    str(sum_df_raw)
-    
+ 
     
   # For backup
   sum_df <- sum_df_raw
@@ -88,74 +75,45 @@
   
   head(n_gen_long)
   
-  cv_cor_long <- sum_df %>%
-    dplyr::select(snp, cv_cor_gen_0, cv_cor_gen_1, cv_cor_gen_2) %>%
-    gather(key = "genotype", value = "cv_cor", -snp) %>%
-    mutate(genotype = gsub("cv_cor_gen_", "", genotype))
-  
-  head(cv_cor_long)
-  
-
 ## Join all long dataframes together
-  sum_df_long <- left_join(n_gen_long, cv_cor_long)
+  sum_df_long <- n_gen_long
   
   head(sum_df_long)
   dim(sum_df_long)
   str(sum_df_long)
   
- 
  # Filter out based on number of gene copies
     hist(sum_df_long$n_gen, breaks = 50)
 
-    gen_copies_thresh <- 1 # Used to be 100
-
-   sum_df_long <- sum_df_long %>%
-      dplyr::filter(n_gen >= gen_copies_thresh)
-    
-  ## Filter out heterozygotes?
-   table(sum_df_long$genotype)
-   # sum_df_long <- sum_df_long %>%
-  #    dplyr::filter(genotype != "1")
-  
-  ## Remove those that predictions weren't made on accession 1
-   # table(sum_df_long$acc_pred)
-   #  sum_df_long <- sum_df_long %>%
-   #    dplyr::filter(acc_pred == 1)
-    
-  # Subset prediction dataframe to just predictions of SNPs that pass filters
-    pred_df_sub <- pred_df_raw %>%
-      mutate(snp_gen = paste0(snp, genotype)) %>%
-      # Snp-genotype must be in sum_df_long dataframe
-      filter(snp_gen %in% paste0(sum_df_long$snp, sum_df_long$genotype)) 
-    
-    dim(pred_df_sub)
-    
-    
-    ## Calculate height change in warmer temperatures for each snp and genotype
-    base0 <- mean(pred_df_sub$pred[pred_df_sub$tmax_sum_dif_unscaled == 0])
-
-    pred_df_long =  pred_df_sub %>%
+  ## Calculate height change in warmer conditions  
+    pred_df_long =  pred_df_raw %>%
       dplyr::group_by(snp, genotype) %>%
       do(data.frame( 
-        #height_change_warmer = mean((.$pred[.$tmax_sum_dif_unscaled > 0]  -
-        #                                       .$pred[.$tmax_sum_dif_unscaled == 0] ) /
-        #                                  abs(.$pred[.$tmax_sum_dif_unscaled == 0]) ) * 100,
-        #            height_change_warmer_base0 = mean((.$pred[.$tmax_sum_dif_unscaled > 0]
-        #                                               - base0 ) /  abs(base0)) * 100,
-         height_change_warmer_absolute = mean(.$pred[.$tmax_sum_dif_unscaled > 0]),
-         height_change_warmer_absolute_training = mean(.$pred_training[.$tmax_sum_dif_unscaled > 0])))
+     height_change_warmer_absolute = mean(.$pred[.$tmax_sum_dif_unscaled > 0]),
+     height_change_warmer_absolute_fold1 = mean(.$pred_fold1[.$tmax_sum_dif_unscaled > 0]),
+     height_change_warmer_absolute_fold2 = mean(.$pred_fold2[.$tmax_sum_dif_unscaled > 0]),
+     height_change_warmer_absolute_fold3 = mean(.$pred_fold3[.$tmax_sum_dif_unscaled > 0]),
+     height_change_warmer_absolute_fold4 = mean(.$pred_fold4[.$tmax_sum_dif_unscaled > 0]),
+     height_change_warmer_absolute_fold5 = mean(.$pred_fold5[.$tmax_sum_dif_unscaled > 0]),
+     height_change_warmer_absolute_fold6 = mean(.$pred_fold6[.$tmax_sum_dif_unscaled > 0]),
+     height_change_warmer_absolute_fold7 = mean(.$pred_fold7[.$tmax_sum_dif_unscaled > 0]),
+     height_change_warmer_absolute_fold8 = mean(.$pred_fold8[.$tmax_sum_dif_unscaled > 0]),
+     height_change_warmer_absolute_fold9 = mean(.$pred_fold9[.$tmax_sum_dif_unscaled > 0]),
+     height_change_warmer_absolute_fold10 = mean(.$pred_fold10[.$tmax_sum_dif_unscaled > 0])
+     ))
     
     head(pred_df_long)
     dim(pred_df_long)
     
+    pred_df_long <- pred_df_long %>%
+      ungroup()
+    
     summary(pred_df_long$height_change_warmer_absolute)
-    summary(pred_df_long$height_change_warmer_absolute_training)
     
     plot(pred_df_long$height_change_warmer_absolute, 
-         pred_df_long$height_change_warmer_absolute_training)
+         pred_df_long$height_change_warmer_absolute_fold1)
     cor.test(pred_df_long$height_change_warmer_absolute, 
-             pred_df_long$height_change_warmer_absolute_training)
-    
+             pred_df_long$height_change_warmer_absolute_fold1)
   
  # Join prediction dataframe to summary dataframe
     sum_df_long_w_preds <- left_join(sum_df_long,
@@ -173,7 +131,7 @@
   #                statistic = "normal", plot = FALSE)
   
   fdr_fvals = fdrtool(c(sum_df$p_val_gen_int),
-                      statistic = "pvalue", plot = TRUE)
+                      statistic = "pvalue", plot = FALSE)
   # 
   # P values
   summary(fdr_fvals$pval)
@@ -222,38 +180,7 @@
   summary(sum_df_long_w_preds$q_val)
   
   
-  
-#    ## Plot interactions at particular genotype
-#    # pred_snp = dplyr::left_join(dplyr::select(man_df, SNP), pred_df_raw, by = c("SNP" = "snp"))
-#    # pred_snp <- pred_snp %>%
-#    #   rename(snp = SNP)
-#    # table(pred_snp$snp)
-#    # 
-#    # snp_filter = "snp_chr8_7837444" # For example of strong interaction
-#    # snp_filter = "snp_chr2_10328592"
-#    # pred_snp %>%
-#    #   dplyr::filter(snp == snp_filter)  %>%
-#    # ggplot(., aes(x = tmax_sum_dif_unscaled, y = pred, col = factor(genotype))) + 
-#    #   geom_vline(aes(xintercept = 0), lty = 2, size = .25) +
-#    #   geom_vline(xintercept = 4.8, size = .25) +
-#    #   geom_ribbon(aes(ymin = pred - 1.96*se, ymax = pred + 1.96 * se, fill = factor(genotype)), alpha = .15, color = NA,
-#    #               show.legend = F) +
-#    #   geom_line(alpha = 1,
-#    #             show.legend = T, size = 1) + 
-#    #   ylab(expression(Relative~growth~rate~(cm~cm^-1~yr^-1))) +
-#    #   xlab("Tmax transfer distance") +
-#    #   theme_bw(15) + 
-#    #   scale_x_continuous(breaks = c(-5, -2.5, 0, 2.5, 5, 7.5)) + 
-#    #   theme(panel.border = element_blank(), panel.grid.major = element_blank(),
-#    #         panel.grid.minor = element_blank(), 
-#    #         axis.line = element_line(colour = "black"))   + 
-#    #   labs(color = "Genotype")
-#    # 
-#    # sum_df_long_w_preds[sum_df_long_w_preds$snp == snp_filter,]
-#    # table(dat_snp[, snp_filter])
-#    
-   
-  
+
 # Figure 2 - Manhattan plot of Q values ---------------------------------------------------------
   
    man_df1 <- data.frame(SNP = snp_col_names, 
@@ -428,35 +355,227 @@
      #                      Sys.Date(), ".png"),
      #          width = 19, height = 4, units = "cm", dpi = 600)
 
-   #   # Save as PDF for legend
-   #   ggsave(paste0("./figs_tables/fig2/Figure 2 - manhattan plot growth predictions LEGEND",
-   #                 Sys.Date(), ".pdf"),
-   #          width = 10, height = 2)
-   # 
-   # 
-
-  
 
 # Calculate polygenic risk score ------------------------------------------
+   
+   ## Parallelize calculations across main calculations and folds
+   library(foreach)
+   library(doParallel)
+   cores=detectCores()
+   cl <- makeCluster(cores[1]-1) #not to overload your computer
+   registerDoParallel(cl)
+   
+   
+   # Calculate polygenic risk score for each maternal genotype
+   gen_dat_moms <- dplyr::select(gen_dat_clim, id, accession, snp_col_names)
+   dim(gen_dat_moms)
+   
+  # Define function that calculates GEBV 
+   calc_gebv <- function(){
+     
+     # Choose SNPs
+     n_snps_values <- c(100, 500, seq(1000, 12000, by = 1000), nrow(sum_df))
+     
+     # Initialize dataframe for output
+     gebv_df_summary <- tibble(n_snps = n_snps_values,
+                               fold = fold,
+                               r2 = NA)
+     
+     # Order snps based on lowest P values
+     if(fold == 0 ){ # If main model with full dataset
+       snp_list_ordered <- sum_df$snp[order(sum_df$p_val_gen_int)]
+     } else {
+       snp_list_ordered <- sum_df$snp[order(sum_df[paste0("p_val_gen_int_fold", fold)])]
+     }
+     
+     # Initialize
+     gebv <- NULL
+     gebv_count <- NULL
+
+     # Initialize counter
+     x = 1
+     
+     for(snp_name in snp_list_ordered){
+       
+       if(x %% 500 == 0){
+         cat("Working on snp number: ", x, "... \n")
+       }
+       
+       # Subset to genotypes
+       sub <- gen_dat_moms[ , snp_name]
+       
+       # If main model with full dataset
+       if(fold == 0 ){ 
+         preds_sub <- dplyr::filter(sum_df_long_w_preds, snp == snp_name) %>%
+           dplyr::select(genotype, height_change_warmer_absolute)
+       } else {
+         preds_sub <- dplyr::filter(sum_df_long_w_preds, snp == snp_name) %>%
+           dplyr::select(genotype, paste0("height_change_warmer_absolute_fold", fold)) %>%
+           dplyr::rename(height_change_warmer_absolute =  
+                           paste0("height_change_warmer_absolute_fold", fold))
+       }
+      
+       counted <- preds_sub$genotype
+       
+       # Add in median value for missing genotypes
+       if(!"0" %in% preds_sub$genotype){
+         preds_sub <- rbind(preds_sub, data.frame(genotype = "0",
+                                                  height_change_warmer_absolute = 0))
+       }
+       if(!"1" %in% preds_sub$genotype){
+         preds_sub <- rbind(preds_sub, data.frame(genotype = "1",
+                                                  height_change_warmer_absolute = 0))
+       }
+       if(!"2" %in% preds_sub$genotype){
+         preds_sub <- rbind(preds_sub, data.frame(genotype = "2",
+                                                  height_change_warmer_absolute = 0))
+       }
+       
+       gebv_temp <-  case_when(
+         sub == "0" ~ preds_sub$height_change_warmer_absolute[preds_sub$genotype == "0"],
+         sub == "1"  ~ preds_sub$height_change_warmer_absolute[preds_sub$genotype == "1"],
+         sub == "2"  ~ preds_sub$height_change_warmer_absolute[preds_sub$genotype == "2"],
+         TRUE ~ 0 # When individual has missing data
+       )
+
+       gebv_count_temp <- ifelse(as.data.frame(sub)[, 1] %in% counted, yes = 1, no = 0)
+
+       if(x == 1){
+         gebv <- gebv_temp
+         gebv_count <- gebv_count_temp
+       } else {
+        gebv <- gebv + gebv_temp
+        gebv_count <- gebv_count + gebv_count_temp
+       }
+       
+       if(x %in% n_snps_values | x == length(snp_list_ordered)){
+         cat("\n||--------------------------------||\n")
+         cat("Running model for:", x, " SNPS... \n")
+         
+         # Adjust for missing data
+         gebv_by_count <- gebv / gebv_count
+
+         ### Join to Testing dataframe
+         if(fold == 0 ){
+           dat_snp_testing <- dat_snp_all[, c("accession" ,"rgr_resids",
+                                              "tmax_sum_dif")]
+         } else {
+         dat_snp_testing <- dat_snp_all[-training_folds[[fold]], c("accession" ,"rgr_resids",
+                                                                   "tmax_sum_dif")]
+         }
+         
+         # Convert accession to numeric
+         dat_snp_testing$accession <- as.numeric(as.character(dat_snp_testing$accession))
+         
+         # Join gebv to testing dataframe
+         dat_snp_testing <- dplyr::left_join(dat_snp_testing, 
+                            cbind(gen_dat_moms[ ,"accession"], gebv_by_count))  
+         
+         # Scale GEBV
+         dat_snp_testing$gebv_by_count <- scale(dat_snp_testing$gebv_by_count)
+                                             
+         # Set up model terms
+         fixed_effects_resids <- paste0(paste0("rgr_resids ~ s(gebv_by_count, bs=\"cr\") + 
+                                               s(tmax_sum_dif, by = gebv_by_count, bs=\"cr\")"))
+         
+         # Gam with interaction effect
+         gam_test_resids = bam(formula = formula(fixed_effects_resids),
+                               data = dat_snp_testing,
+                               discrete = FALSE, 
+                               nthreads = 8,
+                           #    method = "fREML",
+                               method = "GACV.Cp")
+         
+         print(summary(gam_test_resids))
+         
+         # Plot visualization
+         # title <-  paste(" # SNPS: ", x)
+         # visreg(gam_test_resids, xvar = "tmax_sum_dif", by = "gebv_by_count",
+         #        partial = F, overlay = T, main = title)
+         # 
+         # cat(paste(title, "\n"))
+         
+         
+         ## Save results   
+         gebv_df_summary$r2[gebv_df_summary$n_snps == x] <- summary(gam_test_resids)$r.sq
+         
+       } # End model loop
+       
+       x = x + 1 # Move onto next SNP
+       
+     } # End snp loop
+     
+     return(gebv_df_summary) # Return summary df as output of loop
+     
+   } # End calc_gebv function
+   
+
+   ## Run parallelized funtion to calculate gebv for each fold and 
+   gebv_df_summary <- foreach(fold=0:10, 
+                   .packages = c("tidyverse", "mgcv"),
+                   .combine = rbind) %dopar% {
+     calc_gebv() # call function
+   }
+   
+   gebv_df_summary
+   
+   gebv_df_summary %>%
+     arrange(desc(r2))
+   
+   gebv_df_summary %>%
+     group_by(fold) %>%
+     summarise_all(max)
+   
+   gebv_df_summary %>%
+     group_by(fold) %>%
+     summarise_all(max) %>%
+     filter(fold != 0) %>%
+     ungroup() %>%
+     summarise_all(mean)
+   
+   ## Plot relationship between # of SNPS used and variance explained in testing set
+   ggplot(gebv_df_summary, aes(x = n_snps, y = r2, col = factor(fold))) + 
+     geom_point(size = 2) + 
+     geom_line() + 
+     xlab("Number of SNPs in GEBV estimation") +
+     #ylab("R2 adjusted in testing set") +
+     ylab(bquote('R'^2[adj]~'training test')) +
+     scale_x_continuous(breaks = gebv_df_summary$n_snps) +
+     # scale_y_continuous(breaks = seq(0, 0.02, by = 0.0025), limits = c(-0.0015, 0.015)) + 
+     theme_bw(7) + 
+     geom_hline(yintercept = 0, lty = 2) + 
+     theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+           panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
+           plot.margin = (margin(0, 0, 0, 0, "cm")),
+           axis.text.x = element_text(angle = 60, hjust = 1)) +
+     NULL
+   
+   
+   
+
+   
+   
+   
 
   # Calculate polygenic risk score for each maternal genotype
   gen_dat_moms <- dplyr::select(gen_dat_clim, id, accession, snp_col_names)
   dim(gen_dat_moms)
   
   # Choose SNPs
-   n_snps_values <- c(50, 100, 250, 500)
+   n_snps_values <- c(100, 250, 500, seq(1000, 12000, by = 1000))
    
-  gene_copy_thresholds <- c(1, 25, 50, 100, 250)
-  gene_copy_thresh <- c(50)
-  
   # Initialize dataframe for output
   prs_df_summary <- tibble(n_snps = n_snps_values,
-                               r2 = NA)
+                               r2_training = NA)
   
  # Order snps based on lowest P values
    snp_list_ordered <- sum_df$snp[order(sum_df$p_val_gen_int)]
    snp_list_ordered <- sum_df$snp[order(sum_df$p_val_gen_int_training)]
    sum(sum_df$snp[order(sum_df$p_val_gen_int)][1:100] %in% sum_df$snp[order(sum_df$p_val_gen_int_training)][1:100])
+   
+   snp_list_ordered <- sum_df$snp[sum_df$p_val_gen_int < 0.05]
+   snp_list_ordered <- sum_df$snp[sum_df$p_val_gen_int_training < 0.05]
+   length(snp_list_ordered)
    
    # Order by f value
    snp_list_ordered <- sum_df$snp[order(sum_df$f_val_gen_int, decreasing = T)]
@@ -501,10 +620,12 @@
    
 
   # snp_list_ordered <- sum_df$snp[order(sum_df$max_effect, decreasing = TRUE)]
+   snp_weights <- 1 - scales::rescale(sum_df$p_val_gen_int, to = c(0, 1))
+   snp_weights <- scales::rescale(sum_df$dev_explained, to = c(0, 1))
+   names(snp_weights) <- sum_df$snp
    
-   # snp_weights <- 1 - scales::rescale(sum_df$p_val_gen_int, to = c(0, 1))
-   # snp_weights <- scales::rescale(sum_df$dev_explained, to = c(0, 1))
-   # names(snp_weights) <- sum_df$snp
+   sum_df_long_w_preds$height_change_warmer_absolute_se_weights <- 1 - scales::rescale(sum_df_long_w_preds$height_change_warmer_absolute_se, to = c(0, 1))
+   sum_df_long_w_preds$height_change_warmer_absolute_training_se_weights <- 1 - scales::rescale(sum_df_long_w_preds$height_change_warmer_absolute_training_se, to = c(0, 1))
 
   # Initialize
     gen_dat_moms$prs <- NULL
@@ -552,19 +673,35 @@
                                                n_gen = NA))
     }
     
-     prs <-  case_when(
-        sub == "0" ~ preds_sub$height_change_warmer_absolute[preds_sub$genotype == "0"],  
+      prs <-  case_when(
+        sub == "0" ~ preds_sub$height_change_warmer_absolute[preds_sub$genotype == "0"],
         sub == "1"  ~ preds_sub$height_change_warmer_absolute[preds_sub$genotype == "1"],
         sub == "2"  ~ preds_sub$height_change_warmer_absolute[preds_sub$genotype == "2"],
         TRUE ~ 0 # When individual has missing data
       )
      
-     prs_training <- case_when(
-       sub == "0" ~  preds_sub$height_change_warmer_absolute_training[preds_sub$genotype == "0"],  
+     ## Weighted version
+     # prs <-  case_when(
+     #   sub == "0" ~ preds_sub$height_change_warmer_absolute[preds_sub$genotype == "0"] * preds_sub$height_change_warmer_absolute_se_weights[preds_sub$genotype == "0"],  
+     #   sub == "1"  ~ preds_sub$height_change_warmer_absolute[preds_sub$genotype == "1"] * preds_sub$height_change_warmer_absolute_se_weights[preds_sub$genotype == "1"],
+     #   sub == "2"  ~ preds_sub$height_change_warmer_absolute[preds_sub$genotype == "2"] * preds_sub$height_change_warmer_absolute_se_weights[preds_sub$genotype == "2"],
+     #   TRUE ~ 0 # When individual has missing data
+     # )
+     
+      prs_training <- case_when(
+       sub == "0" ~  preds_sub$height_change_warmer_absolute_training[preds_sub$genotype == "0"],
        sub == "1"  ~ preds_sub$height_change_warmer_absolute_training[preds_sub$genotype == "1"],
        sub == "2"  ~ preds_sub$height_change_warmer_absolute_training[preds_sub$genotype == "2"],
        TRUE ~ 0
      )
+     
+     ## Weighted version
+     # prs_training <-  case_when(
+     #   sub == "0" ~ preds_sub$height_change_warmer_absolute_training[preds_sub$genotype == "0"] * preds_sub$height_change_warmer_absolute_training_se_weights[preds_sub$genotype == "0"],  
+     #   sub == "1"  ~ preds_sub$height_change_warmer_absolute_training[preds_sub$genotype == "1"] * preds_sub$height_change_warmer_absolute_training_se_weights[preds_sub$genotype == "1"],
+     #   sub == "2"  ~ preds_sub$height_change_warmer_absolute_training[preds_sub$genotype == "2"] * preds_sub$height_change_warmer_absolute_training_se_weights[preds_sub$genotype == "2"],
+     #   TRUE ~ 0 # When individual has missing data
+     # )
    
    prs_count <- ifelse(as.data.frame(sub)[, 1] %in% counted, yes = 1, no = 0)
    prs_training_count <- ifelse(as.data.frame(sub)[, 1] %in% counted, yes = 1, no = 0)
@@ -583,7 +720,7 @@
 
    }
    
-   if(x %in% n_snps_values){
+   if(x %in% n_snps_values | x == length(snp_list_ordered)){
      cat("\n||--------------------------------||\n")
      cat("Running model for:", x, " SNPS... \n")
      
@@ -609,12 +746,13 @@
      # Set up model terms
      fixed_effects_resids <- paste0(paste0("rgr_resids ~ s(prs_training_scaled, bs=\"cr\") + 
                                            s(tmax_sum_dif, by = prs_training_scaled, bs=\"cr\")"))
- 
+
      # Gam with interaction effect
      gam_test_resids = bam(formula = formula(fixed_effects_resids),
                            data = test2,
                            discrete = FALSE, 
                            nthreads = 8,
+                    #       method = "GCV.Cp", 
                            method = "fREML")
      
      print(summary(gam_test_resids))
@@ -727,9 +865,10 @@
     # Gam with interaction effect
     gam_prs_all = bam(formula = formula(fixed_effects),
                   data = dat_snp_prs,
-                  discrete = TRUE, 
+                  discrete = FALSE, 
                   nthreads = 8,
                   method = "fREML",
+              #    method = "GCV.Cp",
                #   family = "tw",
                   control = list(trace = FALSE))
     
@@ -762,9 +901,10 @@
           # Gam with interaction effect
           gam_prs_training = bam(formula = formula(fixed_effects),
                             data = dat_snp_training2,
-                            discrete = TRUE,
+                            discrete = FALSE,
                             nthreads = 8,
-                            method = "fREML",
+                        #    method = "fREML",
+                        method = "GCV.Cp",
                             #   family = "tw",
                             control = list(trace = FALSE))
 
@@ -779,6 +919,7 @@
         #   # anova(gam_prs_training)
         #    sink()
         #   
+          
         #### Testing
           dat_snp_testing2 <- dat_snp_testing %>%
             dplyr::mutate(accession = as.numeric(as.character(accession))) %>%

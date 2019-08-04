@@ -3,7 +3,6 @@
 
 
 # Load libraries ----------------------------------------------------------
-
   library(psych)
   library(factoextra)
 
@@ -551,6 +550,8 @@
      climate_vars <- c(climate_vars, colnames(garden_climate_pca_vals))
 
 
+     
+     
 # Filter down to seedlings with and without GBS data ----------------------
       
       ## Filtering down individuals who's moms don't have climate data and has GBS data
@@ -560,206 +561,55 @@
       
       
       
-
-      
-      
-      
-# Select a subset of adults for taining and testing, CV Validation
-      
-      
-      # 70/30 sampling
-      # For path "run_475547_tmax_sum_dif_training_set_resids_7030_2019_02_26"
-      # Used in initial submission to PNAS
-      set.seed(129)
-      training_moms <- sample(na.omit(climate_gbs_mom$accession),
-                              size = length(na.omit(climate_gbs_mom$accession))*0.70)
-      
-      testing_moms <- na.omit(climate_gbs_mom$accession)[!na.omit(climate_gbs_mom$accession)
-                                                         %in% training_moms]
-      
-      any(training_moms %in% testing_moms) # Should both be false
-      any(testing_moms %in% training_moms)
-      
-      
-      ## Save two datasets for training and testing
-      dat_gbs_training_clim <- dat_gbs_all_clim %>%
-        dplyr::filter(accession %in% training_moms)
-      dat_gbs_testing_clim <- dat_gbs_all_clim %>%
-        dplyr::filter(accession %in% testing_moms)
-      
-      dim(dat_gbs_training_clim)
-      dim(dat_gbs_testing_clim)
-      
-      table(dat_gbs_testing_clim$section_block)
-      table(dat_gbs_testing_clim$locality)
-      table(dat_gbs_testing_clim$accession)
-      
-      table(dat_gbs_training_clim$section_block)
-      table(dat_gbs_training_clim$locality)
-      table(dat_gbs_training_clim$accession)
-      
-      unique(dat_gbs_testing_clim$accession) %in% unique(dat_gbs_training_clim$accession)
-      unique(dat_gbs_training_clim$accession) %in% unique(dat_gbs_testing_clim$accession)
-      sum(unique(dat_gbs_training_clim$accession) %in% unique(dat_gbs_testing_clim$accession))
-      
-      
-      
-      
-  # 70/30 sampling with family in both training and testing
-      set.seed(309)
-
-     training_seedlings <-  caret::createDataPartition(
-                              factor(dat_gbs_all_clim$accession),
-                                 p = .90)$Resample1
-
-
-      ## Save two datasets for training and testing
-      dat_gbs_training_clim <- dat_gbs_all_clim[training_seedlings, ]
-      dat_gbs_testing_clim <- dat_gbs_all_clim[-training_seedlings, ]
-
-      dim(dat_gbs_training_clim)
-      dim(dat_gbs_testing_clim)
-
-      # Percentages of total
-      nrow(dat_gbs_training_clim)/nrow(dat_gbs_all_clim)
-      nrow(dat_gbs_testing_clim)/nrow(dat_gbs_all_clim)
-
-      table(dat_gbs_testing_clim$section_block)
-      table(dat_gbs_testing_clim$locality)
-      table(dat_gbs_testing_clim$accession)
-
-      table(dat_gbs_training_clim$section_block)
-      table(dat_gbs_training_clim$locality)
-      table(dat_gbs_training_clim$accession)
-
-
-      unique(dat_gbs_testing_clim$accession) %in% unique(dat_gbs_training_clim$accession)
-      unique(dat_gbs_training_clim$accession) %in% unique(dat_gbs_testing_clim$accession)
-      
-      
-      
- # 10 fold cross validation
-      set.seed(129)
-      
-      training_seedlings <-  caret::createFolds(factor(dat_gbs_all_clim$accession),
-                                                k = 2, returnTrain = T)[[1]]
-      
-      ## Save two datasets for training and testing
-      dat_gbs_training_clim <- dat_gbs_all_clim[training_seedlings, ]
-      dat_gbs_testing_clim <- dat_gbs_all_clim[-training_seedlings, ]
-      
-      dim(dat_gbs_training_clim)
-      dim(dat_gbs_testing_clim)
-      
-      # Percentages of total
-      nrow(dat_gbs_training_clim)/nrow(dat_gbs_all_clim)
-      nrow(dat_gbs_testing_clim)/nrow(dat_gbs_all_clim)
-
-      table(dat_gbs_training_clim$section_block)
-      table(dat_gbs_training_clim$locality)
-      table(dat_gbs_training_clim$accession)
-      
-      table(dat_gbs_testing_clim$section_block)
-      table(dat_gbs_testing_clim$locality)
-      table(dat_gbs_testing_clim$accession)
-      
-      unique(dat_gbs_testing_clim$accession) %in% unique(dat_gbs_training_clim$accession)
-      unique(dat_gbs_training_clim$accession) %in% unique(dat_gbs_testing_clim$accession)
-      
-      sum(unique(dat_gbs_testing_clim$accession) %in% unique(dat_gbs_training_clim$accession))
-      
-      
-      
-  # 10 fold cross validation - not across families
-      set.seed(129)
-      
-      training_moms_indices <-  caret::createFolds(na.omit(climate_gbs_mom$accession),
-                                                k = 10, returnTrain = T)[[1]]
-      
-      training_moms <- na.omit(climate_gbs_mom$accession)[training_moms_indices]
-      
-      ## Save two datasets for training and testing
-      dat_gbs_training_clim <- dat_gbs_all_clim[dat_gbs_all_clim$accession %in% training_moms, ]
-      dat_gbs_testing_clim <- dat_gbs_all_clim[!dat_gbs_all_clim$accession %in% training_moms, ]
-      
-      dim(dat_gbs_training_clim)
-      dim(dat_gbs_testing_clim)
-      
-      # Percentages of total
-      nrow(dat_gbs_training_clim)/nrow(dat_gbs_all_clim)
-      nrow(dat_gbs_testing_clim)/nrow(dat_gbs_all_clim)
-      
-      table(dat_gbs_training_clim$section_block)
-      table(dat_gbs_training_clim$locality)
-      table(dat_gbs_training_clim$accession)
-      
-      table(dat_gbs_testing_clim$section_block)
-      table(dat_gbs_testing_clim$locality)
-      table(dat_gbs_testing_clim$accession)
-      
-      unique(dat_gbs_testing_clim$accession) %in% unique(dat_gbs_training_clim$accession)
-      unique(dat_gbs_training_clim$accession) %in% unique(dat_gbs_testing_clim$accession)
-      
-      sum(unique(dat_gbs_testing_clim$accession) %in% unique(dat_gbs_training_clim$accession))    
-
-      
-      
-
-      
 # Calculating difference in climate variables -----------------------------
-
-  climate_vars_dif <- paste(climate_vars, "_dif", sep = "")
-  
-  x = 1
-  
-  ## Calculate difference in climate as ## GARDEN - PROVENANCE
-    for(var in climate_vars){
+      
+      climate_vars_dif <- paste(climate_vars, "_dif", sep = "")
+      
+      x = 1
+      
+      ## Calculate difference in climate as ## GARDEN - PROVENANCE
+      for(var in climate_vars){
+        
+        
+        # For all seedlings    
+        dat_all_clim[dat_all_clim$site == "Chico", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "Chico", var]) - dat_all_clim[dat_all_clim$site == "Chico", var]
+        
+        dat_all_clim[dat_all_clim$site == "IFG", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "IFG", var]) - dat_all_clim[dat_all_clim$site == "IFG", var]
+        
+        
+        # For GBS seedlings  
+        dat_gbs_all_clim[dat_gbs_all_clim$site == "Chico", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "Chico", var]) - dat_gbs_all_clim[dat_gbs_all_clim$site == "Chico", var]
+        
+        dat_gbs_all_clim[dat_gbs_all_clim$site == "IFG", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "IFG", var]) - dat_gbs_all_clim[dat_gbs_all_clim$site == "IFG", var]
+        
+        # Increment counter
+        x = x + 1
+      }
       
       
-    # For all seedlings    
-      dat_all_clim[dat_all_clim$site == "Chico", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "Chico", var]) - dat_all_clim[dat_all_clim$site == "Chico", var]
+      hist(dat_all_clim$tmax_sum_dif)
       
-      dat_all_clim[dat_all_clim$site == "IFG", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "IFG", var]) - dat_all_clim[dat_all_clim$site == "IFG", var]
+      summary(dat_all_clim[, climate_vars_dif])
       
+      ## Find NAs if there are any
+      #View(dat_all_clim[is.na(pull(dat_all_clim, climate_vars_dif[1])), ])
       
-    # For GBS seedlings  
-      dat_gbs_all_clim[dat_gbs_all_clim$site == "Chico", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "Chico", var]) - dat_gbs_all_clim[dat_gbs_all_clim$site == "Chico", var]
-      
-      dat_gbs_all_clim[dat_gbs_all_clim$site == "IFG", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "IFG", var]) - dat_gbs_all_clim[dat_gbs_all_clim$site == "IFG", var]
-      
-      # Testing set
-      dat_gbs_testing_clim[dat_gbs_testing_clim$site == "Chico", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "Chico", var]) - dat_gbs_testing_clim[dat_gbs_testing_clim$site == "Chico", var]
-      
-      dat_gbs_testing_clim[dat_gbs_testing_clim$site == "IFG", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "IFG", var]) - dat_gbs_testing_clim[dat_gbs_testing_clim$site == "IFG", var]
-      
-      # Training set
-      dat_gbs_training_clim[dat_gbs_training_clim$site == "Chico", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "Chico", var]) - dat_gbs_training_clim[dat_gbs_training_clim$site == "Chico", var]
-      
-      dat_gbs_training_clim[dat_gbs_training_clim$site == "IFG", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "IFG", var]) - dat_gbs_training_clim[dat_gbs_training_clim$site == "IFG", var]
-      
-      # Increment counter
-      x = x + 1
-    }
-  
-  
-  hist(dat_all_clim$tmax_sum_dif)
-  
-  summary(dat_all_clim[, climate_vars_dif])
-  
-  ## Find NAs if there are any
-  #View(dat_all_clim[is.na(pull(dat_all_clim, climate_vars_dif[1])), ])
-  
+    
 
 
 # Scaling predictor variables -------------------------------------------------------
+      
+      
+  x <- 1:100    
+  x_sc <- (x - mean(x)) / sd(x)   
+  
+  (x_sc * sd(x)) + mean(x)
+      
   
   # Need to run separately for both full dataset and dataset with only gbs samples
-
   dat_all_scaled <- dat_all_clim
   dat_gbs_all_scaled <- dat_gbs_all_clim
-  dat_gbs_testing_scaled <- dat_gbs_testing_clim
-  dat_gbs_training_scaled <- dat_gbs_training_clim
-  
+
   x = 1
   
   scaled_var_means_all <- NA
@@ -767,13 +617,6 @@
   
   scaled_var_means_gbs_all <- NA
   scaled_var_sds_gbs_all <- NA
-  
-  scaled_var_means_gbs_testing <- NA
-  scaled_var_sds_gbs_testing <- NA
-  
-  scaled_var_means_gbs_training <- NA
-  scaled_var_sds_gbs_training <- NA
-  
 
   to_scale = colnames(dplyr::select(dat_all_clim, climate_vars_dif, 
                                     height_2015, height_2014,
@@ -791,19 +634,6 @@
       scaled_var_sds_gbs_all[x] <- sd(dat_gbs_all_scaled[[var]], na.rm = TRUE)
       dat_gbs_all_scaled[var] <- (dat_gbs_all_scaled[var] - scaled_var_means_gbs_all[x]) /
                                   scaled_var_sds_gbs_all[x]
-      
-    # Testing set  
-      scaled_var_means_gbs_testing[x] <- mean(dat_gbs_testing_scaled[[var]], na.rm = TRUE)
-      scaled_var_sds_gbs_testing[x] <- sd(dat_gbs_testing_scaled[[var]], na.rm = TRUE)
-      dat_gbs_testing_scaled[var] <- (dat_gbs_testing_scaled[var] - scaled_var_means_gbs_testing[x]) /
-        scaled_var_sds_gbs_testing[x]
-      
-    # Training set  
-      scaled_var_means_gbs_training[x] <- mean(dat_gbs_training_scaled[[var]], na.rm = TRUE)
-      scaled_var_sds_gbs_training[x] <- sd(dat_gbs_training_scaled[[var]], na.rm = TRUE)
-      dat_gbs_training_scaled[var] <- (dat_gbs_training_scaled[var] - scaled_var_means_gbs_training[x]) /
-        scaled_var_sds_gbs_training[x]
-  
       x = x + 1
   }
   
@@ -814,12 +644,6 @@
   names(scaled_var_means_gbs_all) <- to_scale
   names(scaled_var_sds_gbs_all) <- to_scale
   
-  names(scaled_var_means_gbs_training) <- to_scale
-  names(scaled_var_sds_gbs_training) <- to_scale
-  
-  names(scaled_var_means_gbs_testing) <- to_scale
-  names(scaled_var_sds_gbs_testing) <- to_scale
-  
 # Check out results
   scaled_var_means_all
   scaled_var_means_gbs_all
@@ -828,12 +652,11 @@
   scaled_var_sds_gbs_all
   
   summary(dat_all_scaled[, to_scale]) ## Means should all be 0
-  
   summary(dat_gbs_all_scaled[, to_scale]) ## Means should all be 0
   
-  summary(dat_gbs_training_scaled[, to_scale]) ## Means should all be 0
-  summary(dat_gbs_testing_scaled[, to_scale]) ## Means should all be 0
-  
-
-
+  summary(dat_gbs_all_scaled$tmax_sum_dif)
+  summary(back_transform(dat_gbs_all_scaled$tmax_sum_dif,
+                 "tmax_sum_dif",
+                 scaled_var_means_gbs_all,
+                 scaled_var_sds_gbs_all))
 
