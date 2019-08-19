@@ -346,7 +346,8 @@ prs_df_summary <- tibble(n_snps = n_snps_values,
                          r2_training = NA)
 
 # Order snps based on lowest Q values
-snp_list_ordered <- sum_df$snp[order(sum_df$p_val_gen_int)]
+#snp_list_ordered <- sum_df$snp[order(sum_df$p_val_gen_int)]
+snp_list_ordered <- sum_df$snp[order(sum_df$p_val_gen_int_training)]
 
 # Initialize
 gen_dat_moms$prs <- NULL
@@ -451,7 +452,7 @@ for(snp_name in snp_list_ordered){
     # Gam with interaction effect
     gam_test_resids = bam(formula = formula(fixed_effects_resids),
                           data = test2,
-                          discrete = TRUE, 
+                          discrete = FALSE, 
                           nthreads = 8,
                           method = "fREML",
                           control = list(trace = FALSE))
@@ -564,7 +565,7 @@ fixed_effects <- paste0(paste0("rgr_resids ~ s(prs_best_scaled, bs=\"cr\") +
 # Gam with interaction effect
 gam_prs_all = bam(formula = formula(fixed_effects),
                   data = dat_snp_prs,
-                  discrete = TRUE, 
+                  discrete = FALSE, 
                   nthreads = 8,
                   method = "fREML",
                   #   family = "tw",
@@ -595,7 +596,7 @@ sink()
 #   # Gam with interaction effect
 #   gam_prs_training = bam(formula = formula(fixed_effects),
 #                     data = dat_snp_training2,
-#                     discrete = TRUE,
+#                     discrete = FALSE,
 #                     nthreads = 8,
 #                     method = "fREML",
 #                     #   family = "tw",
@@ -627,7 +628,7 @@ fixed_effects <- paste0(paste0("rgr_resids ~ s(prs_training_best_scaled, bs=\"cr
 # Gam with interaction effect
 gam_prs_testing = bam(formula = formula(fixed_effects),
                       data = dat_snp_testing2,
-                      discrete = TRUE,
+                      discrete = FALSE,
                       nthreads = 8,
                       method = "fREML",
                       #   family = "tw",
@@ -840,7 +841,7 @@ pairs.panels(select(sum_df_wtruth, snp_effect, dev_explained, rsq_adj,
 ## Testing out different transfer functions per accession
 gam_acc <- bam(rgr ~ section_block + s(tmax_dif, bs = "cr") + s(accession, bs = "re") +  s(tmax_dif, by = accession),
                data = sim_dat,
-               discrete = TRUE,
+               discrete = FALSE,
                nthreads = 8,
                method = "fREML",
                # accession = "gaussian",
