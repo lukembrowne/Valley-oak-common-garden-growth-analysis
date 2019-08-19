@@ -36,7 +36,7 @@
 # Set variable that will be passed to R script
 # Interval needs to match what is set in Job array indexes
 
-set run_label="rgr_9010nofam"
+set run_label="rgr_10fold_acrossfams_FinishSNPs"
 set interval=25
 set climate_var_dif='tmax_sum_dif'
 

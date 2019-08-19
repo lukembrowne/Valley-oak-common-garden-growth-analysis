@@ -87,7 +87,7 @@
                    formula = formula(fixed_effects_resids),
                #   data = dat_snp_training,
                   data = dat_snp_all_unscaled,
-                  discrete = TRUE,
+                  discrete = FALSE,
                   nthreads = 8,
                   method = "fREML")
                 
@@ -100,7 +100,7 @@
       formula = formula(fixed_effects_resids),
       #   data = dat_snp_training,
       data = dat_snp_training_unscaled,
-      discrete = TRUE,
+      discrete = FALSE,
       nthreads = 8,
       method = "fREML")
     

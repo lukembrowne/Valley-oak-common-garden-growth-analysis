@@ -3,7 +3,7 @@
 
   print(args)
 
-	task_id <- as.numeric(args[1])
+  task_id <- as.numeric(args[1])
   interval <- as.numeric(args[2])
 
 # Load libraries
@@ -16,7 +16,7 @@
   load("../gam_cluster_2019-08-03.Rdata")
  
 ## Read in snps to skip
- # skip_these_SNPs <- read_csv("../skip_these_SNPs_2018_12_22.csv")
+  skip_these_SNPs <- read_csv("../skip_these_SNPs_2019_08_05_acrossfams.csv")
   
 
 # Initialize variables
@@ -37,10 +37,10 @@
     snp <- snp_col_names[snp_index]
     
     # Skip SNPs that are already run
-    # if(snp %in% skip_these_SNPs$snp){
-    #   cat("Skipping SNP:", snp, " ... \n")
-    #   next
-    # }
+     if(snp %in% skip_these_SNPs$snp){
+       cat("Skipping SNP:", snp, " ... \n")
+       next
+     }
     
    # Make sure there's at least 2 levels
     if(length(table(dat_snp_all[, snp])) < 2){

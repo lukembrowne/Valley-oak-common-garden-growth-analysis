@@ -60,16 +60,6 @@ sed -i "s/#set data_file=\"XXX\"/set data_file=\"gam_cluster_sim_${n_sites}sites
   qsub -sync y -N r${rep}_${n_sites}_${qtl_ve} run_gams_sim.R.cmd
   wait
 
-# Wait for job to finish 
-# jobdone.log is a file created at the end of the .cmd file that sends jobs to cluster
-# this script won't continue until it exists
-until [ -e GAM_JOBDONE.log ]; do
-   # echo "GAM_JOBDONE.log doesn't exist as of yet..."
-    sleep 5
-done
-
-echo "GAM_JOBDONE.log now exists!!!"
-
  ## Get path to GAM output - should only get gam results folder
 	 gam_output="$(find . -name "run*" -type d)"   
 	 data_file=gam_cluster_sim_${n_sites}sites_workspace.Rdata 

@@ -124,6 +124,4 @@ mkdir model_predictions
 
 # At very end of execution - use this as a flag to move onto next step of simulation_total_analysis.sh
 
-touch ../GAM_JOBDONE.log
-
   exit (0)
