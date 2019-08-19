@@ -113,10 +113,9 @@ back_transform <- function(x, var, means, sds){
 # With all 5,000+ seedlings
   gam_all <- bam(formula = form,
                  data = dat_all_scaled,
-                 discrete = TRUE, 
+                 discrete = FALSE, 
                  nthreads = 8,
-                 method = "fREML", 
-              # family = "gaussian",
+                 method = "fREML",
                family = "tw",
                control = list(trace = FALSE))
   

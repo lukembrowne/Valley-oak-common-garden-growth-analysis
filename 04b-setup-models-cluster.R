@@ -8,20 +8,6 @@
   dim(dat_all_scaled)
   dim(dat_gbs_all_scaled)
 
-  library(gamm4)
-  library(visreg)
-  library(rrBLUP)
-  library(qvalue) # devtools::install_github("jdstorey/qvalue")
-  library(MuMIn)
-  library(vegan)
-  library(beepr)
-  library(patchwork) # devtools::install_github("thomasp85/patchwork")
-  library(rasterVis)
-  library(pdp)
-  library(ggrepel)
-  library(caret)
-  library(flashpcaR) # devtools::install_github("gabraham/flashpca/flashpcaR")
-  
   
   # function to transform from raw to scaled variables
     forward_transform <- function(x, var, means, sds){

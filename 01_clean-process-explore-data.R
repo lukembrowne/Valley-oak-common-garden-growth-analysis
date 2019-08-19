@@ -3,6 +3,27 @@
   library(tidyverse)
   library(googlesheets)
   library(maptools)
+  
+  library(gamm4)
+  library(visreg)
+  library(rrBLUP)
+  library(qvalue) # devtools::install_github("jdstorey/qvalue")
+  library(MuMIn)
+  library(vegan)
+  library(beepr)
+  library(patchwork) # devtools::install_github("thomasp85/patchwork")
+  library(rasterVis)
+  library(pdp)
+  library(ggrepel)
+  library(caret)
+  library(flashpcaR) # devtools::install_github("gabraham/flashpca/flashpcaR")
+
+  library(psych)
+  library(factoextra)
+
+  library(foreach)
+  library(doParallel)
+
 
 # Choose model type -------------------------------------------------------
 

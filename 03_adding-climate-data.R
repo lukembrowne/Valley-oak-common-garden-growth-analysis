@@ -1,11 +1,6 @@
 
 ## Requires 02_processing-climate-rasters.R to be run and files output
 
-
-# Load libraries ----------------------------------------------------------
-  library(psych)
-  library(factoextra)
-
 # Load in climate data ----------------------------------------------------
 
   ## Read in BCM climate data of of maternal trees in the common garden
