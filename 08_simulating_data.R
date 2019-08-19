@@ -303,7 +303,7 @@ table(sim_dat$site)
 ## Gam version
   gam <- bam(rgr ~ section_block + s(accession, bs = "re") +  s(tmax_dif, bs = "cr"),
              data = sim_dat,
-             discrete = TRUE,
+             discrete = FALSE,
              nthreads = 8,
              method = "fREML",
              # accession = "gaussian",
@@ -557,7 +557,7 @@ table(sim_dat$site)
   # Gam with interaction effect
   gam_snp_all = bam(formula = formula(fixed_effects),
                     data = dat_snp_all,
-                    discrete = TRUE, 
+                    discrete = FALSE, 
                     nthreads = 8,
                     method = "fREML",
                #    family = "tw",
