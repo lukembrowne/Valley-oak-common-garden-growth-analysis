@@ -2,6 +2,8 @@
 
 # Simulate data -------------------------------------------------------
 
+# This script will generate a simulated dataset of relative growth rates of progeny planted across Tmax differences
+# This script is designed to be run through the command line, which will vary the simulation parameters and allow the simulations to be run in batches
 
 # Load libraries
 library(mgcv, lib.loc = "/u/home/l/lukembro/R/x86_64-pc-linux-gnu-library/3.5") # Make sure to load latest version of mgcv
@@ -23,10 +25,7 @@ set.seed(rep) # Set seed based on rep
 
 # Experiment parameters
 n_accession <- 300
-# n_sites <- 2
 n_blocks <- 5 # This equals the number of seedlings / accession per site
-
-
 
 # QTL parameters
 r.snp <- 0.99   # Proportion of variance in trait explained by SNPs.
@@ -52,7 +51,6 @@ sim_dat$ID <- as.character(1:nrow(sim_dat))
 # table(sim_dat$accession, sim_dat$section_block)
 # table(sim_dat$accession, sim_dat$site)
 table(sim_dat$site)
-
 
 
 
@@ -171,8 +169,8 @@ table(sim_dat$site)
     sim_dat$tmax_dif[i] <- site_temp[sim_dat$site[i]] -  accession_temp[sim_dat$accession[i]] 
   }
   
-  
-  # In supplementary section
+
+  # Figure for supplementary section
   hist(sim_dat$tmax_dif, breaks = 50, col = "steelblue2", xlab = "Tmax difference",
        las = 1, main = "Histogram of simulated Tmax differences for 2 planting sites")
   
@@ -282,8 +280,6 @@ table(sim_dat$site)
   
   
   
-
-
 # Simulate growth rates
   for(i in 1:nrow(sim_dat)){
     
@@ -299,7 +295,6 @@ table(sim_dat$site)
   hist(sim_dat$rgr)
   
 
- 
 ## Gam version
   gam <- bam(rgr ~ section_block + s(accession, bs = "re") +  s(tmax_dif, bs = "cr"),
              data = sim_dat,
@@ -315,8 +310,7 @@ table(sim_dat$site)
  # visreg(gam, partial = F)
   
 
-  
-  
+
 # Compare model estimate to truth for supplementary material
   par(mfrow = c(1, 2))
   plot(tmax_seq,dnorm(tmax_seq, 
@@ -330,40 +324,6 @@ table(sim_dat$site)
   abline(v = 0, lwd = 1.5)
   
   par(mfrow = c(1, 1))
-  
-
-  
-# Choose training and testing sets ----------------------------------------
-
-  # 70/30 sampling
-  training_moms <- sample(levels(sim_dat$accession),
-                          size = length(levels(sim_dat$accession))*0.70)
-  
-  testing_moms <- levels(sim_dat$accession)[!levels(sim_dat$accession)
-                                                     %in% training_moms]
-  
-  any(training_moms %in% testing_moms) # Should both be false
-  any(testing_moms %in% training_moms)
-  
-  
-  ## Save two datasets for training and testing
-  sim_dat_training <- sim_dat %>%
-    dplyr::filter(accession %in% training_moms)
-  sim_dat_testing <- sim_dat %>%
-    dplyr::filter(accession %in% testing_moms)
-  
-  dim(sim_dat_training)
-  dim(sim_dat_testing)
-  
-  table(sim_dat_testing$section_block)
- # table(sim_dat_testing$locality)
-  table(sim_dat_testing$accession)
-  
-  table(sim_dat_training$section_block)
- # table(sim_dat_training$locality)
-  table(sim_dat_training$accession)  
-  
-  
   
 
 # Set up model for cluster ------------------------------------------------
@@ -439,7 +399,6 @@ table(sim_dat$site)
   dat_snp_all$accession <- factor(dat_snp_all$accession)
   dat_snp_all$section_block <- factor(dat_snp_all$section_block)
   dat_snp_all$section <- factor(dat_snp_all$section)
-#  dat_snp_all$locality <- factor(dat_snp_all$locality)
   
   # Scale PCA axes
   dat_snp_all$PC1_gen <- (dat_snp_all$PC1_gen - mean(dat_snp_all$PC1_gen)) / sd(dat_snp_all$PC1_gen)
@@ -453,87 +412,21 @@ table(sim_dat$site)
   
  # summary(dat_snp_all[, 500:510])
   
-  # ## Testing set  
-  dat_snp_testing = left_join(sim_dat_testing,
-              gen_dat,  by = "accession")
-
-  # Set up factors
-  dat_snp_testing$accession <- factor(dat_snp_testing$accession)
-  dat_snp_testing$section_block <- factor(dat_snp_testing$section_block)
-  dat_snp_testing$section <- factor(dat_snp_testing$section)
-#  dat_snp_testing$locality <- factor(dat_snp_testing$locality)
-
-  # Scale PCA axes
-  dat_snp_testing$PC1_gen <- (dat_snp_testing$PC1_gen - mean(dat_snp_testing$PC1_gen)) / sd(dat_snp_testing$PC1_gen)
-  dat_snp_testing$PC2_gen <- (dat_snp_testing$PC1_gen - mean(dat_snp_testing$PC2_gen)) / sd(dat_snp_testing$PC2_gen)
-  dat_snp_testing$PC3_gen <- (dat_snp_testing$PC1_gen - mean(dat_snp_testing$PC3_gen)) / sd(dat_snp_testing$PC3_gen)
-  dat_snp_testing$PC4_gen <- (dat_snp_testing$PC1_gen - mean(dat_snp_testing$PC4_gen)) / sd(dat_snp_testing$PC4_gen)
-  dat_snp_testing$PC5_gen <- (dat_snp_testing$PC1_gen - mean(dat_snp_testing$PC5_gen)) / sd(dat_snp_testing$PC5_gen)
-
-  # Save unscaled version
-  dat_snp_testing_unscaled <- dat_snp_testing
-
- # summary(dat_snp_testing[, 550:560])
-
-
-  ## Training set
-  dat_snp_training = left_join(sim_dat_training,
-                               gen_dat,  by = "accession")
-
-  # Set up factors
-  dat_snp_training$accession <- factor(dat_snp_training$accession)
-  dat_snp_training$section_block <- factor(dat_snp_training$section_block)
-  dat_snp_training$section <- factor(dat_snp_training$section)
-  #dat_snp_training$locality <- factor(dat_snp_training$locality)
-
-  # Scale PCA axes
-  dat_snp_training$PC1_gen <- (dat_snp_training$PC1_gen - mean(dat_snp_training$PC1_gen)) / sd(dat_snp_training$PC1_gen)
-  dat_snp_training$PC2_gen <- (dat_snp_training$PC1_gen - mean(dat_snp_training$PC2_gen)) / sd(dat_snp_training$PC2_gen)
-  dat_snp_training$PC3_gen <- (dat_snp_training$PC1_gen - mean(dat_snp_training$PC3_gen)) / sd(dat_snp_training$PC3_gen)
-  dat_snp_training$PC4_gen <- (dat_snp_training$PC1_gen - mean(dat_snp_training$PC4_gen)) / sd(dat_snp_training$PC4_gen)
-  dat_snp_training$PC5_gen <- (dat_snp_training$PC1_gen - mean(dat_snp_training$PC5_gen)) / sd(dat_snp_training$PC5_gen)
-
-  # Save unscaled version
-  dat_snp_training_unscaled <- dat_snp_training
-
- # summary(dat_snp_training[, 550:560])
-
   
-  
-  # Save means and sds for prediction
+# Save means and sds for prediction
   scaled_snps_means_all <- apply(dat_snp_all[, snp_col_names], MARGIN = 2,
                                  function(x) mean(x, na.rm = TRUE))
   scaled_snps_sds_all <- apply(dat_snp_all[, snp_col_names], MARGIN = 2,
                                function(x) sd(x, na.rm = TRUE))
 
-  scaled_snps_means_training <- apply(dat_snp_training[, snp_col_names], MARGIN = 2,
-                                      function(x) mean(x, na.rm = TRUE))
-  scaled_snps_sds_training <- apply(dat_snp_training[, snp_col_names], MARGIN = 2,
-                                    function(x) sd(x, na.rm = TRUE))
-
-  scaled_snps_means_testing <- apply(dat_snp_testing[, snp_col_names], MARGIN = 2,
-                                     function(x) mean(x, na.rm = TRUE))
-  scaled_snps_sds_testing <- apply(dat_snp_testing[, snp_col_names], MARGIN = 2,
-                                   function(x) sd(x, na.rm = TRUE))
-
-
   ## Scale genotypes
   dat_snp_all[, snp_col_names] <-   apply(dat_snp_all[,
                                                       snp_col_names], MARGIN = 2,
                                           function(x) (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE))
-  dat_snp_training[, snp_col_names] <-   apply(dat_snp_training[,
-                                                                snp_col_names], MARGIN = 2,
-                                               function(x) (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE))
-  dat_snp_testing[, snp_col_names] <-   apply(dat_snp_testing[,
-                                                              snp_col_names], MARGIN = 2,
-                                              function(x) (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE))
 
 
   
-  # Set a prediction data frame for training dataset
-  
-  
-  # Set up each climate variable individually
+# Set up prediction dataframe
   pred <-  expand.grid(height_2014 = 0,
                        accession = "1",
                        section_block = "1_1",
@@ -552,7 +445,6 @@ table(sim_dat$site)
   
   ### Run full model and save out residuals for cluster analysis
   fixed_effects <- paste0(paste0("rgr ~ section_block  + s(tmax_dif, bs=\"cr\") + s(accession, bs = \"re\")"))
-  # fixed_effects <- paste0(paste0("rgr ~ section_block + s(accession, bs = \"re\")"))
   
   # Gam with interaction effect
   gam_snp_all = bam(formula = formula(fixed_effects),
@@ -560,7 +452,6 @@ table(sim_dat$site)
                     discrete = FALSE, 
                     nthreads = 8,
                     method = "fREML",
-               #    family = "tw",
                     control = list(trace = FALSE))
   
   summary(gam_snp_all)
@@ -569,18 +460,8 @@ table(sim_dat$site)
   dat_snp_all_unscaled$rgr_resids <- resid(gam_snp_all)
   hist(dat_snp_all$rgr_resids, breaks = 50)
   
-  ## Join residuals to training and testing data
-  dat_snp_training <- dplyr::left_join(dat_snp_training, 
-                                       dplyr::select(dat_snp_all, ID, rgr_resids))
-  dat_snp_training_unscaled <- dplyr::left_join(dat_snp_training_unscaled,
-                                                dplyr::select(dat_snp_all, ID, rgr_resids))
   
-  dat_snp_testing <- dplyr::left_join(dat_snp_testing, dplyr::select(dat_snp_all, ID, rgr_resids))
-  dat_snp_testing_unscaled <- dplyr::left_join(dat_snp_testing_unscaled,
-                                               dplyr::select(dat_snp_all, ID, rgr_resids))
-  
-  
- # # Save data to file that will be uploaded to cluster  
+ # Save data to file that will be uploaded to cluster  
   # Save entire environment
   save.image(paste0("./gam_cluster_sim_", n_sites, "sites_workspace.Rdata"))
   

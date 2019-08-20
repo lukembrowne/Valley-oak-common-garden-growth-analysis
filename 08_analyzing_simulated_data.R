@@ -1,4 +1,7 @@
 
+# This script contains the analyses that calculates and compares 'true' and estimated breeding values
+# This script is designed to be run on the command line on a computing cluster
+
 # Analyzing cluster output ------------------------------------------------
 library(rrBLUP)
 library(visreg)
@@ -22,8 +25,6 @@ library(mgcv, lib.loc = "/u/home/l/lukembro/R/x86_64-pc-linux-gnu-library/3.5") 
   }
   
 
-
-
 # Read in command line arguments
 args<-commandArgs(trailingOnly=TRUE)
 
@@ -39,7 +40,6 @@ path_to_summaries <- paste0(path, "/model_summaries/")
 path_to_predictions <- paste0(path, "/model_predictions/")
 
 # Load data
-
 data_file <- as.character(args[2])
 
 load(file = paste0("./", data_file))
@@ -58,27 +58,12 @@ which(!snp_col_names %in% sum_df_raw$snp)
 snp_col_names[which(!snp_col_names %in% sum_df_raw$snp)]
 length( which(!snp_col_names %in% sum_df_raw$snp))
 
-## snp_chr5_22319422 doesn't have 2 levels
-
-## Write snps that were run to file to rerun missing snps on cluster
-# write_csv(data.frame(snp = snp_col_names[which(snp_col_names %in% sum_df_raw$snp)]),
-#           path = "./output/skip_these_SNPs_2018_12_28.csv")
-
 # Make sure columns are in right format
 sum_df_raw <- sum_df_raw %>%
   mutate(n_gen0 = as.numeric(n_gen0),
          n_gen1 = as.numeric(n_gen1),
          n_gen2 = as.numeric(n_gen2),
-         # height_change_gen_0 = as.numeric(height_change_gen_0),
-         # height_change_gen_1 = as.numeric(height_change_gen_1),
-         # height_change_gen_2 = as.numeric(height_change_gen_2),
-         # p_val_gen_0 = as.numeric(p_val_gen_0),
-         # p_val_gen_1 = as.numeric(p_val_gen_1),
-         # p_val_gen_2 = as.numeric(p_val_gen_2),
-         p_val_gen_int = as.numeric(p_val_gen_int),
-         cv_cor_gen_0 = as.numeric(cv_cor_gen_0),
-         cv_cor_gen_1 = as.numeric(cv_cor_gen_1),
-         cv_cor_gen_2 = as.numeric(cv_cor_gen_2))
+         p_val_gen_int = as.numeric(p_val_gen_int))
 
 str(sum_df_raw)
 
@@ -114,39 +99,14 @@ n_gen_long <- sum_df %>%
 
 head(n_gen_long)
 
-cv_cor_long <- sum_df %>%
-  dplyr::select(snp, cv_cor_gen_0, cv_cor_gen_1, cv_cor_gen_2) %>%
-  gather(key = "genotype", value = "cv_cor", -snp) %>%
-  mutate(genotype = gsub("cv_cor_gen_", "", genotype))
-
-head(cv_cor_long)
-
 
 ## Join all long dataframes together
-sum_df_long <- left_join(n_gen_long, cv_cor_long)
+sum_df_long <- n_gen_long
 
 head(sum_df_long)
 dim(sum_df_long)
 str(sum_df_long)
 
-
-# Filter out based on number of gene copies
-hist(sum_df_long$n_gen, breaks = 50)
-
-gen_copies_thresh <- 1 # Used to be 100
-
-sum_df_long <- sum_df_long %>%
-  dplyr::filter(n_gen >= gen_copies_thresh)
-
-## Filter out heterozygotes?
-table(sum_df_long$genotype)
-# sum_df_long <- sum_df_long %>%
-#    dplyr::filter(genotype != "1")
-
-## Remove those that predictions weren't made on accession 1
-# table(sum_df_long$acc_pred)
-#  sum_df_long <- sum_df_long %>%
-#    dplyr::filter(acc_pred == 1)
 
 # Subset prediction dataframe to just predictions of SNPs that pass filters
 pred_df_sub <- pred_df_raw %>%
@@ -181,26 +141,23 @@ sum_df_long_w_preds <- left_join(sum_df_long,
 
 
 # F values of interaction term
-hist(sum_df$f_val_gen_int, breaks = 50)
+hist(sum_df$p_val_gen_int, breaks = 50)
 
-# fdr_fvals = fdrtool(c(sum_df$f_val_gen_int),
-#                     statistic = "normal", plot = FALSE)
-
-fdr_fvals = fdrtool(c(sum_df$p_val_gen_int),
+fdr_pvals = fdrtool(c(sum_df$p_val_gen_int),
                     statistic = "pvalue", plot = FALSE)
 
 # P values
-summary(fdr_fvals$pval)
-hist(fdr_fvals$pval, breaks = 40)
-sum(fdr_fvals$pval < 0.05)
-sort(fdr_fvals$pval)[1:50]
+summary(fdr_pvals$pval)
+hist(fdr_pvals$pval, breaks = 40)
+sum(fdr_pvals$pval < 0.05)
+sort(fdr_pvals$pval)[1:50]
 
 
 # Q values
-hist(fdr_fvals$qval, breaks = 40) # Each q-value is the expected proportion of false positives among all SNP effects that are at least as extreme as that observed for the current SNP.
-sum(fdr_fvals$qval < 0.05) 
-summary(fdr_fvals$qval)
-sort(fdr_fvals$qval, decreasing = F)[1:100]
+hist(fdr_pvals$qval, breaks = 40) # Each q-value is the expected proportion of false positives among all SNP effects that are at least as extreme as that observed for the current SNP.
+sum(fdr_pvals$qval < 0.05) 
+summary(fdr_pvals$qval)
+sort(fdr_pvals$qval, decreasing = F)[1:100]
 
 
 
@@ -213,15 +170,15 @@ png( paste0("./figures/Qqplots of p values ", n_sites, "sites_", Sys.Date(), ".p
 par(mfrow = c(2,2))
 
 # P values
-hist(fdr_fvals$pval, breaks = 40, col = "steelblue2",
+hist(fdr_pvals$pval, breaks = 40, col = "steelblue2",
      xlab = "p-value", main = "Uncorrected p-values", las = 1)
-qq(fdr_fvals$pval, main = "Uncorrected p-values", las = 1)
+qq(fdr_pvals$pval, main = "Uncorrected p-values", las = 1)
 
 # Q values
-#hist(fdr_fvals$qval, breaks = 40, col = "steelblue2",
+#hist(fdr_pvals$qval, breaks = 40, col = "steelblue2",
 #     xlab = "q-value", main = "q-values", las = 1)
-#if(!all(fdr_fvals$qval == 1)){ # Only plot if all q values are not 1
-#  qq(fdr_fvals$qval, main = "q-values", las = 1)
+#if(!all(fdr_pvals$qval == 1)){ # Only plot if all q values are not 1
+#  qq(fdr_pvals$qval, main = "q-values", las = 1)
 #}
 
 dev.off()
@@ -229,13 +186,13 @@ dev.off()
 par(mfrow = c(1,1))
 
 # Local false discovery rate
-hist(fdr_fvals$lfdr, breaks = 40)
-sum(fdr_fvals$lfdr < 0.05)
-summary(fdr_fvals$lfdr)
+hist(fdr_pvals$lfdr, breaks = 40)
+sum(fdr_pvals$lfdr < 0.05)
+summary(fdr_pvals$lfdr)
 
 
 # Join back to main dataframe
-sum_df$q_val <- fdr_fvals$qval
+sum_df$q_val <- fdr_pvals$qval
 sum_df_long_w_preds <- dplyr::left_join(sum_df_long_w_preds,
                                         dplyr::select(sum_df, snp, q_val, p_val_gen_int),
                                         by = "snp")
@@ -332,9 +289,9 @@ ggsave(paste0("./figures/manhattan plot interaction term wo labels_", n_sites, "
 
 
 
-# Calculate PRS -----------------------------------------------------------
+# Calculate PRS / GEBV -----------------------------------------------------------
 
-# Calculate polygenic risk score for each maternal genotype
+# Calculate polygenic risk score / breeding value for each maternal genotype
 gen_dat_moms <- dplyr::select(gen_dat, accession, snp_col_names)
 dim(gen_dat_moms)
 
@@ -346,8 +303,7 @@ prs_df_summary <- tibble(n_snps = n_snps_values,
                          r2_training = NA)
 
 # Order snps based on lowest Q values
-#snp_list_ordered <- sum_df$snp[order(sum_df$p_val_gen_int)]
-snp_list_ordered <- sum_df$snp[order(sum_df$p_val_gen_int_training)]
+snp_list_ordered <- sum_df$snp[order(sum_df$p_val_gen_int)]
 
 # Initialize
 gen_dat_moms$prs <- NULL
