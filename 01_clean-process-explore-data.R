@@ -25,6 +25,17 @@
   library(doParallel)
 
 
+  # Function to transform from raw to scaled variables
+  forward_transform <- function(x, var, means, sds){
+    ( x - means[var]) / sds[var]
+  }
+  
+  # Function to back transform variables
+  back_transform <- function(x, var, means, sds){
+    (x * sds[var]) + means[var]
+  }
+
+
 # Choose model type -------------------------------------------------------
 
   #  response_variable = "height"
@@ -401,20 +412,6 @@
     ## Filtering based on RGR
       if(response_variable == "rgr"){
 
-    ## Individuals with negative growth rates
-      neg_rgr <- dplyr::filter(dat_all, rgr < quantile(dat_all$rgr, 0.025, na.rm = TRUE)) %>% arrange(rgr)
-    #  View(dplyr::select(neg_rgr, rgr, height_2014, height_2015, height_2017) )
-
-    ## Individuals with high positive growth rates
-      pos_rgr <- dplyr::filter(dat_all, rgr > quantile(dat_all$rgr, 0.975, na.rm = TRUE)) %>% arrange(rgr)
-      # View(dplyr::select(pos_rgr, accession_progeny, rgr, height_2014,
-      #                    height_2015, height_2017) )
-      
-    #  Change to NA outlier values in relative growth rate
-      # dat_all$rgr[dat_all$rgr <= quantile(dat_all$rgr, 0.005, na.rm = TRUE) |
-      #               dat_all$rgr >= quantile(dat_all$rgr, 0.995, na.rm = TRUE)] <- NA
-      
-      
       ## Filter out individuals without an estimated RGR
        dat_all <- dplyr::filter(dat_all, !is.na(rgr))
 
@@ -433,5 +430,5 @@
     ## Filtering based on garden
      # dat_all <- dat_all[dat_all$site == "Chico", ]
     
-   dim(dat_all)
+     dim(dat_all)
 

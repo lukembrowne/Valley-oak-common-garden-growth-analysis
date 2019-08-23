@@ -8,16 +8,6 @@
   dim(dat_all_scaled)
   dim(dat_gbs_all_scaled)
 
-  
-  # function to transform from raw to scaled variables
-    forward_transform <- function(x, var, means, sds){
-      ( x - means[var]) / sds[var]
-    }
-    
-    # Function to back transform variables
-    back_transform <- function(x, var, means, sds){
-      (x * sds[var]) + means[var]
-    }
 
 # Format and save to .Rdata for cluster -----------------------------------
 
@@ -202,39 +192,18 @@
     
     
     # 10 fold cross validation - not across families
-    set.seed(129)
-    
-    training_folds_moms <-  caret::createFolds(na.omit(climate_gbs_mom$accession),
-                                          k = 10, returnTrain = T)
-    
-    training_folds <- list()
-    for(fold in 1:length(training_folds_moms)){
-      training_folds[[fold]] <- which(dat_gbs_all_clim$accession %in% 
-                                  na.omit(climate_gbs_mom$accession)[training_folds_moms[[fold]]]) 
-    }
-    
-    
-    
-    ## Check on folds
-    x = 1
-    for(fold in 1:length(training_folds)){
-      cat(paste0("|--- Fold ", fold, " ---| \n"))
-      cat("percent in training vs. testing: \n ")
-      print(nrow(dat_gbs_all_clim[training_folds[[fold]], ])/nrow(dat_gbs_all_clim))
-      print(nrow(dat_gbs_all_clim[-training_folds[[fold]], ])/nrow(dat_gbs_all_clim))
-      
-      cat("Number of accessions in training that are in testing \n ")
-      print(sum(unique(dat_gbs_all_clim$accession[training_folds[[fold]]]) %in% 
-                  unique(dat_gbs_all_clim$accession[-training_folds[[fold]]])))
-      x = x + 1
-    }
-
-    
-## 10 fold validation across families    
-    # set.seed(129)
+    # set.seed(300)
     # 
-    # training_folds <-  caret::createFolds(factor(dat_gbs_all_clim$accession),
-    #                                           k = 10, returnTrain = T)
+    # training_folds_moms <-  caret::createFolds(na.omit(climate_gbs_mom$accession),
+    #                                       k = 10, returnTrain = T)
+    # 
+    # training_folds <- list()
+    # for(fold in 1:length(training_folds_moms)){
+    #   training_folds[[fold]] <- which(dat_gbs_all_clim$accession %in% 
+    #                               na.omit(climate_gbs_mom$accession)[training_folds_moms[[fold]]]) 
+    # }
+    # 
+    # 
     # 
     # ## Check on folds
     # x = 1
@@ -246,9 +215,30 @@
     #   
     #   cat("Number of accessions in training that are in testing \n ")
     #   print(sum(unique(dat_gbs_all_clim$accession[training_folds[[fold]]]) %in% 
-    #         unique(dat_gbs_all_clim$accession[-training_folds[[fold]]])))
+    #               unique(dat_gbs_all_clim$accession[-training_folds[[fold]]])))
     #   x = x + 1
     # }
+
+    
+## 10 fold validation across families    
+    set.seed(300)
+
+    training_folds <-  caret::createFolds(factor(dat_gbs_all_clim$accession),
+                                              k = 10, returnTrain = T)
+
+    ## Check on folds
+    x = 1
+    for(fold in 1:length(training_folds)){
+      cat(paste0("|--- Fold ", fold, " ---| \n"))
+      cat("percent in training vs. testing: \n ")
+      print(nrow(dat_gbs_all_clim[training_folds[[fold]], ])/nrow(dat_gbs_all_clim))
+      print(nrow(dat_gbs_all_clim[-training_folds[[fold]], ])/nrow(dat_gbs_all_clim))
+
+      cat("Number of accessions in training that are in testing \n ")
+      print(sum(unique(dat_gbs_all_clim$accession[training_folds[[fold]]]) %in%
+            unique(dat_gbs_all_clim$accession[-training_folds[[fold]]])))
+      x = x + 1
+    }
     
   ### Run full model and save out residuals for cluster analysis
   

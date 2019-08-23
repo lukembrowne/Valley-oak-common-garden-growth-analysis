@@ -13,10 +13,10 @@
   # library(patchwork) # Installed on home directory
 
 # Load data
-  load("../gam_cluster_2019-08-03.Rdata")
+  load("../gam_cluster_2019-08-20.Rdata")
  
 ## Read in snps to skip
-  skip_these_SNPs <- read_csv("../skip_these_SNPs_2019_08_05_acrossfams.csv")
+ # skip_these_SNPs <- read_csv("../skip_these_SNPs_2019_08_05_acrossfams.csv")
   
 
 # Initialize variables
@@ -37,10 +37,10 @@
     snp <- snp_col_names[snp_index]
     
     # Skip SNPs that are already run
-     if(snp %in% skip_these_SNPs$snp){
-       cat("Skipping SNP:", snp, " ... \n")
-       next
-     }
+   #  if(snp %in% skip_these_SNPs$snp){
+   #    cat("Skipping SNP:", snp, " ... \n")
+   #    next
+   #  }
     
    # Make sure there's at least 2 levels
     if(length(table(dat_snp_all[, snp])) < 2){
@@ -55,6 +55,7 @@
    	fixed_effects_resids <- paste0(paste0("rgr_resids ~ ", snp, " + s(tmax_sum_dif, by = ", snp, ", bs=\"cr\")"))
 
    ## Impute missing data to mean allele frequency - assumes genotypes are scaled
+    n_missing <- sum(is.na(dat_snp_all[, snp]))
     dat_snp_all[is.na(dat_snp_all[, snp]), snp] <- 0
      
   # Gam with interaction effect
@@ -74,6 +75,7 @@
     gam_snp_int$n_gen0 <- as.numeric(gen_table["0"])
     gam_snp_int$n_gen1 <- as.numeric(gen_table["1"])
     gam_snp_int$n_gen2 <- as.numeric(gen_table["2"])
+    gam_snp_int$n_missing <- n_missing
     
     
   # Make predictions
@@ -96,18 +98,19 @@
     
     # When SNPs are continuous, make own genotypes
     gen_temp_all <- data.frame(accession = "1", 
-                               genotype = c(0, 1, 2),             
+                               genotype = c(0, 1, 2, NA),             
                                genotype_scaled = c((0 - scaled_snps_means_all[snp]) /
                                                      scaled_snps_sds_all[snp],
                                                    (1 - scaled_snps_means_all[snp]) / scaled_snps_sds_all[snp],
-                                                   (2 - scaled_snps_means_all[snp]) / scaled_snps_sds_all[snp]))
+                                                   (2 - scaled_snps_means_all[snp]) / scaled_snps_sds_all[snp],
+                                                   0))
     
     # Join to prediction dataframe
     pred_sub <- left_join(pred, gen_temp_all)
     
     ## For SNPs as - make it so that column name is snp name
     pred_sub <-  pred_sub  %>%
-      dplyr::filter(genotype %in% pull(dat_snp_all_unscaled, snp)) %>%
+      # dplyr::filter(genotype %in% pull(dat_snp_all_unscaled, snp)) %>%
       dplyr::mutate(!!snp := genotype_scaled) %>% 
       dplyr::mutate(genotype = as.character(genotype))
     
@@ -146,9 +149,7 @@
       n_gen0 = gam_snp_int$n_gen0,
       n_gen1 = gam_snp_int$n_gen1,
       n_gen2 = gam_snp_int$n_gen2,
-      
-      # Converged?
-      converged = gam_snp_int$mgcv.conv,
+      n_missing = gam_snp_int$n_missing,
       
       # Deviance explained
       dev_explained = gam_snp_int_summary$dev.expl,
@@ -160,6 +161,12 @@
       # # Use grep to look at the last number of the smooth summary table - 
       # # Should correspond to the genotype
       # # Returns NA if no match
+      p_val_gen_main = ifelse(length(gam_snp_int_summary$p.table[grep(pattern = "snp_",                                            rownames(gam_snp_int_summary$p.table)), "Pr(>|t|)"]) == 0,
+                                       yes = NA,
+                                       no = gam_snp_int_summary$p.table[grep(pattern = "snp_",
+                                                                                      rownames(gam_snp_int_summary$p.table)), "Pr(>|t|)"]),
+      
+      
       p_val_gen_int = ifelse(length(gam_snp_int_summary$s.table[grep(pattern = ":snp_",                                            rownames(gam_snp_int_summary$s.table)), "p-value"]) == 0,
                              yes = NA,
                              no = gam_snp_int_summary$s.table[grep(pattern = ":snp_",
@@ -209,17 +216,18 @@ for(fold in 1:length(training_folds)){
   
   # Make prediction dataframe
   gen_temp_training <- data.frame(accession = "1", 
-                                  genotype = c(0, 1, 2),             
+                                  genotype = c(0, 1, 2, NA),             
                                   genotype_scaled = c((0 - scaled_snps_means_all[snp]) /
                                                         scaled_snps_sds_all[snp],
                                                       (1 - scaled_snps_means_all[snp]) / scaled_snps_sds_all[snp],
-                                                      (2 - scaled_snps_means_all[snp]) / scaled_snps_sds_all[snp]))
+                                                      (2 - scaled_snps_means_all[snp]) / scaled_snps_sds_all[snp], 
+                                                      0))
   
   pred_sub_training <- left_join(pred, gen_temp_training)
   
   
   pred_sub_training <-  pred_sub_training  %>%
-    dplyr::filter(genotype %in% pull(dat_snp_training_unscaled, snp)) %>%
+   # dplyr::filter(genotype %in% pull(dat_snp_training_unscaled, snp)) %>%
     dplyr::mutate(!!snp := genotype_scaled) %>% 
     dplyr::mutate(genotype = as.character(genotype))
   
@@ -244,6 +252,13 @@ for(fold in 1:length(training_folds)){
   
   
   ## Extract test statistics and p value for training model
+  p_val_gen_main_training = ifelse(length(gam_snp_int_training_summary$p.table[grep(pattern = "snp_",                                            rownames(gam_snp_int_training_summary$p.table)), "Pr(>|t|)"]) == 0,
+                                   yes = NA,
+                                   no = gam_snp_int_training_summary$p.table[grep(pattern = "snp_",
+                                                                                  rownames(gam_snp_int_training_summary$p.table)), "Pr(>|t|)"])
+  
+  
+  
   p_val_gen_int_training = ifelse(length(gam_snp_int_training_summary$s.table[grep(pattern = ":snp_",
                                  rownames(gam_snp_int_training_summary$s.table)), "p-value"]) == 0,
                                   yes = NA,
@@ -258,6 +273,7 @@ for(fold in 1:length(training_folds)){
                                                      rownames(gam_snp_int_training_summary$s.table)), "F"])
   
   ## Add to summary df
+  gam_mod_summary_df[, paste0("p_val_gen_main_fold", fold)] <- p_val_gen_main_training
   gam_mod_summary_df[, paste0("p_val_gen_int_fold", fold)] <- p_val_gen_int_training
   gam_mod_summary_df[, paste0("f_val_gen_int_fold", fold)] <- f_val_gen_int_training
   

@@ -71,9 +71,6 @@ str(sum_df_raw)
 # For backup
 sum_df <- sum_df_raw
 
-# Filter out models that did not converge
-table(sum_df_raw$converged)
-
 # How many acccession used for prediction
 table(sum_df_raw$acc_pred)
 
@@ -122,14 +119,12 @@ base0 <- mean(pred_df_sub$pred[pred_df_sub$tmax_dif_unscaled == 0])
 
 pred_df_long =  pred_df_sub %>%
   dplyr::group_by(snp, genotype) %>%
-  do(data.frame(height_change_warmer_absolute = mean(.$pred[.$tmax_dif_unscaled > 0]),
-                height_change_warmer_absolute_training = mean(.$pred_training[.$tmax_dif_unscaled > 0])))
+  do(data.frame(height_change_warmer_absolute = mean(.$pred[.$tmax_dif_unscaled > 0])))
 
 head(pred_df_long)
 dim(pred_df_long)
 
 summary(pred_df_long$height_change_warmer_absolute)
-summary(pred_df_long$height_change_warmer_absolute_training)
 
 
 # Join prediction dataframe to summary dataframe
@@ -300,7 +295,7 @@ n_snps_values <- round(c(seq(100, nrow(sum_df), length.out = 20)))
 
 # Initialize dataframe for output
 prs_df_summary <- tibble(n_snps = n_snps_values,
-                         r2_training = NA)
+                         r2 = NA)
 
 # Order snps based on lowest Q values
 snp_list_ordered <- sum_df$snp[order(sum_df$p_val_gen_int)]
@@ -308,8 +303,6 @@ snp_list_ordered <- sum_df$snp[order(sum_df$p_val_gen_int)]
 # Initialize
 gen_dat_moms$prs <- NULL
 gen_dat_moms$prs_count <- NULL
-gen_dat_moms$prs_training <- NULL
-gen_dat_moms$prs_training_count <- NULL
 
 x = 1
 
@@ -323,8 +316,7 @@ for(snp_name in snp_list_ordered){
   sub <- gen_dat_moms[ , snp_name]
   
   preds_sub <- dplyr::filter(sum_df_long_w_preds, snp == snp_name) %>%
-    dplyr::select(genotype, height_change_warmer_absolute, 
-                  height_change_warmer_absolute_training, n_gen, q_val)
+    dplyr::select(genotype, height_change_warmer_absolute, n_gen, q_val)
   
   counted <- preds_sub$genotype
   
@@ -332,21 +324,18 @@ for(snp_name in snp_list_ordered){
   if(!"0" %in% preds_sub$genotype){
     preds_sub <- rbind(preds_sub, data.frame(genotype = "0",
                                              height_change_warmer_absolute = 0,
-                                             height_change_warmer_absolute_training = 0,
                                              n_gen = NA,
                                              q_val = NA))
   }
   if(!"1" %in% preds_sub$genotype){
     preds_sub <- rbind(preds_sub, data.frame(genotype = "1",
                                              height_change_warmer_absolute = 0,
-                                             height_change_warmer_absolute_training = 0,
                                              n_gen = NA,
                                              q_val = NA))
   }
   if(!"2" %in% preds_sub$genotype){
     preds_sub <- rbind(preds_sub, data.frame(genotype = "2",
                                              height_change_warmer_absolute = 0,
-                                             height_change_warmer_absolute_training = 0,
                                              n_gen = NA,
                                              q_val = NA))
   }
@@ -358,26 +347,15 @@ for(snp_name in snp_list_ordered){
     TRUE ~ 0
   )
   
-  prs_training <- case_when(
-    sub == "0" ~  preds_sub$height_change_warmer_absolute_training[preds_sub$genotype == "0"],  
-    sub == "1"  ~ preds_sub$height_change_warmer_absolute_training[preds_sub$genotype == "1"],
-    sub == "2"  ~ preds_sub$height_change_warmer_absolute_training[preds_sub$genotype == "2"],
-    TRUE ~ 0
-  )
   
   prs_count <- ifelse(as.data.frame(sub)[, 1] %in% counted, yes = 1, no = 0)
-  prs_training_count <- ifelse(as.data.frame(sub)[, 1] %in% counted, yes = 1, no = 0)
-  
+
   if(x == 1){
     gen_dat_moms$prs <- prs
     gen_dat_moms$prs_count <- prs_count
-    gen_dat_moms$prs_training <- prs_training
-    gen_dat_moms$prs_training_count <- prs_training_count
   } else {
     gen_dat_moms$prs <- gen_dat_moms$prs + prs
     gen_dat_moms$prs_count <- gen_dat_moms$prs_count + prs_count
-    gen_dat_moms$prs_training <- gen_dat_moms$prs_training + prs_training
-    gen_dat_moms$prs_training_count <- gen_dat_moms$prs_training_count + prs_training_count
   }
   
   if(x %in% n_snps_values){
@@ -386,24 +364,21 @@ for(snp_name in snp_list_ordered){
     
     # Adjust for missing data
     gen_dat_moms$prs_by_count <- gen_dat_moms$prs / gen_dat_moms$prs_count
-    gen_dat_moms$prs_training_by_count <- gen_dat_moms$prs_training / gen_dat_moms$prs_training_count
     
     # Save prs score as its own variable for later use
     gen_dat_moms[, paste0("prs_", x)] <-  gen_dat_moms$prs_by_count
-    gen_dat_moms[, paste0("prs_training_", x)] <-  gen_dat_moms$prs_training_by_count
-    
+
     ### Join to testing dataframe
-    #  dat_snp_testing_unscaled$accession <- as.numeric(as.character(dat_snp_testing_unscaled$accession))
-    test2 <- dplyr::left_join(dat_snp_testing_unscaled, 
-              dplyr::select(gen_dat_moms, accession, prs_training_by_count), by = "accession")
+    test2 <- dplyr::left_join(dat_snp_all, 
+              dplyr::select(gen_dat_moms, accession, prs_by_count), by = "accession")
     
     # Scale prs
-    test2$prs_training_scaled <- (test2$prs_training_by_count - mean(test2$prs_training_by_count)) / sd(test2$prs_training_by_count)
+    test2$prs_scaled <- (test2$prs_by_count - mean(test2$prs_by_count)) / sd(test2$prs_by_count)
     
 
     # Set up model terms
-    fixed_effects_resids <- paste0(paste0("rgr_resids ~ s(prs_training_scaled, bs=\"cr\") + 
-                                          s(tmax_dif, by = prs_training_scaled, bs=\"cr\")"))
+    fixed_effects_resids <- paste0(paste0("rgr_resids ~ s(prs_scaled, bs=\"cr\") + 
+                                          s(tmax_dif, by = prs_scaled, bs=\"cr\")"))
     
     # Gam with interaction effect
     gam_test_resids = bam(formula = formula(fixed_effects_resids),
@@ -417,13 +392,13 @@ for(snp_name in snp_list_ordered){
     
     # Plot visualization
     title <-  paste(" # SNPS: ", x)
-    visreg(gam_test_resids, xvar = "tmax_dif", by = "prs_training_scaled", partial = F,
+    visreg(gam_test_resids, xvar = "tmax_dif", by = "prs_scaled", partial = F,
            overlay = T, main = title)
     
     cat(paste(title, "\n"))
     
     ## Save results   
-    prs_df_summary$r2_training[prs_df_summary$n_snps == x] <- summary(gam_test_resids)$r.sq
+    prs_df_summary$r2[prs_df_summary$n_snps == x] <- summary(gam_test_resids)$r.sq
     
   } # End model loop
   
@@ -435,15 +410,15 @@ for(snp_name in snp_list_ordered){
 prs_df_summary
 
 prs_df_summary %>%
-  arrange(desc(r2_training))
+  arrange(desc(r2))
 
 ## Plot relationship between # of SNPS used and variance explained in testing set
-ggplot(prs_df_summary, aes(x = n_snps, y = r2_training)) + 
+ggplot(prs_df_summary, aes(x = n_snps, y = r2)) + 
   geom_point(size = 2) + 
   geom_line() + 
   xlab("Number of SNPs in GEBV estimation") +
   #ylab("R2 adjusted in testing set") +
-  ylab(bquote('R'^2[adj]~'training test')) +
+  ylab(bquote('R'^2[adj]~'test')) +
   scale_x_continuous(breaks = prs_df_summary$n_snps) +
   # scale_y_continuous(breaks = seq(0, 0.02, by = 0.0025), limits = c(-0.0015, 0.015)) + 
   theme_bw(7) + 
@@ -462,13 +437,11 @@ ggsave(paste0("./figures/Testing variance explained by number of snps_", n_sites
 
 
 
-top_r2_index <- which(prs_df_summary$r2_training == max(prs_df_summary$r2_training,
+top_r2_index <- which(prs_df_summary$r2 == max(prs_df_summary$r2,
                                                na.rm = T))
 
 # Set top PRS
 gen_dat_moms$prs_best <- gen_dat_moms[, paste0("prs_",
-                                               prs_df_summary$n_snps[top_r2_index])]
-gen_dat_moms$prs_training_best <- gen_dat_moms[, paste0("prs_training_",
                                                prs_df_summary$n_snps[top_r2_index])]
 
 # Scale PRS scores
@@ -478,17 +451,6 @@ gen_dat_moms$prs_best_unscaled <- gen_dat_moms$prs_best
 gen_dat_moms$prs_best_scaled <- (gen_dat_moms$prs_best - prs_best_mean) / prs_best_sd
 
 summary(gen_dat_moms$prs_best_scaled); hist(gen_dat_moms$prs_best_scaled, breaks = 50)
-
-prs_training_best_mean <- mean(gen_dat_moms$prs_training_best)
-prs_training_best_sd <- sd(gen_dat_moms$prs_training_best)
-gen_dat_moms$prs_training_best_unscaled <- gen_dat_moms$prs_training_best
-gen_dat_moms$prs_training_best_scaled <- (gen_dat_moms$prs_training_best - prs_training_best_mean) / prs_training_best_sd
-
-summary(gen_dat_moms$prs_training_best_scaled); hist(gen_dat_moms$prs_training_best_scaled, breaks = 50)
-
-
-
-
 
 
 
@@ -538,68 +500,6 @@ summary(gam_prs_all)
 anova(gam_prs_all)
 sink()
 
-
-
-# Run models with testing and training set and output model summaries
-# 
-# # ## Training  
-#   dat_snp_training2 <- dat_snp_training %>%
-#     dplyr::mutate(accession = as.numeric(as.character(accession))) %>%
-#     dplyr::left_join(.,  dplyr::select(gen_dat_moms, accession, prs_best, prs_best_scaled))
-# 
-#   dim(dat_snp_training2)
-# 
-#   # Gam with interaction effect
-#   gam_prs_training = bam(formula = formula(fixed_effects),
-#                     data = dat_snp_training2,
-#                     discrete = FALSE,
-#                     nthreads = 8,
-#                     method = "fREML",
-#                     #   family = "tw",
-#                     control = list(trace = FALSE))
-# 
-#   summary(gam_prs_training)
-
-#   ## Save output
-#   
-#   # Save gam summary to file
-#    sink(file = paste0("./figs_tables/Table S2 - prs_training_gam_model_summary_",
-#                       Sys.Date(), ".txt"))
-#    summary(gam_prs_training)
-#   # anova(gam_prs_training)
-#    sink()
-#   
-#### Testing
-dat_snp_testing2 <- dat_snp_testing %>%
-  #  dplyr::mutate(accession = as.numeric(as.character(accession))) %>%
-  dplyr::left_join(.,  dplyr::select(gen_dat_moms, accession, prs_best, prs_training_best_scaled))
-
-dim(dat_snp_testing2)
-
-# Set formula
-fixed_effects <- paste0(paste0("rgr_resids ~ s(prs_training_best_scaled, bs=\"cr\") + 
-                               s(tmax_dif, by = prs_training_best_scaled, bs=\"cr\")"))
-
-
-# Gam with interaction effect
-gam_prs_testing = bam(formula = formula(fixed_effects),
-                      data = dat_snp_testing2,
-                      discrete = FALSE,
-                      nthreads = 8,
-                      method = "fREML",
-                      #   family = "tw",
-                      control = list(trace = FALSE))
-
-summary(gam_prs_testing)
-
-## Save output
-
-# Save gam summary to file
-sink(file = paste0("./figures/prs_testing_gam_model_summary_",n_sites, "_sites_",
-                   Sys.Date(), ".txt"))
-summary(gam_prs_testing)
-anova(gam_prs_testing)
-sink()
 
 
 ## Plot predictions
@@ -733,7 +633,8 @@ summary(acc_prs$prs_true)
 hist(acc_prs$prs, breaks = 50)
 
 # Set colors for training and testing set
-col <- ifelse(acc_prs$accession %in% training_moms, "steelblue", "coral")
+# col <- ifelse(acc_prs$accession %in% training_moms, "steelblue", "coral")
+col <- "black"
 
 
 png(paste0("./figures/GAM correlation with true GEBV ", 
@@ -753,21 +654,21 @@ par(mfrow = c(1,2))
 
 
 ## Second plot is focusing on training vs. testing
-  plot(scale(acc_prs$prs_true), gen_dat_moms$prs_training_best_scaled, pch = 19,
-       xlab = "GEBV True", ylab = "GEBV Estimated in Training model", col = col)
-  abline(a = 0, b = 1, lwd = 2)
-
-  cor_overall <- cor(acc_prs$prs_true, gen_dat_moms$prs_training_best_scaled)
-  cor_training <- cor(acc_prs$prs_true[acc_prs$accession %in% training_moms], 
-                      gen_dat_moms$prs_training_best_scaled[gen_dat_moms$accession %in% training_moms])
-  cor_testing <- cor(acc_prs$prs_true[!acc_prs$accession %in% training_moms], 
-                     gen_dat_moms$prs_training_best_scaled[!gen_dat_moms$accession %in% training_moms])
-
-
-  legend("bottomright", legend = c(paste0("R = ", round(cor_overall, 3)),
-                                    paste0("R = ", round(cor_training, 3)),
-                                    paste0("R = ", round(cor_testing, 3))),
-          col = c("black", "steelblue", "coral"), pch = 19)
+  # plot(scale(acc_prs$prs_true), gen_dat_moms$prs_training_best_scaled, pch = 19,
+  #      xlab = "GEBV True", ylab = "GEBV Estimated in Training model", col = col)
+  # abline(a = 0, b = 1, lwd = 2)
+  # 
+  # cor_overall <- cor(acc_prs$prs_true, gen_dat_moms$prs_training_best_scaled)
+  # cor_training <- cor(acc_prs$prs_true[acc_prs$accession %in% training_moms], 
+  #                     gen_dat_moms$prs_training_best_scaled[gen_dat_moms$accession %in% training_moms])
+  # cor_testing <- cor(acc_prs$prs_true[!acc_prs$accession %in% training_moms], 
+  #                    gen_dat_moms$prs_training_best_scaled[!gen_dat_moms$accession %in% training_moms])
+  # 
+  # 
+  # legend("bottomright", legend = c(paste0("R = ", round(cor_overall, 3)),
+  #                                   paste0("R = ", round(cor_training, 3)),
+  #                                   paste0("R = ", round(cor_testing, 3))),
+  #         col = c("black", "steelblue", "coral"), pch = 19)
 
 
 par(mfrow = c(1,1))
@@ -795,25 +696,20 @@ pairs.panels(select(sum_df_wtruth, snp_effect, dev_explained, rsq_adj,
 # Testing out conventional approaches -------------------------------------
 
 ## Testing out different transfer functions per accession
-gam_acc <- bam(rgr ~ section_block + s(tmax_dif, bs = "cr") + s(accession, bs = "re") +  s(tmax_dif, by = accession),
+gam_acc <- bam(rgr ~ section_block + s(tmax_dif, bs = "cr") +
+                 s(tmax_dif, by = accession, bs = "cr"),
                data = sim_dat,
                discrete = FALSE,
-               nthreads = 8,
-               method = "fREML",
-               # accession = "gaussian",
-               #   accession = "tw",
-               control = list(trace = FALSE))
+               method = "fREML")
 
 # summary(gam_acc)
 
 ## Doing the same with a quadratic function
-gam_acc_quad <- lmer(rgr ~ section_block + tmax_dif + I(tmax_dif^2) + 
+gam_acc_quad <- lmer(rgr ~ section_block + I(tmax_dif^2) + 
                        + (tmax_dif | accession),
                      data = sim_dat)
 
 summary(gam_acc_quad)
-
-visreg(gam_acc_quad, partial = F)
 
 
 ## Calculate RGR at tmax > 0 based on individual accession curves
@@ -894,7 +790,6 @@ for(acc in names(tmax_opt)){
   x = x + 1
 }
 
-
 acc_rgr_absolute
 
 # Comapre with true values of gebv
@@ -933,50 +828,28 @@ cor.test(acc_rgr_absolute$height_change_warmer,
  y.quad = acc_rgr_absolute$height_change_warmer_quad
  summary(y)
  
- # Make training set
- y.training <- y
- y.training[!acc_rgr_absolute$accession %in% training_moms] <- NA # Set as NA those in the testing set
- summary(y.training)
- 
- y.quad.training <- y
- y.quad.training[!acc_rgr_absolute$accession %in% training_moms] <- NA # Set as NA those in the testing set
- summary(y.quad.training)
- 
- ## Model with SNP and methylation data
- mod.snp <-BGLR( y = y,
-                 ETA = list(list(K = A.snp, model = 'RKHS')),
-                 nIter = nIter, burnIn = burnIn,
-                 saveAt='./bglr/', 
-                 verbose = verbose)
 
-  mod.snp.training <-BGLR( y = y.training,
+ ## Model with SNP and methylation data
+ mod.snp <- BGLR( y = y,
                  ETA = list(list(K = A.snp, model = 'RKHS')),
                  nIter = nIter, burnIn = burnIn,
                  saveAt='./bglr/', 
                  verbose = verbose)
   
-  mod.snp.quad <-BGLR( y = y.quad,
+ mod.snp.quad <- BGLR( y = y.quad,
                   ETA = list(list(K = A.snp, model = 'RKHS')),
                   nIter = nIter, burnIn = burnIn,
                   saveAt='./bglr/', 
                   verbose = verbose)
-  
-  mod.snp.quad.training <-BGLR( y = y.quad.training,
-                           ETA = list(list(K = A.snp, model = 'RKHS')),
-                           nIter = nIter, burnIn = burnIn,
-                           saveAt='./bglr/', 
-                           verbose = verbose)
- 
+
  ## Compare estimated breeding values to true breeding values
  bglr_gebv <- mod.snp$ETA[[1]]$u
- bglr_gebv_training <- mod.snp.training$ETA[[1]]$u
- 
  bglr_gebv_quad <- mod.snp.quad$ETA[[1]]$u
- bglr_gebv_quad_training <- mod.snp.quad.training$ETA[[1]]$u
- 
+
  
  # Set colors for training and testing set
- col <- ifelse(acc_prs$accession %in% training_moms, "steelblue", "coral")
+# col <- ifelse(acc_prs$accession %in% training_moms, "steelblue", "coral")
+ col <- "black"
  
  
  
@@ -998,21 +871,21 @@ cor.test(acc_rgr_absolute$height_change_warmer,
 
 
 ## Second plot is focusing on training vs. testing
-  plot(scale(acc_prs$prs_true), scale(bglr_gebv_training), pch = 19,
-       xlab = "GEBV True", ylab = "GEBV Estimated (BLUP) in Training model", col = col)
-  abline(a = 0, b = 1, lwd = 2)
-
-  cor_overall <- cor(acc_prs$prs_true, scale(bglr_gebv_training))
-  cor_training <- cor(acc_prs$prs_true[acc_prs$accession %in% training_moms], 
-                      scale(bglr_gebv_training)[gen_dat_moms$accession %in% training_moms])
-  cor_testing <- cor(acc_prs$prs_true[!acc_prs$accession %in% training_moms], 
-                     scale(bglr_gebv_training)[!gen_dat_moms$accession %in% training_moms])
-
-
-  legend("bottomright", legend = c(paste0("R = ", round(cor_overall, 3)),
-                                    paste0("R = ", round(cor_training, 3)),
-                                    paste0("R = ", round(cor_testing, 3))),
-          col = c("black", "steelblue", "coral"), pch = 19)
+  # plot(scale(acc_prs$prs_true), scale(bglr_gebv_training), pch = 19,
+  #      xlab = "GEBV True", ylab = "GEBV Estimated (BLUP) in Training model", col = col)
+  # abline(a = 0, b = 1, lwd = 2)
+  # 
+  # cor_overall <- cor(acc_prs$prs_true, scale(bglr_gebv_training))
+  # cor_training <- cor(acc_prs$prs_true[acc_prs$accession %in% training_moms], 
+  #                     scale(bglr_gebv_training)[gen_dat_moms$accession %in% training_moms])
+  # cor_testing <- cor(acc_prs$prs_true[!acc_prs$accession %in% training_moms], 
+  #                    scale(bglr_gebv_training)[!gen_dat_moms$accession %in% training_moms])
+  # 
+  # 
+  # legend("bottomright", legend = c(paste0("R = ", round(cor_overall, 3)),
+  #                                   paste0("R = ", round(cor_training, 3)),
+  #                                   paste0("R = ", round(cor_testing, 3))),
+  #         col = c("black", "steelblue", "coral"), pch = 19)
 
 
   par(mfrow = c(1,1))
@@ -1039,21 +912,21 @@ cor.test(acc_rgr_absolute$height_change_warmer,
  
  
  ## Second plot is focusing on training vs. testing
- plot(scale(acc_prs$prs_true), scale(bglr_gebv_quad_training), pch = 19,
-      xlab = "GEBV True", ylab = "GEBV Estimated (BLUP) in Training model", col = col)
- abline(a = 0, b = 1, lwd = 2)
- 
- cor_overall <- cor(acc_prs$prs_true, scale(bglr_gebv_quad_training))
- cor_training <- cor(acc_prs$prs_true[acc_prs$accession %in% training_moms], 
-                     scale(bglr_gebv_quad_training)[gen_dat_moms$accession %in% training_moms])
- cor_testing <- cor(acc_prs$prs_true[!acc_prs$accession %in% training_moms], 
-                    scale(bglr_gebv_quad_training)[!gen_dat_moms$accession %in% training_moms])
- 
- 
- legend("bottomright", legend = c(paste0("R = ", round(cor_overall, 3)),
-                                  paste0("R = ", round(cor_training, 3)),
-                                  paste0("R = ", round(cor_testing, 3))),
-        col = c("black", "steelblue", "coral"), pch = 19)
+ # plot(scale(acc_prs$prs_true), scale(bglr_gebv_quad_training), pch = 19,
+ #      xlab = "GEBV True", ylab = "GEBV Estimated (BLUP) in Training model", col = col)
+ # abline(a = 0, b = 1, lwd = 2)
+ # 
+ # cor_overall <- cor(acc_prs$prs_true, scale(bglr_gebv_quad_training))
+ # cor_training <- cor(acc_prs$prs_true[acc_prs$accession %in% training_moms], 
+ #                     scale(bglr_gebv_quad_training)[gen_dat_moms$accession %in% training_moms])
+ # cor_testing <- cor(acc_prs$prs_true[!acc_prs$accession %in% training_moms], 
+ #                    scale(bglr_gebv_quad_training)[!gen_dat_moms$accession %in% training_moms])
+ # 
+ # 
+ # legend("bottomright", legend = c(paste0("R = ", round(cor_overall, 3)),
+ #                                  paste0("R = ", round(cor_training, 3)),
+ #                                  paste0("R = ", round(cor_testing, 3))),
+ #        col = c("black", "steelblue", "coral"), pch = 19)
  
  
  par(mfrow = c(1,1))
