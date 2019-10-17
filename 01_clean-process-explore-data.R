@@ -431,4 +431,20 @@
      # dat_all <- dat_all[dat_all$site == "Chico", ]
     
      dim(dat_all)
+     
+     
+     ## For Jessica
+     # write_csv(dat_all, "~/Desktop/Common garden growth rates - individual.csv")
+     # 
+     # dat_all$accession <- factor(dat_all$accession)
+     # lm1 <- lmer(rgr ~ (1 | accession) + height_2014 + (1 | section_block),  data = dat_all)
+     # summary(lm1)
+     # 
+     # blups <- ranef(lm1)$accession
+     # blups$accession <- rownames(blups)
+     # blups <- blups[, c("accession", "(Intercept)")]
+     # colnames(blups) <- c("accession", "rgr_blup")
+     # head(blups)
+     # 
+     # write_csv(blups, "~/Desktop/Common garden growth rates - blups.csv")
 

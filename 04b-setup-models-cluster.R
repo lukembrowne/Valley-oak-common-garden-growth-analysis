@@ -261,7 +261,7 @@
   dat_snp_all_unscaled$rgr_resids <- resid(gam_snp_all)
   hist(dat_snp_all$rgr_resids, breaks = 50)
   
-  save.image(paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
+  # save.image(paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
   
   
   summary(back_transform(dat_snp_all$tmax_sum_dif,
