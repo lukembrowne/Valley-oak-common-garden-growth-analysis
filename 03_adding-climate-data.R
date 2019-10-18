@@ -426,8 +426,6 @@
     
 # Choose climate variables ------------------------------------------------
    
-     ## Core variables from Riordan et al. 2016 Am J Botany  
-    ## Except we are excluding AET because it is very strongly correlated with cwd
     climate_vars <- c("tmax_sum",
                       "tmax","tmin",
                       "tave",
@@ -594,13 +592,6 @@
 
 # Scaling predictor variables -------------------------------------------------------
       
-      
-  x <- 1:100    
-  x_sc <- (x - mean(x)) / sd(x)   
-  
-  (x_sc * sd(x)) + mean(x)
-      
-  
   # Need to run separately for both full dataset and dataset with only gbs samples
   dat_all_scaled <- dat_all_clim
   dat_gbs_all_scaled <- dat_gbs_all_clim

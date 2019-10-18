@@ -1,4 +1,6 @@
 
+## Code to setup datasets for uploading to computing cluster to run GAM GWAS analysis
+
 
 # Load libraries ----------------------------------------------------------
   
@@ -151,73 +153,34 @@
 
  ## Create folds for cross validation
     
-    
-    # Select a subset of adults for taining and testing, CV Validation
-    
-    
-    # 70/30 sampling
-    # For path "run_475547_tmax_sum_dif_training_set_resids_7030_2019_02_26"
-    # Used in initial submission to PNAS
-    # set.seed(129)
-    # training_moms <- sample(na.omit(climate_gbs_mom$accession),
-    #                         size = length(na.omit(climate_gbs_mom$accession))*0.70)
-    # 
-    # testing_moms <- na.omit(climate_gbs_mom$accession)[!na.omit(climate_gbs_mom$accession)
-    #                                                    %in% training_moms]
-    # 
-    # any(training_moms %in% testing_moms) # Should both be false
-    # any(testing_moms %in% training_moms)
-    # 
-    # 
-    # ## Save two datasets for training and testing
-    # dat_gbs_training_clim <- dat_gbs_all_clim %>%
-    #   dplyr::filter(accession %in% training_moms)
-    # dat_gbs_testing_clim <- dat_gbs_all_clim %>%
-    #   dplyr::filter(accession %in% testing_moms)
-    # 
-    # dim(dat_gbs_training_clim)
-    # dim(dat_gbs_testing_clim)
-    # 
-    # table(dat_gbs_testing_clim$section_block)
-    # table(dat_gbs_testing_clim$locality)
-    # table(dat_gbs_testing_clim$accession)
-    # 
-    # table(dat_gbs_training_clim$section_block)
-    # table(dat_gbs_training_clim$locality)
-    # table(dat_gbs_training_clim$accession)
-    # 
-    # unique(dat_gbs_testing_clim$accession) %in% unique(dat_gbs_training_clim$accession)
-    # unique(dat_gbs_training_clim$accession) %in% unique(dat_gbs_testing_clim$accession)
-    # sum(unique(dat_gbs_training_clim$accession) %in% unique(dat_gbs_testing_clim$accession))
-    
-    
+   
     # 10 fold cross validation - not across families
-    # set.seed(300)
-    # 
-    # training_folds_moms <-  caret::createFolds(na.omit(climate_gbs_mom$accession),
-    #                                       k = 10, returnTrain = T)
-    # 
-    # training_folds <- list()
-    # for(fold in 1:length(training_folds_moms)){
-    #   training_folds[[fold]] <- which(dat_gbs_all_clim$accession %in% 
-    #                               na.omit(climate_gbs_mom$accession)[training_folds_moms[[fold]]]) 
-    # }
-    # 
-    # 
-    # 
-    # ## Check on folds
-    # x = 1
-    # for(fold in 1:length(training_folds)){
-    #   cat(paste0("|--- Fold ", fold, " ---| \n"))
-    #   cat("percent in training vs. testing: \n ")
-    #   print(nrow(dat_gbs_all_clim[training_folds[[fold]], ])/nrow(dat_gbs_all_clim))
-    #   print(nrow(dat_gbs_all_clim[-training_folds[[fold]], ])/nrow(dat_gbs_all_clim))
-    #   
-    #   cat("Number of accessions in training that are in testing \n ")
-    #   print(sum(unique(dat_gbs_all_clim$accession[training_folds[[fold]]]) %in% 
-    #               unique(dat_gbs_all_clim$accession[-training_folds[[fold]]])))
-    #   x = x + 1
-    # }
+    set.seed(300)
+
+    training_folds_moms <-  caret::createFolds(na.omit(climate_gbs_mom$accession),
+                                          k = 10, returnTrain = T)
+
+    training_folds <- list()
+    for(fold in 1:length(training_folds_moms)){
+      training_folds[[fold]] <- which(dat_gbs_all_clim$accession %in%
+                                  na.omit(climate_gbs_mom$accession)[training_folds_moms[[fold]]])
+    }
+
+
+
+    ## Check on folds
+    x = 1
+    for(fold in 1:length(training_folds)){
+      cat(paste0("|--- Fold ", fold, " ---| \n"))
+      cat("percent in training vs. testing: \n ")
+      print(nrow(dat_gbs_all_clim[training_folds[[fold]], ])/nrow(dat_gbs_all_clim))
+      print(nrow(dat_gbs_all_clim[-training_folds[[fold]], ])/nrow(dat_gbs_all_clim))
+
+      cat("Number of accessions in training that are in testing \n ")
+      print(sum(unique(dat_gbs_all_clim$accession[training_folds[[fold]]]) %in%
+                  unique(dat_gbs_all_clim$accession[-training_folds[[fold]]])))
+      x = x + 1
+    }
 
     
 ## 10 fold validation across families    
@@ -240,9 +203,10 @@
       x = x + 1
     }
     
-  ### Run full model and save out residuals for cluster analysis
+    
+    
+### Run full model and save out residuals for cluster analysis
   
-  ## Original used in PNAS submission
   fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(accession, bs = \"re\") + s(locality, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\")  + s(tmax_sum_dif, by = PC1_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC2_gen, bs=\"cr\") + s(PC1_clim, bs=\"cr\") + s(PC2_clim, bs=\"cr\")  + s(tmax_sum_dif, by = PC1_clim, bs=\"cr\") + s(tmax_sum_dif, by = PC2_clim, bs=\"cr\")"))
 
   
@@ -262,12 +226,6 @@
   hist(dat_snp_all$rgr_resids, breaks = 50)
   
   # save.image(paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
-  
-  
-  summary(back_transform(dat_snp_all$tmax_sum_dif,
-                         "tmax_sum_dif",
-                         scaled_var_means_gbs_all,
-                         scaled_var_sds_gbs_all))
 
 
  

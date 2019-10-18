@@ -38,17 +38,12 @@
 
 # Choose model type -------------------------------------------------------
 
-  #  response_variable = "height"
     response_variable = "rgr"
-  # response_variable = "survival"
-
 
 # Load and quality check data ---------------------------------------------------------------
     
   ## Load in garden data from 2017 - "Qlobata census measurements 2017"
 
-    ## If token is stale: gs_auth(new_user = TRUE)
-     #dat_17_raw <- gs_read(gs_key("1CvaUjE7qBvKbbc8QaG_B4vxFZlCNe79z_q9JwYhMhhw"), ws = 2)
     dat_17_raw <- read_csv("./data/cleaned_data/Qlobata census measurements 2017 - Measurement data 2017.csv", guess_max = 50000)
     colnames(dat_17_raw) <- paste0(colnames(dat_17_raw), "_2017")
     
@@ -59,7 +54,6 @@
     dim(dat_17_raw)
     
   ## Load in garden data from 2015 - "Qlobata census measurements 2015"
-   #dat_15_raw <- gs_read(gs_key("1ljUeS4j3tte1qaXQFNJGmeOL7wTIlBRC8N5vJ1HlN8k"), ws = 2)
     dat_15_raw <- read_csv("./data/cleaned_data/Qlobata census measurements 2015 - Measurement Data 2015.csv", guess_max = 50000)
     colnames(dat_15_raw) <- paste0(colnames(dat_15_raw), "_2015")
     
@@ -71,7 +65,6 @@
     
     
   ## Load in 2014 data which has heights before planted into garden
-   # dat_14_raw <- gs_read(gs_key("10Yss2ciOo0cazkT9Udu55QUr37T7zXeQbnGuLpTnAMM"), ws = 2)
     dat_14_raw <- read_csv("./data/cleaned_data/Qlobata census measurements 2014 - Measurement data 2014.csv", guess_max = 50000)
     colnames(dat_14_raw) <- paste0(colnames(dat_14_raw), "_2014")
     dat_14_raw$Progeny_2014 <- as.character(dat_14_raw$Progeny_2014)
@@ -199,47 +192,11 @@
         }
       }
       
-      #### Round height values to the nearest 5
-     # dat_all$height_2014 <- round(dat_all$height_2014 / 5) * 5
-     # dat_all$height_2015 <- round(dat_all$height_2015 / 5) * 5
-     # dat_all$height_2017 <- round(dat_all$height_2017 / 5) * 5
-      
-      ## Calculate height difference
-      # dat_all$height_dif <- dat_all$height_2017 - dat_all$height_2015
-      # 
-      # summary(dat_all$height_dif); hist(dat_all$height_dif)
-      # 
-      # plot(dat_all$height_2015, dat_all$height_dif, pch = 19, cex = 0.5)
-      
-      
     ## Calculate relative growth rates: over 3 years
-      # dat_all$rgr <- (log(dat_all$height_2017) - log(dat_all$height_2015))/ 2
       dat_all$rgr <- (log(dat_all$height_2017) - log(dat_all$height_2014)) / 3
       
-      # plot(dat_all$height_2017, (exp(dat_all$rgr * 3)) * dat_all$height_2014)
-      
+
       summary(dat_all$rgr)
-      
-      # ## Plots of 2015 vs 2017
-      # plot(jitter(dat_all$height_2015), jitter(dat_all$height_2017),
-      #      pch = 19, cex = 0.5, las = 1,
-      #      xlab = "Height 2015 (cm)", ylab = "Height 2017 (cm)")
-      # abline(a = 0, b = 1, lwd = 2, col = "steelblue")
-      
-      ## Plot of RGR
-      # plot(dat_all$height_2014, dat_all$rgr, pch = 19, cex = 0.5, las = 1)
-      # cor.test(dat_all$height_2015, dat_all$rgr)
-      
-      ## Histogram of RGR
-        # ggplot(dat_all, aes(rgr)) + geom_histogram(fill = "steelblue2",
-        #                                            col = "black") + theme_bw() +
-        #   xlab("Relative growth rate (rgr)")
-      
-      ## View 'outliers
-      # View(dat_all[dat_all$rgr < -1 & !is.na(dat_all$rgr), ])
-      
-      # View(dat_all[dat_all$rgr > 1 & !is.na(dat_all$rgr), ])
-      
       
 
 # Reading in GBS data -----------------------------------------------------
@@ -248,10 +205,6 @@
   ## Reading in 012 genotype matrix created with vcftools, processing and cleaning in R
       
   ## MOMS IN GARDEN      
-    ## Read in position of SNPs - first column is chromosome number, second column is position
-  #  snp_pos <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_garden_moms.012.pos", 
-  #                             col_names = c("chrom", "pos"))
-      
     ## Using iterative filtering
     snp_pos <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4_noLD.012.pos", col_names = c("chrom", "pos"))
       
@@ -264,9 +217,7 @@
     col_names <- c("NUM", paste0("snp_", snp_pos$chrom, "_", snp_pos$pos))
 
     ## Set missing values (-1) to NA
-    # genotypes <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_garden_moms.012",
-    #                              col_names = col_names, na = "-1")
-    
+
     # Iterative filtering
     genotypes <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4_noLD.012",
                                  col_names = col_names, na = "-1")
@@ -277,9 +228,7 @@
     genotypes
     
     ## Read in individual
-    # indv <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_garden_moms.012.indv",
-    #                         col_names = "ID")
-    
+
     # Iterative filtering
     indv <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4_noLD.012.indv",
                             col_names = "ID")
@@ -291,7 +240,6 @@
       sample_key
       
       ## Link up with accession number
-      # accession_key <- gs_read(gs_key("1DUEV-pqV28D6qJl6vJM6S1VLWbxc9E71afufulDRbIc"), ws = 2)
       accession_key <- read_csv("./data/cleaned_data/Maternal tree locations and sample IDs - Locations and sample IDs.csv")
       accession_key
       
@@ -332,9 +280,6 @@
   ## ALL TREES WITH GBS SAMPLES  
       
       ## Set missing values (-1) to NA
-      # genotypes_all <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_all_moms.012",
-      #                              col_names = col_names, na = "-1")
-      
       # Iterative filtering
       genotypes_all <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4_noLD.012",
                                        col_names = col_names, na = "-1")
@@ -345,9 +290,6 @@
       genotypes_all
       
       ## Read in individual
-      # indv_all <- readr::read_tsv("./data/GBS_data/cleaned_data/gbs_all_moms.012.indv",
-      #                         col_names = "ID")
-      
       # Iterative filtering
       indv_all <- readr::read_tsv("./data/GBS_data/iterative filtering/cleaned_data/gbs451_FIL-4_noLD.012.indv",
                                   col_names = "ID")
@@ -389,34 +331,15 @@
       mech$comments_2015
       dat_all <- dplyr::filter(dat_all, !(accession_progeny %in% mech$accession_progeny))
 
-    ## Filtering based on height
-      
-      if(response_variable == "height"){
-        
-        # # Exclude based on percentle
-        # dat_all$height_2017[dat_all$height_2017 <= quantile(dat_all$height_2017, 0.025,
-        #                                                     na.rm = TRUE) |
-        #                       dat_all$height_2017 >= quantile(dat_all$height_2017, 0.975,
-        #                                                       na.rm = TRUE)] <- NA
-
-        ## Filter out NA heights
-        dat_all <- dplyr::filter(dat_all, !is.na(height_2017))
-        dat_all <- dplyr::filter(dat_all, !is.na(height_2014)) 
-        
-        ## Exclude individuals that lost height
-        dat_all <- dplyr::filter(dat_all, height_2017 - height_2014 >= 0)
- 
-      }
-
     
     ## Filtering based on RGR
       if(response_variable == "rgr"){
 
-      ## Filter out individuals without an estimated RGR
-       dat_all <- dplyr::filter(dat_all, !is.na(rgr))
-
-    # Exclude individuals with a negative growth rate
-      dat_all <- dplyr::filter(dat_all, rgr >= 0)
+          ## Filter out individuals without an estimated RGR
+           dat_all <- dplyr::filter(dat_all, !is.na(rgr))
+    
+          # Exclude individuals with a negative growth rate
+          dat_all <- dplyr::filter(dat_all, rgr >= 0)
 
       }
       
@@ -430,21 +353,6 @@
     ## Filtering based on garden
      # dat_all <- dat_all[dat_all$site == "Chico", ]
     
-     dim(dat_all)
+    dim(dat_all)
      
-     
-     ## For Jessica
-     # write_csv(dat_all, "~/Desktop/Common garden growth rates - individual.csv")
-     # 
-     # dat_all$accession <- factor(dat_all$accession)
-     # lm1 <- lmer(rgr ~ (1 | accession) + height_2014 + (1 | section_block),  data = dat_all)
-     # summary(lm1)
-     # 
-     # blups <- ranef(lm1)$accession
-     # blups$accession <- rownames(blups)
-     # blups <- blups[, c("accession", "(Intercept)")]
-     # colnames(blups) <- c("accession", "rgr_blup")
-     # head(blups)
-     # 
-     # write_csv(blups, "~/Desktop/Common garden growth rates - blups.csv")
 

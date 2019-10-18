@@ -1,3 +1,5 @@
+## Code to run GAM analysis of SNPs on a computing cluster
+
 # Read in command line arguments
 	args<-commandArgs(trailingOnly=TRUE)
 

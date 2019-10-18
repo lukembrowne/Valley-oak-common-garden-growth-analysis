@@ -1,34 +1,50 @@
 
 # Run model setup ---------------------------------------------------------
 
-  source("./04b-setup-models-cluster.R")
+ # If running from scratch
+ # source("./04b-setup-models-cluster.R")
+
+
+# Load libraries ----------------------------------------------------------
+  library(tidyverse)
+  library(googlesheets)
+  library(maptools)
+  
+  library(gamm4)
+  library(visreg)
+  library(rrBLUP)
+  library(qvalue) # devtools::install_github("jdstorey/qvalue")
+  library(MuMIn)
+  library(vegan)
+  library(beepr)
+  library(patchwork) # devtools::install_github("thomasp85/patchwork")
+  library(rasterVis)
+  library(pdp)
+  library(ggrepel)
+  library(caret)
+  library(flashpcaR) # devtools::install_github("gabraham/flashpca/flashpcaR")
+  
+  library(psych)
+  library(factoextra)
+  
+  library(foreach)
+  library(doParallel)
+  
 
 # Read in cluster run output ----------------------------------------------
 
-  # Path to results
-  # Used in first submission to PNAS - "run_475547_tmax_sum_dif_training_set_resids_7030_2019_02_26"
-  # path <- "run_475547_tmax_sum_dif_training_set_resids_7030_2019_02_26"
-
-## 10 fold cross validation - 1st revision August 2019
-
+  # Choose a path
    # Not across families - used for plotting main results in text
    path <- "run_642454_tmax_sum_dif_rgr_10fold_notacross_seed300"
    
    # Across families
    path <- "run_648224_tmax_sum_dif_rgr_10fold_acrossfams_seed300"
    
-   
-   ## Testing Tmax as main effect
-   path <- "run_1041948_tmax_sum_dif_rgr_10fold_notacross_seed300_tmax_main"
-  
-   
-   
   path_to_summaries <- paste0("./output/", path, "/model_summaries/")
   path_to_predictions <- paste0("./output/", path, "/model_predictions/")
   
-  ## Load in data
+  ## Load in data - this should provide all the phenotypic, genotypic, and climate data needed
   load(grep("*.Rdata", list.files(paste0("./output/", path), full = TRUE), value = TRUE))
-
   
  # Read in files
     sum_df_raw <- plyr::ldply(list.files(path_to_summaries, full = TRUE), read_csv)
@@ -58,9 +74,6 @@
     
   # For backup
   sum_df <- sum_df_raw
-  
-  # How many acccession used for prediction
-  table(sum_df_raw$acc_pred)
   
   
 ## Read in model predictions
@@ -128,11 +141,6 @@ table(sum_df_long$genotype)
     
     summary(pred_df_long$height_change_warmer_absolute)
 
-    plot(pred_df_long$height_change_warmer_absolute, 
-         pred_df_long$height_change_warmer_absolute_fold1)
-    cor.test(pred_df_long$height_change_warmer_absolute, 
-             pred_df_long$height_change_warmer_absolute_fold1)
-  
  # Join prediction dataframe to summary dataframe
     sum_df_long_w_preds <- left_join(sum_df_long,
                                      pred_df_long)
@@ -176,54 +184,9 @@ table(sum_df_long$genotype)
        xlab = "p-value", main = "Uncorrected p-values", las = 1)
   qq(fdr_fvals$pval, main = "Uncorrected p-values", las = 1)
   
-  # Q values
-  # hist(fdr_fvals$qval, breaks = 40, col = "steelblue2",
-  #      xlab = "q-value", main = "q-values", las = 1)
-  # qq(fdr_fvals$qval, main = "q-values", las = 1)
-  # sort(fdr_fvals$qval, decreasing = T)
-  
-  # Plot figure
-  #Need to hand-edit the axis labesl for q values to say Q instead of P
-  # dev.copy(pdf, paste0("./figs_tables/Figure S9 - histogram and qqplots of p values ", Sys.Date(), ".pdf"),
-  #          width = 7, height = 3.5, useDingbats = FALSE)
-  # dev.off()
-
   par(mfrow = c(1,1))
   
-  
-  ## Combine p values of main and interaction terms
-  # library(metap)
-  # 
-  # for(row in 1:nrow(sum_df)){
-  # 
-  #   if(row %% 500 == 0){
-  #     cat("Working on row... ", row, " \n")
-  #   }
-  # 
-  #   # For full dataset
-  #   sum_df$p_val_gen_combined[row] <- metap::sumlog(c(sum_df$p_val_gen_int[row],
-  #                                                sum_df$p_val_gen_main[row]))$p
-  #   # Loop through folds
-  #   for(fold in 1:10){
-  #     pval_main <- sum_df[row, paste0("p_val_gen_main_fold", fold)]
-  #     pval_int <- sum_df[row, paste0("p_val_gen_int_fold", fold)]
-  # 
-  #     # Check to see if pval of main effect is NaN
-  #     if(is.na(pval_main)){
-  #       sum_df[row, paste0("p_val_gen_combined_fold", fold)] <- pval_int
-  #       next
-  #     }
-  # 
-  #     # Assign new p value for fold
-  #     sum_df[row, paste0("p_val_gen_combined_fold", fold)] <-
-  #           metap::sumlog(c(pval_main, pval_int))$p
-  #   }
-  # }
-  # 
-  # hist(sum_df$p_val_gen_combined)
-  # summary(sum_df$p_val_gen_combined)
-  
-  
+ 
 # Join back to main dataframe
   sum_df$q_val <- fdr_fvals$qval
   sum_df_long_w_preds <- dplyr::left_join(sum_df_long_w_preds,
@@ -233,7 +196,7 @@ table(sum_df_long$genotype)
   
   
 
-# Figure 2 - Manhattan plot of Q values ---------------------------------------------------------
+# Figure 2 - Manhattan plot of P values ---------------------------------------------------------
   
    man_df1 <- data.frame(SNP = snp_col_names, 
                          snp_pos)
@@ -408,12 +371,11 @@ table(sum_df_long$genotype)
      #          width = 19, height = 4, units = "cm", dpi = 600)
 
 
-# Calculate polygenic risk score ------------------------------------------
+# Calculate polygenic risk score - takes a long time to run ------------------------------------------
    
    
    # Save workspace to upload to hoffman
   # save.image(file = "./output/gebv_calculation_acrossfamily.Rdata")
-   
    
    ## Parallelize calculations across main calculations and folds
    cores=detectCores()
@@ -443,9 +405,7 @@ table(sum_df_long$genotype)
      gebv_df_summary <- tibble(n_snps = n_snps_values,
                                fold = fold,
                                r2 = NA,
-                               dev = NA,
-                               high_mid = NA,
-                               high_low = NA)
+                               dev = NA)
      gebv_values <- tibble(accession = gen_dat_moms$accession)
      
      # Order snps based on lowest P values
@@ -454,14 +414,7 @@ table(sum_df_long$genotype)
      } else {
        snp_list_ordered <- sum_df$snp[order(sum_df[paste0("p_val_gen_int_fold", fold)])]
      }
-     
-     # Randomizing order of P values as suggested by reviewers
-     # if(fold == 0 ){ # If main model with full dataset
-     #   snp_list_ordered <- sum_df$snp[sample(1:length(sum_df$p_val_gen_int))]
-     # } else {
-     #   snp_list_ordered <- sum_df$snp[sample(1:length(sum_df$p_val_gen_int))]
-     # }
-     
+
      # Initialize
      gebv <- NULL
      gebv_count <- NULL
@@ -493,7 +446,6 @@ table(sum_df_long$genotype)
         preds_sub <- preds_sub %>%
           filter(!is.na(height_change_warmer_absolute))
        
-      
        counted <- preds_sub$genotype
        
        # Add in median value for missing genotypes
@@ -539,8 +491,7 @@ table(sum_df_long$genotype)
          
          # Adjust for missing data
           gebv_by_count <- gebv / gebv_count
-        # gebv_by_count <- gebv
-         
+
          # Save to output DF
          gebv_values[, paste0("gebv_fold",fold, "_", x)] <- gebv_by_count
 
@@ -578,67 +529,27 @@ table(sum_df_long$genotype)
          
          cat(":::::::::::::::::::::::::::::\n")
          cat("Working on permutations... \n ")
-         ## Permutation test
-         # for(perm in 1:500){
-         #   
-         #   if(perm %% 10 == 0){
-         #     cat("Working on permutation: ", perm, "... \n")
-         #   }
-         #   
-         #   # Permute phenotype
-         #   dat_snp_testing$rgr_resids_permuted <- sample(dat_snp_testing$rgr_resids)
-         #   
-         #   # Gam with interaction effect
-         #   gam_test_resids_permuted = bam(formula = formula(fixed_effects_resids_permuted),
-         #                         data = dat_snp_testing,
-         #                         discrete = FALSE, 
-         #                         nthreads = 8,
-         #                         method = "fREML")
-         # 
-         # gebv_df_summary[gebv_df_summary$n_snps == x, paste0("r2_permuted_", perm)] <- summary(gam_test_resids_permuted)$r.sq
-         # 
-         # }
          
-         ## Make prediction of effect size
-           # newdata <-  expand.grid(section_block = "Block1_1",
-           #                         locality = "FHL",
-           #                         height_2014 = 0,
-           #                         accession = "6",
-           #                         tmax_sum_dif = c(forward_transform(c(0, 4.8), "tmax_sum_dif",
-           #                                                            scaled_var_means_gbs_all,
-           #                                                            scaled_var_sds_gbs_all)),
-           #                         PC1_gen = 0, PC2_gen = 0,
-           #                         PC1_clim = 0, PC2_clim = 0,
-           #                         gebv_by_count = c(-1, 0, 1)) # SD away from average
-           # 
-           # # Make predictions
-           # newdata$pred <- predict(gam_test_resids,
-           #                         newdata = newdata,
-           #                         se.fit = FALSE, type = "response")
-           # 
-           # # Add on baseline predictions from model without genetic information
-           # newdata$pred <- newdata$pred + predict(gam_snp_all,
-           #                                        newdata = newdata,
-           #                                        se.fit = TRUE, type = "response")$fit
-           # 
-           # ## Calculating differences in growth rates
-           # growth_dif =  newdata %>%
-           #   dplyr::mutate(tmax_sum_dif_unscaled = back_transform(tmax_sum_dif, var = "tmax_sum_dif",
-           #                                                        means = scaled_var_means_gbs_all,
-           #                                                        sds = scaled_var_sds_gbs_all))
-           # 
-           # # Comparing high to mid
-           # high_mid <- (growth_dif$pred[growth_dif$gebv_by_count == 1 & growth_dif$tmax_sum_dif_unscaled == 4.8] -
-           #     growth_dif$pred[growth_dif$gebv_by_count == 0 & growth_dif$tmax_sum_dif_unscaled == 4.8]) /
-           #   abs(growth_dif$pred[growth_dif$gebv_by_count == 0 & growth_dif$tmax_sum_dif_unscaled == 4.8]) * 100
-           # 
-           # # Compare high to low
-           # high_low <-  (growth_dif$pred[growth_dif$gebv_by_count == 1 & growth_dif$tmax_sum_dif_unscaled == 4.8] -
-           #     growth_dif$pred[growth_dif$gebv_by_count == -1 & growth_dif$tmax_sum_dif_unscaled == 4.8]) /
-           #   abs(growth_dif$pred[growth_dif$gebv_by_count == -1 & growth_dif$tmax_sum_dif_unscaled == 4.8]) * 100
-           # 
-           # gebv_df_summary$high_mid[gebv_df_summary$n_snps == x] <- high_mid
-           # gebv_df_summary$high_low[gebv_df_summary$n_snps == x] <- high_low
+         # Permutation test
+         for(perm in 1:100){
+
+           if(perm %% 10 == 0){
+             cat("Working on permutation: ", perm, "... \n")
+           }
+
+           # Permute phenotype
+           dat_snp_testing$rgr_resids_permuted <- sample(dat_snp_testing$rgr_resids)
+
+           # Gam with interaction effect
+           gam_test_resids_permuted = bam(formula = formula(fixed_effects_resids_permuted),
+                                 data = dat_snp_testing,
+                                 discrete = FALSE,
+                                 nthreads = 8,
+                                 method = "fREML")
+
+         gebv_df_summary[gebv_df_summary$n_snps == x, paste0("r2_permuted_", perm)] <- summary(gam_test_resids_permuted)$r.sq
+
+         }
          
        } # End model loop
        
@@ -678,55 +589,16 @@ table(sum_df_long$genotype)
    gebv_df_summary <- bind_tibbles(gebv_df_summary_list[, 1], mode = "rbind")
    
    gebv_df_summary %>%
-     arrange(desc(r2))
-   
-   gebv_df_summary %>%
-     group_by(fold) %>%
-     summarise_all(max)
-   
-   gebv_df_summary %>%
-     group_by(fold) %>%
-     summarise_all(max) %>%
-     filter(fold != 0) %>%
-     ungroup() %>%
-     summarise_all(mean)
-   
-   gebv_df_summary %>%
      filter(fold != 0) %>%
      group_by(fold) %>%
      filter(r2 == max(r2)) %>%
      ungroup() %>%
      summarise_all(mean)
    
-   # How many snps at max r2?
-   gebv_df_summary %>%
-     group_by(fold) %>%
-     filter(r2 == max(r2))
-  
-   
-   ## Plot relationship between # of SNPS used and variance explained in testing set
-   ggplot(gebv_df_summary, aes(x = n_snps, y = r2, col = factor(fold))) + 
-     geom_point(size = 2) + 
-     geom_line() + 
-     xlab("Number of SNPs in GEBV estimation") +
-     #ylab("R2 adjusted in testing set") +
-     ylab(bquote('R'^2[adj]~'training test')) +
-     scale_x_continuous(breaks = gebv_df_summary$n_snps) +
-     # scale_y_continuous(breaks = seq(0, 0.02, by = 0.0025), limits = c(-0.0015, 0.015)) + 
-     theme_bw(7) + 
-     geom_hline(yintercept = 0, lty = 2) + 
-     theme(panel.border = element_blank(), panel.grid.major = element_blank(),
-           panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"),
-           plot.margin = (margin(0, 0, 0, 0, "cm")),
-           axis.text.x = element_text(angle = 60, hjust = 1)) +
-     NULL
-   
-   
    
    ## Plot relationship between # of SNPS used and variance explained in full model
    gebv_df_fold0 <-  gebv_df_summary %>%
      filter(fold == 0)
-   
    
    ggplot(gebv_df_fold0, aes(x = n_snps, y = r2)) + 
      geom_point(size = 1) + 
@@ -745,41 +617,12 @@ table(sum_df_long$genotype)
      NULL
    
    
-   
-   ### Read in GEBV cross-validation results
-   cv_files <- list.files("./output/cv_permutations_across", full.names = T)
-   
-   cv_out = plyr::ldply(cv_files, read_csv)
-   
-   
-   # Calculate average R2 and 95% confidence interval
-   cv_out2 <- cv_out %>%
-    mutate(r2_permuted = rowMeans(dplyr::select(cv_out, contains("r2_permuted")))) %>%
-     dplyr::select(n_snps, fold, r2, r2_permuted)
-
-   cv_out2 %>%
-     filter(fold != 0) %>%
-     group_by(fold) %>%
-     filter(r2 == max(r2)) %>%
-     ungroup() %>%
-     summarise_all(mean)
-   
-   
-   cv_out2 %>%
-     filter(fold != 0) %>%
-     group_by(fold) %>%
-     filter(r2 == max(r2)) %>%
-     ungroup() %>%
-     summarise_all(sd)
-   
-   
    # Save as file
    # ggsave(paste0("./figs_tables/Figure S4 - testing variance explained by number of snps",
    #                      Sys.Date(), ".png"),
    #          width = 12, height = 4, units = "cm", dpi = 300)
    
-   
-   
+  
    
    ## Get GEBVs
    gebvs <- bind_tibbles(gebv_df_summary_list[, 2], mode = "cbind")
@@ -804,6 +647,34 @@ table(sum_df_long$genotype)
   gen_dat_moms$gebv_best_scaled <- (gen_dat_moms$gebv_best - gebv_best_mean) / gebv_best_sd
   
   summary(gen_dat_moms$gebv_best_scaled); hist(gen_dat_moms$gebv_best_scaled, breaks = 50)
+  
+  
+  
+  ### Read in GEBV cross-validation results
+  cv_files <- list.files("./output/cv_permutations_across", full.names = T)
+  
+  cv_out = plyr::ldply(cv_files, read_csv)
+  
+  
+  # Calculate average R2 and 95% confidence interval
+  cv_out2 <- cv_out %>%
+    mutate(r2_permuted = rowMeans(dplyr::select(cv_out, contains("r2_permuted")))) %>%
+    dplyr::select(n_snps, fold, r2, r2_permuted)
+  
+  cv_out2 %>%
+    filter(fold != 0) %>%
+    group_by(fold) %>%
+    filter(r2 == max(r2)) %>%
+    ungroup() %>%
+    summarise_all(mean)
+  
+  
+  cv_out2 %>%
+    filter(fold != 0) %>%
+    group_by(fold) %>%
+    filter(r2 == max(r2)) %>%
+    ungroup() %>%
+    summarise_all(sd)
   
   
 # Plot predictions of PRS -------------------------------------------------
@@ -1580,7 +1451,7 @@ table(sum_df_long$genotype)
  
   
   
-  # Remove NAs from dataframe or random forest will complain
+  # Remove NAs from dataframe
   gam_dist_rast_df_nona <-  gam_dist_rast_df %>%
     dplyr::filter(!is.na(tmax_sum)) %>%
     dplyr::filter(!is.na(elevation)) %>%
