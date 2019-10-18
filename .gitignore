@@ -18,5 +18,10 @@
 manuscript/ms.Rmd
 *.jpg
 *.pdf
+/data_simulation
 
 Common garden growth manuscript/\.dropbox
+
+Common garden growth manuscript/
+
+*.dat

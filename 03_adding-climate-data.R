@@ -1,12 +1,6 @@
 
 ## Requires 02_processing-climate-rasters.R to be run and files output
 
-
-# Load libraries ----------------------------------------------------------
-
-  library(psych)
-  library(factoextra)
-
 # Load in climate data ----------------------------------------------------
 
   ## Read in BCM climate data of of maternal trees in the common garden
@@ -361,39 +355,39 @@
   ## Calculating MEMs / PCNM
     
   # Calculate distance matrix
-    library(geosphere)
-    
-    mom_lat_longs <- as.data.frame(dplyr::select(climate_gbs_mom, longitude, latitude))
-    dist_mat <- matrix(NA, ncol = nrow(climate_gbs_mom), nrow = nrow(climate_gbs_mom))
-    
-    for(i in 1:nrow(dist_mat)){
-      
-      if(i %% 50 == 0){
-        cat("Working on row:", i, " ... \n")
-      }
-      
-      for(j in 1:nrow(dist_mat)){
-        
-        dist_mat[i, j] <- distHaversine(mom_lat_longs[i, ], 
-                                        mom_lat_longs[j, ])/ 1000 # To convert to km
-        
-      }
-    }
-    
-    dist_mat[1:10, 1:10]
-    
-  mem = vegan::pcnm(dist_mat)  
-  
-  # Plot out MEMs
-  vegan::ordisurf(mom_lat_longs, mem$vectors[,1], bubble = 4, main = "PCNM 1")
-  vegan::ordisurf(mom_lat_longs, mem$vectors[,2], bubble = 4, main = "PCNM 2")
-    
-  mem$values # Eigenvalues
-  mem$vectors # Eigenvectors
-
-  ## Bind positive eigenvectors to climate dataset
-  climate_gbs_mom <- dplyr::bind_cols(climate_gbs_mom, as.data.frame(mem$vectors))
-  
+  #   library(geosphere)
+  #   
+  #   mom_lat_longs <- as.data.frame(dplyr::select(climate_gbs_mom, longitude, latitude))
+  #   dist_mat <- matrix(NA, ncol = nrow(climate_gbs_mom), nrow = nrow(climate_gbs_mom))
+  #   
+  #   for(i in 1:nrow(dist_mat)){
+  #     
+  #     if(i %% 50 == 0){
+  #       cat("Working on row:", i, " ... \n")
+  #     }
+  #     
+  #     for(j in 1:nrow(dist_mat)){
+  #       
+  #       dist_mat[i, j] <- distHaversine(mom_lat_longs[i, ], 
+  #                                       mom_lat_longs[j, ])/ 1000 # To convert to km
+  #       
+  #     }
+  #   }
+  #   
+  #   dist_mat[1:10, 1:10]
+  #   
+  # mem = vegan::pcnm(dist_mat)  
+  # 
+  # # Plot out MEMs
+  # vegan::ordisurf(mom_lat_longs, mem$vectors[,1], bubble = 4, main = "PCNM 1")
+  # vegan::ordisurf(mom_lat_longs, mem$vectors[,2], bubble = 4, main = "PCNM 2")
+  #   
+  # mem$values # Eigenvalues
+  # mem$vectors # Eigenvectors
+  # 
+  # ## Bind positive eigenvectors to climate dataset
+  # climate_gbs_mom <- dplyr::bind_cols(climate_gbs_mom, as.data.frame(mem$vectors))
+  # 
   
   ## Merge data to give climate of origin for each seedling
     dat_all_clim <- left_join(dat_all, climate_garden_mom, by = "accession")
@@ -432,8 +426,6 @@
     
 # Choose climate variables ------------------------------------------------
    
-     ## Core variables from Riordan et al. 2016 Am J Botany  
-    ## Except we are excluding AET because it is very strongly correlated with cwd
     climate_vars <- c("tmax_sum",
                       "tmax","tmin",
                       "tave",
@@ -495,14 +487,14 @@
 
       ## Save plot of contributions
       
-      # fviz_pca_var(clim_pca_home, axes = c(1, 2), col.var="contrib")
-      # ggsave(filename = paste0("./figs_tables/Figure S2 - climate PCA 1 ", 
+      # fviz_pca_var(clim_pca_home, axes = c(1, 2))
+      # ggsave(filename = paste0("./figs_tables/Figure S3 - climate PCA 1 ",
       #                          Sys.Date(), ".pdf"),
       #        units = "cm",
       #        width = 20, height = 15)
 
 
-    ## Predict PC values for
+    # Predict PC values for
     # 1) Seedlings in common garden
     # 2) Chico  & IFG based on pca of climate of origin
     # 3) GBS moms
@@ -551,77 +543,67 @@
      climate_vars <- c(climate_vars, colnames(garden_climate_pca_vals))
 
 
+     
+     
 # Filter down to seedlings with and without GBS data ----------------------
       
       ## Filtering down individuals who's moms don't have climate data and has GBS data
-      dat_gbs_only_clim <- dplyr::filter(dat_all_clim,
+      dat_gbs_all_clim <- dplyr::filter(dat_all_clim,
                                          accession %in% climate_gbs_mom$accession)
-      dim(dat_gbs_only_clim)
+      dim(dat_gbs_all_clim)
       
       
-      # Select a 1/2 subset of adults for taining and testing
-      # set.seed(1)
-      # training_moms <- sample(na.omit(climate_gbs_mom$accession), 
-      #                         size = length(na.omit(climate_gbs_mom$accession))/2)
-      # testing_moms <- na.omit(climate_gbs_mom$accession)[!na.omit(climate_gbs_mom$accession) %in% training_moms]
-      # 
-      # any(training_moms %in% testing_moms) # Should both be false
-      # any(testing_moms %in% training_moms)
-      # 
-      # dat_gbs_only_clim <- dat_gbs_only_clim %>%
-      #   dplyr::filter(accession %in% training_moms)
+      
+# Calculating difference in climate variables -----------------------------
+      
+      climate_vars_dif <- paste(climate_vars, "_dif", sep = "")
+      
+      x = 1
+      
+      ## Calculate difference in climate as ## GARDEN - PROVENANCE
+      for(var in climate_vars){
+        
+        
+        # For all seedlings    
+        dat_all_clim[dat_all_clim$site == "Chico", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "Chico", var]) - dat_all_clim[dat_all_clim$site == "Chico", var]
+        
+        dat_all_clim[dat_all_clim$site == "IFG", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "IFG", var]) - dat_all_clim[dat_all_clim$site == "IFG", var]
+        
+        
+        # For GBS seedlings  
+        dat_gbs_all_clim[dat_gbs_all_clim$site == "Chico", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "Chico", var]) - dat_gbs_all_clim[dat_gbs_all_clim$site == "Chico", var]
+        
+        dat_gbs_all_clim[dat_gbs_all_clim$site == "IFG", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "IFG", var]) - dat_gbs_all_clim[dat_gbs_all_clim$site == "IFG", var]
+        
+        # Increment counter
+        x = x + 1
+      }
+      
+      
+      hist(dat_all_clim$tmax_sum_dif)
+      
+      summary(dat_all_clim[, climate_vars_dif])
+      
+      ## Find NAs if there are any
+      #View(dat_all_clim[is.na(pull(dat_all_clim, climate_vars_dif[1])), ])
       
     
-# Calculating difference in climate variables -----------------------------
-
-  climate_vars_dif <- paste(climate_vars, "_dif", sep = "")
-  
-  x = 1
-  
-  ## Calculate difference in climate as ## GARDEN - PROVENANCE
-    for(var in climate_vars){
-      
-      
-    # For all seedlings    
-      dat_all_clim[dat_all_clim$site == "Chico", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "Chico", var]) - dat_all_clim[dat_all_clim$site == "Chico", var]
-      
-      dat_all_clim[dat_all_clim$site == "IFG", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "IFG", var]) - dat_all_clim[dat_all_clim$site == "IFG", var]
-      
-      
-    # For GBS seedlings  
-      dat_gbs_only_clim[dat_gbs_only_clim$site == "Chico", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "Chico", var]) - dat_gbs_only_clim[dat_gbs_only_clim$site == "Chico", var]
-      
-      dat_gbs_only_clim[dat_gbs_only_clim$site == "IFG", climate_vars_dif[x]] <- as.numeric(garden_climate[garden_climate$site == "IFG", var]) - dat_gbs_only_clim[dat_gbs_only_clim$site == "IFG", var]
-      
-   
-      x = x + 1
-    }
-  
-  
-  hist(dat_all_clim$tmax_sum_dif)
-  
-  summary(dat_all_clim[, climate_vars_dif])
-  
-  ## Find NAs if there are any
-  #View(dat_all_clim[is.na(pull(dat_all_clim, climate_vars_dif[1])), ])
-  
 
 
 # Scaling predictor variables -------------------------------------------------------
-  
+      
   # Need to run separately for both full dataset and dataset with only gbs samples
-
   dat_all_scaled <- dat_all_clim
-  dat_gbs_only_scaled <- dat_gbs_only_clim
-  
+  dat_gbs_all_scaled <- dat_gbs_all_clim
+
   x = 1
-  
-  scaled_var_means_gbs_only <- NA
-  scaled_var_sds_gbs_only <- NA
   
   scaled_var_means_all <- NA
   scaled_var_sds_all <- NA
   
+  scaled_var_means_gbs_all <- NA
+  scaled_var_sds_gbs_all <- NA
+
   to_scale = colnames(dplyr::select(dat_all_clim, climate_vars_dif, 
                                     height_2015, height_2014,
                                     climate_vars))
@@ -634,11 +616,10 @@
       dat_all_scaled[var] <- (dat_all_scaled[var] - scaled_var_means_all[x]) / scaled_var_sds_all[x]
       
     # For seedlings with gbs data  
-      scaled_var_means_gbs_only[x] <- mean(dat_gbs_only_scaled[[var]], na.rm = TRUE)
-      scaled_var_sds_gbs_only[x] <- sd(dat_gbs_only_scaled[[var]], na.rm = TRUE)
-      dat_gbs_only_scaled[var] <- (dat_gbs_only_scaled[var] - scaled_var_means_gbs_only[x]) /
-                                  scaled_var_sds_gbs_only[x]
-  
+      scaled_var_means_gbs_all[x] <- mean(dat_gbs_all_scaled[[var]], na.rm = TRUE)
+      scaled_var_sds_gbs_all[x] <- sd(dat_gbs_all_scaled[[var]], na.rm = TRUE)
+      dat_gbs_all_scaled[var] <- (dat_gbs_all_scaled[var] - scaled_var_means_gbs_all[x]) /
+                                  scaled_var_sds_gbs_all[x]
       x = x + 1
   }
   
@@ -646,43 +627,22 @@
   names(scaled_var_means_all) <- to_scale
   names(scaled_var_sds_all) <- to_scale
   
-  names(scaled_var_means_gbs_only) <- to_scale
-  names(scaled_var_sds_gbs_only) <- to_scale
+  names(scaled_var_means_gbs_all) <- to_scale
+  names(scaled_var_sds_gbs_all) <- to_scale
   
 # Check out results
   scaled_var_means_all
-  scaled_var_means_gbs_only
+  scaled_var_means_gbs_all
   
   scaled_var_sds_all
-  scaled_var_sds_gbs_only
+  scaled_var_sds_gbs_all
   
   summary(dat_all_scaled[, to_scale]) ## Means should all be 0
+  summary(dat_gbs_all_scaled[, to_scale]) ## Means should all be 0
   
-  summary(dat_gbs_only_scaled[, to_scale]) ## Means should all be 0
-  
-
-
- # pairs.panels(climate_garden_mom[, c("latitude", "longitude", 
- #                                     #"mem1", "mem2", "mem3", 
- #                                     climate_vars)])
- # 
- # pairs.panels(climate_garden_mom[, c("tmax_sum", "tmin_winter", "DD5", "tmax_sum_lgm","tmin_winter_lgm", "DD5_lgm")], ellipses = F)
- # 
- # pairs.panels(climate_garden_mom[, c("tmax_sum",
- #                                     "tmax_sum_lgm",
- #                                     "tmin_winter", 
- #                                     "tmin_winter_lgm",
- #                                     "DD5", 
- #                                     "DD5_lgm")], ellipses = F, cex = 2)
- # 
- # pairs.panels(climate_garden_mom[, c("tmax_sum",
- #                                     "tmax",
- #                                     "DD5",
- #                                     "tave",
- #                                     "bioclim_04")])
- 
- #pairs.panels(dat_all_scaled[, climate_vars_dif])
- 
-
-
+  summary(dat_gbs_all_scaled$tmax_sum_dif)
+  summary(back_transform(dat_gbs_all_scaled$tmax_sum_dif,
+                 "tmax_sum_dif",
+                 scaled_var_means_gbs_all,
+                 scaled_var_sds_gbs_all))
 

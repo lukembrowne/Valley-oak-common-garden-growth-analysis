@@ -1,4 +1,6 @@
 
+## Code to setup datasets for uploading to computing cluster to run GAM GWAS analysis
+
 
 # Load libraries ----------------------------------------------------------
   
@@ -6,41 +8,13 @@
   source("./03_adding-climate-data.R")
   
   dim(dat_all_scaled)
-  dim(dat_gbs_only_scaled)
+  dim(dat_gbs_all_scaled)
 
-
-  
-  library(gamm4)
-  library(visreg)
-  library(rrBLUP)
-  library(qvalue) # devtools::install_github("jdstorey/qvalue")
-  library(MuMIn)
-  library(vegan)
-  library(beepr)
-  library(patchwork) # devtools::install_github("thomasp85/patchwork")
-  library(rasterVis)
-  library(pdp)
-  library(ggrepel)
-  library(caret)
-  library(flashpcaR) # devtools::install_github("gabraham/flashpca/flashpcaR")
-  
-  
-  # function to transform from raw to scaled variables
-    forward_transform <- function(x, var, means, sds){
-      ( x - means[var]) / sds[var]
-    }
-    
-    # Function to back transform variables
-    back_transform <- function(x, var, means, sds){
-      (x * sds[var]) + means[var]
-    }
-
-
-# Goal is to run an individual gam for each SNP, like a fancy GWAS, and then correct for multiple testing after
-    
 
 # Format and save to .Rdata for cluster -----------------------------------
 
+  # Do PCA on kinship matrix  
+    
   # Joining climate and genetic data
   # Do an inner join to avoid having GBS moms with climate data but poor genotyping data
  
@@ -61,12 +35,12 @@
   snp_col_names <- colnames(gen_dat[, -c(1, 2)])
   
   # Calculate percent missing data  
-  missing <- gen_dat_clim %>%
-    dplyr::select(id, accession) %>%
-    mutate(missing = apply(gen_dat_clim[, snp_col_names], 1, function(x) sum(is.na(x))/length(x)))
-  
-  missing %>%
-    arrange(desc(missing))
+  # missing <- gen_dat_clim %>%
+  #   dplyr::select(id, accession) %>%
+  #   mutate(missing = apply(gen_dat_clim[, snp_col_names], 1, function(x) sum(is.na(x))/length(x)))
+  # 
+  # missing %>%
+  #   arrange(desc(missing))
 
   # Scale data and impute missing before converting 012 to -101
   bglr_gen_scaled <- flashpcaR::scale2(gen_dat_clim[, snp_col_names], impute = 2)
@@ -76,45 +50,21 @@
   
   ## Calculate kinship matrix
   
-      # ## Subset to samples for Alayna
-      # subset <- c(63, 64, 65, 66, 68, 69, 70, 206, 208, 209, 210, 211, 212, 214, 217, 218, 220, 221, 345, 346, 347, 349, 350, 351, 508, 509, 510, 512, 513, 514, 529, 530, 532, 533, 536)
-      # 
-      # subset %in% gen_dat_clim$accession
-      # subset[which(subset %in% gen_dat_clim$accession)]
-      # 
-      # # WHich one's do not have GBS data?
-      # subset[which(!subset %in% gen_dat_clim$accession)]
-      # 
-      # gen_dat_clim <- gen_dat_clim %>%
-      #   filter(accession %in% subset)
-      # dim(gen_dat_clim)
-  
-
   # Need to first convert to -1, 0, 1 matrix
-
-  kin_mat <- as.matrix(gen_dat_clim[, snp_col_names])
-  kin_mat[kin_mat == 0] <- -1
-  kin_mat[kin_mat == 1] <- 0
-  kin_mat[kin_mat == 2] <- 1
+    kin_mat <- as.matrix(gen_dat_clim[, snp_col_names])
+    kin_mat[kin_mat == 0] <- -1
+    kin_mat[kin_mat == 1] <- 0
+    kin_mat[kin_mat == 2] <- 1
+    
+    kin_mat <- A.mat(kin_mat) # Calculate kinship matrix
   
-  kin_mat <- A.mat(kin_mat) # Calculate kinship matrix
   
-  # ## Output kinship matrix for Alanya
-    # rownames(kin_mat) <- gen_dat_clim$accession
-    # colnames(kin_mat) <- gen_dat_clim$accession
-    # write.csv(kin_mat, "./output/kinship matrix for alayna 2018_02_07.csv")
-    # 
-  
-  ## Calculate PCA on genetic data
-  #  pca_gen = prcomp(bglr_gen_scaled, center = FALSE, scale = FALSE)
-  
-  pca_gen = prcomp(kin_mat, center = TRUE, scale = TRUE) ## PCA on kinship matrix
-  
+  ## Calculate PCA on kinship matrix
+    pca_gen = prcomp(kin_mat, center = TRUE, scale = TRUE) ## PCA on kinship matrix
   
    # biplot(pca_gen)
     summary(pca_gen)
   #  screeplot(pca_gen, bstick = TRUE)
-    
     
   ### Figure S3 - Plotting results of PCA for supplementary material
 
@@ -163,129 +113,119 @@
     bglr_gen_scaled <- bind_cols(bglr_gen_scaled, pcs)
 
     
-  # Set up dataframe with SNP data, height data, and climate data
-    dat_snp = left_join(dat_gbs_only_scaled,
-                      bind_cols(gen_dat_clim[, c("accession", snp_col_names)],
-                                         pcs),
-                      by = "accession")
-    
-
-  # Set up factors  
-    dat_snp$accession <- factor(dat_snp$accession)
-    dat_snp$section_block <- factor(dat_snp$section_block)
-    dat_snp$section <- factor(dat_snp$section)
-    dat_snp$locality <- factor(dat_snp$locality)
-    
-    
-  # Scale PCA axes
-    dat_snp$PC1_gen <- (dat_snp$PC1_gen - mean(dat_snp$PC1_gen)) / sd(dat_snp$PC1_gen)
-    dat_snp$PC2_gen <- (dat_snp$PC1_gen - mean(dat_snp$PC2_gen)) / sd(dat_snp$PC2_gen)
-    dat_snp$PC3_gen <- (dat_snp$PC1_gen - mean(dat_snp$PC3_gen)) / sd(dat_snp$PC3_gen)
-    dat_snp$PC4_gen <- (dat_snp$PC1_gen - mean(dat_snp$PC4_gen)) / sd(dat_snp$PC4_gen)
-    dat_snp$PC5_gen <- (dat_snp$PC1_gen - mean(dat_snp$PC5_gen)) / sd(dat_snp$PC5_gen)
-    
-    
-  # Save unscaled version  
-    dat_snp_unscaled <- dat_snp
  
     
-  # Scale genotypes  
-    scaled_snps_means <- apply(dat_snp[, snp_col_names], MARGIN = 2,
-          function(x) mean(x, na.rm = TRUE))
+ # Set up dataframe with SNP data, height data, and climate data
+    dat_snp_all = left_join(dat_gbs_all_scaled,
+                      bind_cols(gen_dat_clim[, c("accession", snp_col_names)],
+                                         pcs),  by = "accession")
     
-    scaled_snps_sds <- apply(dat_snp[, snp_col_names], MARGIN = 2,
-                               function(x) sd(x, na.rm = TRUE))
+  # Set up factors  
+    dat_snp_all$accession <- factor(dat_snp_all$accession)
+    dat_snp_all$section_block <- factor(dat_snp_all$section_block)
+    dat_snp_all$section <- factor(dat_snp_all$section)
+    dat_snp_all$locality <- factor(dat_snp_all$locality)
     
-    dat_snp[, snp_col_names] <-   apply(dat_snp[, 
-                                             snp_col_names], MARGIN = 2,
-                    function(x) (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE))
+  # Scale PCA axes
+    dat_snp_all$PC1_gen <- (dat_snp_all$PC1_gen - mean(dat_snp_all$PC1_gen)) / sd(dat_snp_all$PC1_gen)
+    dat_snp_all$PC2_gen <- (dat_snp_all$PC1_gen - mean(dat_snp_all$PC2_gen)) / sd(dat_snp_all$PC2_gen)
+    dat_snp_all$PC3_gen <- (dat_snp_all$PC1_gen - mean(dat_snp_all$PC3_gen)) / sd(dat_snp_all$PC3_gen)
+    dat_snp_all$PC4_gen <- (dat_snp_all$PC1_gen - mean(dat_snp_all$PC4_gen)) / sd(dat_snp_all$PC4_gen)
+    dat_snp_all$PC5_gen <- (dat_snp_all$PC1_gen - mean(dat_snp_all$PC5_gen)) / sd(dat_snp_all$PC5_gen)
     
-    dat_snp[1:10, 1050:1060]
+  # Save unscaled version  
+    dat_snp_all_unscaled <- dat_snp_all
+ 
+    summary(dat_snp_all[, 1050:1060])
     
-    # Mean impute
-    # dat_snp[, snp_col_names] <- apply(dat_snp[, 
-    #                                                 snp_col_names], MARGIN = 2,
-    #            function(x) ifelse(is.na(x), yes = 0, no = x))
-    
-    dat_snp[1:10, 1050:1060]
-    
-    summary(dat_snp[, 1050:1060])
-    
-    
-    
-# Set a prediction data frame
-
-
- # Prediction frame with a XXXX degree increase
-    
-  degree_increase = 4.8
-    
-  # Set up each climate variable individually
-  pred <-  expand.grid(height_2014 = 0,
-                      accession = "1",
-                      section_block = "Block1_1",
-                      locality = "FHL",
-                      PC1_clim =0, PC2_clim = 0,
-                      PC1_gen = 0, PC2_gen = 0)
   
-  for(var in "tmax_sum_dif"){
-    
-    var_unscaled <- paste0(var, "_unscaled")
-    
-    # Set scaled climate var dif, with a 0 and XXXX degree increase as well
-    var_df <- expand.grid(accession = "1",
-                          var_temp = c(seq(min(dat_all_clim[ ,var]),
-                                           max(dat_all_clim[ ,var]),
-                                           length.out = 150), 0, degree_increase))
+  # Save means and sds for prediction
+    scaled_snps_means_all <- apply(dat_snp_all[, snp_col_names], MARGIN = 2,
+                                   function(x) mean(x, na.rm = TRUE))
+    scaled_snps_sds_all <- apply(dat_snp_all[, snp_col_names], MARGIN = 2,
+                                 function(x) sd(x, na.rm = TRUE))
 
-    # Rename columns and set unscaled climate_var dif
-    var_df <- var_df %>%
-      rename(!!var_unscaled := var_temp) %>%
-      mutate(!!var := forward_transform(x = get(var_unscaled),
-                                              var = var,
-                                              means = scaled_var_means_gbs_only,
-                                              sds = scaled_var_sds_gbs_only))
+    ## Scale genotypes
+    dat_snp_all[, snp_col_names] <-   apply(dat_snp_all[, 
+                                                snp_col_names], MARGIN = 2,
+                                        function(x) (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE))
+
+
+ ## Create folds for cross validation
     
-   # Do a left join if the first variable, or else just bind cols, removing accession column  
-    if(nrow(pred) == 1){
-    pred <- left_join(pred, var_df)
-    } else {
-      pred <- bind_cols(pred, var_df[, -1])
+   
+    # 10 fold cross validation - not across families
+    set.seed(300)
+
+    training_folds_moms <-  caret::createFolds(na.omit(climate_gbs_mom$accession),
+                                          k = 10, returnTrain = T)
+
+    training_folds <- list()
+    for(fold in 1:length(training_folds_moms)){
+      training_folds[[fold]] <- which(dat_gbs_all_clim$accession %in%
+                                  na.omit(climate_gbs_mom$accession)[training_folds_moms[[fold]]])
     }
-  }
-  
-  head(pred)
 
-  pred
-  
-  ## Create folds for 80-20 validation
-  set.seed(129)
-  
-  folds <- caret::createFolds(factor(dat_snp_unscaled$accession), k = 5)
 
-  # table(dat_snp_unscaled$accession)
-  # table(dat_snp_unscaled$accession[folds[[1]]])
-  # table(dat_snp_unscaled$accession[folds[[2]]])
-  # table(dat_snp_unscaled$accession[folds[[3]]])
-  # table(dat_snp_unscaled$accession[folds[[4]]])
-  # table(dat_snp_unscaled$accession[folds[[5]]])
-  # 
-  # table(dat_snp_unscaled$section_block)
-  # table(dat_snp_unscaled$section_block[folds[[1]]])
-  # table(dat_snp_unscaled$section_block[folds[[2]]])
-  # table(dat_snp_unscaled$section_block[folds[[3]]])
-  # table(dat_snp_unscaled$section_block[folds[[4]]])
-  # table(dat_snp_unscaled$section_block[folds[[5]]])
-  
-  
 
-# Save data to file that will be uploaded to cluster  
-  # save(dat_snp, dat_snp_unscaled,
-  #      snp_col_names, pred,
-  #      scaled_snps_means, scaled_snps_sds,
-  #      scaled_var_means_gbs_only, scaled_var_sds_gbs_only,
-  #      folds,
-  #   file = paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
+    ## Check on folds
+    x = 1
+    for(fold in 1:length(training_folds)){
+      cat(paste0("|--- Fold ", fold, " ---| \n"))
+      cat("percent in training vs. testing: \n ")
+      print(nrow(dat_gbs_all_clim[training_folds[[fold]], ])/nrow(dat_gbs_all_clim))
+      print(nrow(dat_gbs_all_clim[-training_folds[[fold]], ])/nrow(dat_gbs_all_clim))
+
+      cat("Number of accessions in training that are in testing \n ")
+      print(sum(unique(dat_gbs_all_clim$accession[training_folds[[fold]]]) %in%
+                  unique(dat_gbs_all_clim$accession[-training_folds[[fold]]])))
+      x = x + 1
+    }
+
+    
+## 10 fold validation across families    
+    set.seed(300)
+
+    training_folds <-  caret::createFolds(factor(dat_gbs_all_clim$accession),
+                                              k = 10, returnTrain = T)
+
+    ## Check on folds
+    x = 1
+    for(fold in 1:length(training_folds)){
+      cat(paste0("|--- Fold ", fold, " ---| \n"))
+      cat("percent in training vs. testing: \n ")
+      print(nrow(dat_gbs_all_clim[training_folds[[fold]], ])/nrow(dat_gbs_all_clim))
+      print(nrow(dat_gbs_all_clim[-training_folds[[fold]], ])/nrow(dat_gbs_all_clim))
+
+      cat("Number of accessions in training that are in testing \n ")
+      print(sum(unique(dat_gbs_all_clim$accession[training_folds[[fold]]]) %in%
+            unique(dat_gbs_all_clim$accession[-training_folds[[fold]]])))
+      x = x + 1
+    }
+    
+    
+    
+### Run full model and save out residuals for cluster analysis
+  
+  fixed_effects <- paste0(paste0("rgr ~ section_block + s(height_2014, bs=\"cr\") + s(tmax_sum_dif, bs=\"cr\") + s(accession, bs = \"re\") + s(locality, bs = \"re\") + s(PC1_gen, bs=\"cr\") + s(PC2_gen, bs=\"cr\")  + s(tmax_sum_dif, by = PC1_gen, bs=\"cr\") + s(tmax_sum_dif, by = PC2_gen, bs=\"cr\") + s(PC1_clim, bs=\"cr\") + s(PC2_clim, bs=\"cr\")  + s(tmax_sum_dif, by = PC1_clim, bs=\"cr\") + s(tmax_sum_dif, by = PC2_clim, bs=\"cr\")"))
+
+  
+  # Gam with interaction effect
+  gam_snp_all = bam(formula = formula(fixed_effects),
+                    data = dat_snp_all,
+                    discrete = FALSE, 
+                    nthreads = 8,
+                    method = "fREML",
+                    family = "tw",
+                    control = list(trace = FALSE))
+  
+  summary(gam_snp_all)
+  
+  dat_snp_all$rgr_resids <- resid(gam_snp_all)
+  dat_snp_all_unscaled$rgr_resids <- resid(gam_snp_all)
+  hist(dat_snp_all$rgr_resids, breaks = 50)
+  
+  # save.image(paste0("./output/gam_cluster_", Sys.Date(), ".Rdata"))
 
 
  

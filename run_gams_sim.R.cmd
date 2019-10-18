@@ -18,7 +18,7 @@
 #  program output  = Specified by user program
 #  Threaded:     8-way threaded
 #  Resources requested
-#$ -l h_data=4096M,h_rt=06:00:00
+#$ -l h_data=4096M,h_rt=02:00:00
 # #
 #  Name of application for log
 #$ -v QQAPP=job
@@ -30,14 +30,15 @@
 #$ -r n
 #
 #  Job array indexes
-#$ -t 1-12358:25
-# 12358 Snps after iterative filtering
+#$ -t 1-12000:100
 
 # Set variable that will be passed to R script
 # Interval needs to match what is set in Job array indexes
 
-set run_label="rgr_10fold_notacross_seed229"
-set interval=25
+#set run_label="XXX"
+#set data_file="XXX"
+
+set interval=100
 set climate_var_dif='tmax_sum_dif'
 
 
@@ -51,7 +52,7 @@ set climate_var_dif='tmax_sum_dif'
   set qqidir    = /u/flashscratch/flashscratch2/l/lukembro/qlobata_growth
   set qqjob     = run_gams.R
   set qqodir    = /u/flashscratch/flashscratch2/l/lukembro/qlobata_growth
-  cd     /u/flashscratch/flashscratch2/l/lukembro/qlobata_growth
+ # cd     /u/flashscratch/flashscratch2/l/lukembro/qlobata_growth
   source /u/local/bin/qq.sge/qr.runtime
   if ($status != 0) exit (1)
 #
@@ -79,9 +80,9 @@ set climate_var_dif='tmax_sum_dif'
 
 # Make directories and copy over R file
 mkdir run_${JOB_ID}_${climate_var_dif}_{$run_label}
-cp ./run_gams.R ./run_${JOB_ID}_${climate_var_dif}_{$run_label}
-cp ./run_gams.R.cmd ./run_${JOB_ID}_${climate_var_dif}_{$run_label}
-cp ./gam_cluster_2*.Rdata ./run_${JOB_ID}_${climate_var_dif}_{$run_label}
+cp ./run_gams_sim.R ./run_${JOB_ID}_${climate_var_dif}_{$run_label}
+cp ./run_gams_sim.R.cmd ./run_${JOB_ID}_${climate_var_dif}_{$run_label}
+cp ./${data_file} ./run_${JOB_ID}_${climate_var_dif}_{$run_label}
 cd ./run_${JOB_ID}_${climate_var_dif}_{$run_label}
 mkdir R_output
 mkdir output
@@ -102,7 +103,7 @@ mkdir model_predictions
   echo ""
   setenv OMP_NUM_THREADS 8
 #
-  /usr/bin/time R CMD BATCH --vanilla "--args $SGE_TASK_ID $interval $climate_var_dif" run_gams.R ./R_output/run_gams.$JOB_ID.$SGE_TASK_ID.out >& ./output/run_gams.R.output.$JOB_ID.$SGE_TASK_ID
+  /usr/bin/time R CMD BATCH --vanilla "--args $SGE_TASK_ID $interval $climate_var_dif $data_file" run_gams_sim.R ./R_output/run_gams.$JOB_ID.$SGE_TASK_ID.out >& ./output/run_gams.R.output.$JOB_ID.$SGE_TASK_ID
 #
   echo ""
   echo "Task $SGE_TASK_ID for run_gams.R finished at:  "` date `
@@ -119,4 +120,8 @@ mkdir model_predictions
   else
         cat ./logs/run_gams.R.joblog.$JOB_ID.$SGE_TASK_ID >> /u/local/apps/queue.logs/jobarray.log.multithread
   endif
+
+
+# At very end of execution - use this as a flag to move onto next step of simulation_total_analysis.sh
+
   exit (0)
